@@ -39,7 +39,7 @@ const auth = getAuth(app);
 // Para fallback rápido: informe e-mails permitidos em minúsculo.
 // Se vazio, usa somente claim admin.
 const ADMIN_EMAILS = [
-  // "seuemail@dominio.com"
+  "willianzucareli@gmail.com"
 ];
 
 const loginWrapper = document.getElementById("login-wrapper");

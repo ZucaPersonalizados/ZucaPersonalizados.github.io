@@ -1,0 +1,5 @@
+# Credenciais locais (NUNCA commite)
+config.local.js
+config.local.*.js
+firebase-key.json
+.env.local

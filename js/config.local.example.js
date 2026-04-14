@@ -20,8 +20,8 @@ export const firebaseConfig = {
   projectId: "zuca-personalizados",
   storageBucket: "zuca-personalizados.firebasestorage.app",
   messagingSenderId: "651379669151",
-  appId: "1:651379669151:web:0a0bb2c2047e7558d14aaa",
-  measurementId: "G-PR8E6LTS9K"
+  appId: "1:651379669151:web:c24d2011fe047863d14aaa",
+  measurementId: "G-464H4KJF8P"
 };
 
 console.log("✅ Configuração do Firebase carregada de config.local.js");

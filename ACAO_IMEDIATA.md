@@ -97,7 +97,7 @@ apiKey: "SUA_CHAVE_NOVA_AQUI",
 # Salve e feche (Ctrl+X, depois Y, depois Enter)
 ```
 
-✅ Feito? Marque aqui: [ ]
+✅ Feito? Marque aqui: [x]
 
 ---
 
@@ -127,7 +127,7 @@ grep -r "AIzaSyDP3XJYquHpbKHNt1gvQOZS1--b0CXfknw" js/
 # SE HOUVER RESULTADO: reexecute os passos 1-5
 ```
 
-✅ Verificado? Marque aqui: [ ]
+✅ Verificado? Marque aqui: [x]
 
 ---
 

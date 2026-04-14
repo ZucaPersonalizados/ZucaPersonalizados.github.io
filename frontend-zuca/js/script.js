@@ -1,27 +1,15 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { db, auth } from "./firebase.js";
 import {
-  getAuth,
+  getFirestore,
+  collection,
+  getDocs
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {
   GoogleAuthProvider,
   signInWithPopup,
   signOut,
   onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-
-const firebaseConfig = {
-  apiKey: "AIzaSyDP3XJYquHpbKHNt1gvQOZS1--b0CXfknw",
-  authDomain: "zuca-personalizados.firebaseapp.com",
-  databaseURL: "https://zuca-personalizados-default-rtdb.firebaseio.com",
-  projectId: "zuca-personalizados",
-  storageBucket: "zuca-personalizados.firebasestorage.app",
-  messagingSenderId: "651379669151",
-  appId: "1:651379669151:web:0a0bb2c2047e7558d14aaa",
-  measurementId: "G-PR8E6LTS9K"
-};
-
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-const auth = getAuth(app);
 
 let filtros = {
   categoria: "todos",

@@ -30,9 +30,16 @@ build/
 temp/
 *.tmp
 
+# Backend (não deve ir para GitHub)
+src/
+server.js
+pix-server.js
+
 # Firebase
 /src/config/firebase-key.json
 firebaseKey.json
+config.local.js
+config.local.*.js
 
 # Logs
 logs/

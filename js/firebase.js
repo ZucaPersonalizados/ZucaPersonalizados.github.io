@@ -15,16 +15,20 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/fireba
 import { getFirestore } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { getAuth } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-// ⚠️ Carrega credenciais do arquivo local (não commitado)
+// ⚠️ Carrega credenciais: primeiro tenta config.local.js (dev), depois firebase.config.js (produção)
 let firebaseConfig = {};
 
 try {
-  // Tenta importar do arquivo local de configuração
-  const { firebaseConfig: config } = await import('./config.local.js').catch(() => ({}));
-  if (config) {
+  // Tenta importar do arquivo local de desenvolvimento (não commitado)
+  try {
+    const { firebaseConfig: config } = await import('./config.local.js');
     firebaseConfig = config;
-  } else {
-    throw new Error('config.local.js não encontrado');
+    console.log("✅ Firebase configurado com credenciais de DESENVOLVIMENTO (config.local.js)");
+  } catch (localError) {
+    // Se não encontrou, tenta o arquivo de produção (commitado e restrito)
+    const { firebaseConfig: config } = await import('./firebase.config.js');
+    firebaseConfig = config;
+    console.log("✅ Firebase configurado com credenciais de PRODUÇÃO (firebase.config.js)");
   }
 } catch (error) {
   console.error('❌ ERRO: Firebase não está configurado corretamente');

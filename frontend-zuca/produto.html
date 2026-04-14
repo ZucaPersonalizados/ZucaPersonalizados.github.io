@@ -2,17 +2,335 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <title>Produto</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Produto • Zuca Personalizados</title>
   <link rel="stylesheet" href="css/style.css">
+  <style>
+    /* ========== PÁGINA PRODUTO - MINIMALISTA ========== */
+    
+    .breadcrumb {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 16px 0;
+      font-size: 0.9rem;
+      color: var(--muted);
+      width: min(1120px, calc(100% - 48px));
+      margin: 0 auto;
+    }
+
+    .breadcrumb a {
+      color: var(--accent);
+      font-weight: 600;
+      transition: color 0.2s;
+    }
+
+    .breadcrumb a:hover {
+      color: var(--accent-deep);
+    }
+
+    .produto-hero {
+      width: 100%;
+      padding: 40px 0;
+      background: linear-gradient(135deg, rgba(201, 141, 89, 0.08) 0%, rgba(31, 78, 104, 0.06) 100%);
+    }
+
+    .produto-main {
+      width: min(1200px, calc(100% - 48px));
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 40px;
+      align-items: start;
+    }
+
+    /* GALERIA */
+    .produto-galeria {
+      display: flex;
+      flex-direction: row;
+      gap: 16px;
+      align-items: flex-start;
+      justify-content: flex-start;
+    }
+
+    .produto-galeria-thumb {
+      display: grid;
+      grid-template-columns: 80px;
+      grid-auto-rows: 80px;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+
+    .produto-galeria-thumb img {
+      width: 80px;
+      height: 80px;
+      aspect-ratio: 1;
+      object-fit: cover;
+      border: 2px solid var(--line);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .produto-galeria-thumb img:hover,
+    .produto-galeria-thumb img.ativa {
+      border-color: var(--accent);
+      transform: scale(1.05);
+      box-shadow: 0 4px 12px rgba(201, 141, 89, 0.25);
+    }
+
+    .produto-galeria-principal {
+      position: relative;
+      width: 400px;
+      height: 400px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      background: #fff;
+      flex-shrink: 0;
+    }
+
+    .produto-galeria-principal img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      padding: 20px;
+      transition: transform 0.3s ease;
+    }
+
+    .produto-galeria-principal:hover img {
+      transform: scale(1.05);
+    }
+
+    /* INFO */
+    .produto-info {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .produto-header {
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 16px;
+      margin-bottom: 8px;
+    }
+
+    .produto-header h1 {
+      font-size: clamp(1.5rem, 3vw, 2rem);
+      margin: 0;
+      line-height: 1.2;
+      color: var(--ink-deep);
+    }
+
+    .produto-estoque {
+      padding: 12px;
+      border-radius: var(--radius-md);
+      border-left: 4px solid #27ae60;
+      background: rgba(39, 174, 96, 0.05);
+    }
+
+    .produto-estoque #estoque-icon {
+      font-size: 1.1rem;
+    }
+
+    .produto-estoque #estoque-status {
+      font-weight: 700;
+      color: var(--ink-deep);
+      font-size: 0.95rem;
+    }
+
+    .produto-estoque #estoque-mensagem {
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+
+    .produto-preco {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding: 16px;
+      background: transparent;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-md);
+    }
+
+    .produto-preco-valor {
+      font-size: 1.8rem;
+      font-weight: 800;
+      color: var(--accent);
+    }
+
+    .produto-preco-economia {
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+
+    .produto-features {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+
+    .produto-feature {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding: 10px;
+      border-radius: var(--radius-md);
+      background: transparent;
+      border: 1px solid var(--line);
+      text-align: center;
+      align-items: center;
+    }
+
+    .produto-feature-icon {
+      font-size: 1.2rem;
+    }
+
+    .produto-feature-text {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .produto-descricao {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .produto-descricao-label {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--ink-deep);
+    }
+
+    .produto-descricao-texto {
+      font-size: 0.9rem;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    .produto-actions {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: white;
+      border: none;
+      padding: 14px 20px;
+      border-radius: 6px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      flex: 1;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      background: #b8825a;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(201, 141, 89, 0.25);
+    }
+
+    .btn-primary:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .btn-favorito {
+      width: 56px;
+      height: 56px;
+      border: 1px solid var(--line);
+      background: transparent;
+      border-radius: 6px;
+      font-size: 1.5rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .btn-favorito:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    /* SEÇÃO DESCRIÇÃO COMPLETA */
+    .produto-detalhes {
+      display: none;
+    }
+
+    .produto-especificacoes {
+      display: none;
+    }
+
+    /* RESPONSIVO */
+    @media (max-width: 1024px) {
+      .produto-main {
+        grid-template-columns: 1fr;
+        gap: 30px;
+      }
+
+      .produto-galeria {
+        flex-direction: row;
+        gap: 16px;
+      }
+
+      .produto-galeria-thumb {
+        grid-template-columns: repeat(4, 80px);
+        grid-auto-rows: 80px;
+      }
+
+      .produto-galeria-principal {
+        width: 350px;
+        height: 350px;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .produto-main {
+        grid-template-columns: 1fr;
+        gap: 30px;
+      }
+
+      .produto-galeria {
+        flex-direction: column;
+        align-items: center;
+      }
+
+      .produto-galeria-thumb {
+        grid-template-columns: repeat(5, 70px);
+        grid-auto-rows: 70px;
+      }
+
+      .produto-galeria-principal {
+        width: 300px;
+        height: 300px;
+      }
+
+      .produto-detalhes {
+        grid-template-columns: 1fr;
+        margin: 40px auto;
+      }
+
+      .produto-features {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
 </head>
 
 <body>
 
 <header class="header">
-  <div class="container">
-
+  <div class="container header-shell">
     <div class="logo-area">
-      <img src="img/logo/logo.png" alt="Zuca">
+      <img src="img/logo/logo.png" alt="Zuca Personalizados">
       <div class="text">
         <h1>Zuca Personalizados</h1>
         <span>Personalizados que fazem a diferença</span>
@@ -20,60 +338,303 @@
     </div>
 
     <nav class="menu">
-      <a href="/">Início</a>
-      <a href="/#produtos">Produtos</a>
-      <a href="/#sobre">Sobre</a>
-      <a href="/#contato">Contato</a>
+      <a href="index.html">Início</a>
+      <a href="index.html#produtos">Produtos</a>
+      <a href="index.html#sobre">Sobre</a>
+      <a href="index.html#contato">Contato</a>
     </nav>
 
-    <a href="https://wa.me/5567984381778" class="btn-whatsapp">
-      WhatsApp
-    </a>
+    <div class="header-actions">
+      <button id="btn-cart" class="btn-cart-header" type="button" aria-label="Abrir carrinho">
+        <svg class="cart-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <circle cx="9" cy="21" r="1"></circle>
+          <circle cx="20" cy="21" r="1"></circle>
+          <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+        </svg>
+        <span id="cart-count" class="cart-count">0</span>
+      </button>
 
+      <div class="avatar-menu">
+        <button id="btn-avatar" type="button" class="avatar-btn" aria-haspopup="true" aria-expanded="false">
+          <span id="avatar-label">Entrar</span>
+        </button>
+        <div id="avatar-dropdown" class="avatar-dropdown">
+          <button id="btn-login-google" type="button">Entrar com Google</button>
+          <button id="btn-logout-user" type="button">Sair</button>
+          <a href="checkout.html">Minha conta</a>
+        </div>
+      </div>
+    </div>
   </div>
 </header>
 
-<section class="produto-detalhe">
+<!-- BREADCRUMB -->
+<div class="breadcrumb">
+  <a href="index.html">Início</a>
+  <span>/</span>
+  <a href="index.html#produtos">Produtos</a>
+  <span>/</span>
+  <span id="breadcrumb-produto">Produto</span>
+</div>
 
-  <div class="produto-container">
-
-    <!-- ESQUERDA -->
-    <div class="galeria">
-
-      <div class="miniaturas"></div>
-      
-      <div class="imagem-container">
-        <img id="imagem-principal" src="">
+  <!-- PRODUTO MAIN -->
+  <main>
+    <div class="produto-main">
+    
+    <!-- GALERIA -->
+    <div class="produto-galeria">
+      <div class="produto-galeria-thumb" id="miniaturas"></div>
+      <div class="produto-galeria-principal">
+        <img id="imagem-principal" src="" alt="Produto">
       </div>
-  
     </div>
-  
-    <!-- DIREITA -->
-    <div class="info">
-  
-      <h1 id="nome"></h1>
-  
-      <p class="preco" id="preco"></p>
-  
-      <p class="descricao" id="descricao"></p>
-  
-      <button id="btn-adicionar-carrinho" class="btn-carrinho">
-        Adicionar ao carrinho
-      </button>
-  
+
+    <!-- INFO -->
+    <div class="produto-info">
+      
+      <div class="produto-header">
+        <h1 id="nome">Carregando...</h1>
+      </div>
+
+      <div class="produto-preco">
+        <div class="produto-preco-valor" id="preco">R$ 0,00</div>
+        <div class="produto-preco-economia">Em até 3x sem juros</div>
+      </div>
+
+      <!-- DISPONIBILIDADE DE ESTOQUE -->
+      <div id="estoque-container" class="produto-estoque">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span id="estoque-icon">✓</span>
+          <div>
+            <div id="estoque-status">Carregando...</div>
+            <div id="estoque-mensagem"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="produto-descricao">
+        <div class="produto-descricao-label">Sobre este produto</div>
+        <div class="produto-descricao-texto" id="descricao">Carregando descrição...</div>
+      </div>
+
+      <div class="produto-features">
+        <div class="produto-feature">
+          <div class="produto-feature-icon">✓</div>
+          <div class="produto-feature-text">Personalização Exclusiva</div>
+        </div>
+        <div class="produto-feature">
+          <div class="produto-feature-icon">🚚</div>
+          <div class="produto-feature-text">Frete Rápido</div>
+        </div>
+        <div class="produto-feature">
+          <div class="produto-feature-icon">🛡️</div>
+          <div class="produto-feature-text">Garantia 12 Meses</div>
+        </div>
+      </div>
+
+      <div class="produto-actions">
+        <button id="btn-adicionar-carrinho" class="btn-primary">
+          🛒 Adicionar ao carrinho
+        </button>
+        <button class="btn-favorito" title="Adicionar aos favoritos">
+          ♡
+        </button>
+      </div>
+
     </div>
-  
-  </div>
 
-  <!-- DESCRIÇÃO GRANDE -->
-  <div class="descricao-longa">
-    <h2>Descrição do produto</h2>
-    <p id="descricao-completa"></p>
   </div>
+</main>
 
-</section>
-  
-<script type="module" src="js/produto.js"></script>
-  
+<!-- FOOTER -->
+<footer class="footer">
+  <div class="footer-container">
+    <div class="footer-column">
+      <h4>Zuca Personalizados</h4>
+      <p style="font-size: 0.9rem; margin: 8px 0; color: var(--muted);">Personalizados que fazem a diferença</p>
+      <p style="font-size: 0.85rem; margin: 8px 0; color: var(--muted);">📞 (67) 9 8438-1778</p>
+    </div>
+    <div class="footer-column">
+      <h4>Navegação</h4>
+      <a href="index.html">Início</a>
+      <a href="index.html#produtos">Produtos</a>
+      <a href="index.html#sobre">Sobre</a>
+      <a href="index.html#contato">Contato</a>
+    </div>
+    <div class="footer-column">
+      <h4>Suporte</h4>
+      <a href="https://wa.me/5567984381778" target="_blank">WhatsApp</a>
+      <a href="mailto:contato@zuca.com">Email</a>
+    </div>
+  </div>
+  <div style="text-align: center; padding-top: 24px; border-top: 1px solid var(--line); font-size: 0.85rem; color: var(--muted);">
+    © 2026 Zuca Personalizados. Todos os direitos reservados.
+  </div>
+</footer>
+
+  <script type="module">
+  import { db } from "./js/firebase.js";
+  import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+  // Função para formatar moeda
+  const formatarMoeda = (valor) => {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL'
+    }).format(valor);
+  };
+
+  // Função para atualizar UI de estoque
+  const atualizarEstoqueUI = (estoque) => {
+    const container = document.getElementById("estoque-container");
+    const icon = document.getElementById("estoque-icon");
+    const status = document.getElementById("estoque-status");
+    const mensagem = document.getElementById("estoque-mensagem");
+    const botaoCarrinho = document.getElementById("btn-adicionar-carrinho");
+
+    if (estoque > 0) {
+      // EM ESTOQUE
+      container.style.borderColor = "#27ae60";
+      container.style.background = "rgba(39, 174, 96, 0.05)";
+      icon.textContent = "✓";
+      icon.style.color = "#27ae60";
+      status.textContent = "Em Estoque";
+      status.style.color = "#27ae60";
+      
+      if (estoque <= 3) {
+        mensagem.textContent = `⚠️ Apenas ${estoque} unidade${estoque !== 1 ? 's' : ''} disponível${estoque !== 1 ? 's' : ''}`;
+        mensagem.style.color = "#e67e22";
+      } else {
+        mensagem.textContent = `${estoque} unidades disponíveis`;
+        mensagem.style.color = "var(--muted)";
+      }
+      
+      botaoCarrinho.disabled = false;
+      botaoCarrinho.style.opacity = "1";
+      botaoCarrinho.style.cursor = "pointer";
+    } else {
+      // FORA DE ESTOQUE
+      container.style.borderColor = "#e74c3c";
+      container.style.background = "rgba(231, 76, 60, 0.05)";
+      icon.textContent = "✗";
+      icon.style.color = "#e74c3c";
+      status.textContent = "Fora de Estoque";
+      status.style.color = "#e74c3c";
+      mensagem.textContent = "Produto indisponível no momento";
+      mensagem.style.color = "var(--muted)";
+      
+      botaoCarrinho.textContent = "❌ Fora de Estoque";
+      botaoCarrinho.disabled = true;
+      botaoCarrinho.style.opacity = "0.5";
+      botaoCarrinho.style.cursor = "not-allowed";
+      botaoCarrinho.style.background = "linear-gradient(135deg, #95a5a6 0%, #7f8c8d 100%)";
+    }
+  };
+
+  async function carregarProduto() {
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get("id");
+
+    if (!id) {
+      document.body.innerHTML = "<div style='text-align:center; padding: 100px;'><h2>Produto não encontrado</h2><p><a href='index.html'>Voltar para início</a></p></div>";
+      return;
+    }
+
+    try {
+      const docRef = doc(db, "produtos", id);
+      const docSnap = await getDoc(docRef);
+
+      if (!docSnap.exists()) {
+        document.body.innerHTML = "<div style='text-align:center; padding: 100px;'><h2>Produto não encontrado</h2><p><a href='index.html'>Voltar para início</a></p></div>";
+        return;
+      }
+
+      const produto = docSnap.data();
+
+      // Preenchendo dados
+      document.getElementById("nome").textContent = produto.nome || "Sem nome";
+      document.getElementById("breadcrumb-produto").textContent = produto.nome || "Produto";
+      document.getElementById("preco").textContent = formatarMoeda(produto.preco || 0);
+      document.getElementById("descricao").textContent = produto.descricaoCurta || "Descrição não disponível";
+
+      // Atualizar UI de estoque
+      const estoque = produto.estoque || 0;
+      atualizarEstoqueUI(estoque);
+
+      // Galeria
+      const imagens = Array.isArray(produto.imagens) ? produto.imagens : [];
+      const imgPrincipal = document.getElementById("imagem-principal");
+      const miniaturas = document.getElementById("miniaturas");
+
+      if (imagens.length > 0) {
+        imgPrincipal.src = imagens[0];
+      }
+
+      imagens.forEach((img, index) => {
+        const thumb = document.createElement("img");
+        thumb.src = img;
+        if (index === 0) thumb.classList.add("ativa");
+        thumb.addEventListener("click", () => {
+          imgPrincipal.src = img;
+          document.querySelectorAll("#miniaturas img").forEach(i => i.classList.remove("ativa"));
+          thumb.classList.add("ativa");
+        });
+        miniaturas.appendChild(thumb);
+      });
+
+      // Botão carrinho com validação de estoque
+      document.getElementById("btn-adicionar-carrinho").addEventListener("click", () => {
+        // Validar estoque
+        if (estoque <= 0) {
+          alert("❌ Este produto está fora de estoque");
+          return;
+        }
+
+        const carrinho = JSON.parse(localStorage.getItem("zuca_carrinho") || "[]");
+        const existe = carrinho.find(item => item.id === produto.id);
+        
+        // Validar quantidade no carrinho
+        const quantidadeNoCarrinho = existe ? existe.quantidade : 0;
+        const quantidadeTentada = quantidadeNoCarrinho + 1;
+
+        if (quantidadeTentada > estoque) {
+          alert(`❌ Máximo de ${estoque} unidade(s) disponível(is). Você já tem ${quantidadeNoCarrinho} no carrinho.`);
+          return;
+        }
+        
+        if (existe) {
+          existe.quantidade += 1;
+        } else {
+          carrinho.push({
+            id: produto.id,
+            nome: produto.nome,
+            preco: produto.preco,
+            imagem: imagens[0] || "",
+            quantidade: 1
+          });
+        }
+        
+        localStorage.setItem("zuca_carrinho", JSON.stringify(carrinho));
+        
+        const btn = document.getElementById("btn-adicionar-carrinho");
+        const original = btn.textContent;
+        btn.textContent = "✓ Adicionado!";
+        btn.style.background = "linear-gradient(135deg, #27ae60 0%, #229954 100%)";
+        
+        setTimeout(() => {
+          btn.textContent = original;
+          btn.style.background = "";
+        }, 2000);
+      });
+
+    } catch (error) {
+      console.error("Erro ao carregar produto:", error);
+      document.body.innerHTML = "<div style='text-align:center; padding: 100px;'><h2>Erro ao carregar produto</h2><p><a href='index.html'>Voltar para início</a></p></div>";
+    }
+  }
+
+    carregarProduto();
+  </script>
+
 </body>
 </html>

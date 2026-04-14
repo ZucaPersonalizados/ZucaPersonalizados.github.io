@@ -72,3 +72,14 @@ Acesse: `http://localhost:8000`
 - **Frontend:** HTML5, CSS3, JavaScript vanilla
 - **Banco de dados:** Firebase Firestore
 - **Autenticação:** Firebase Auth
+
+## 💳 Configuração Mercado Pago
+
+Para integração completa de pagamentos com cartão:
+
+1. Acesse: https://www.mercadopago.com.br/developers/panel
+2. Copie suas credenciais (Access Token + Public Key)
+3. Cole no arquivo `.env`
+4. Reinicie o servidor
+
+Veja [MERCADO_PAGO_SETUP.md](./MERCADO_PAGO_SETUP.md) para detalhes completos e credenciais de teste.

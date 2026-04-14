@@ -7,8 +7,22 @@ import cors from "cors";
 import axios from "axios";
 import QRCode from "qrcode";
 import dotenv from "dotenv";
+import admin from "firebase-admin";
+import fs from "fs";
 
 dotenv.config();
+
+// ==================== FIREBASE CONFIG ====================
+const firebaseKeyPath = process.env.FIREBASE_KEY_PATH || "./config/firebase-key.json";
+if (fs.existsSync(firebaseKeyPath)) {
+  const serviceAccount = JSON.parse(fs.readFileSync(firebaseKeyPath, "utf8"));
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount)
+  });
+} else {
+  console.warn("⚠️  Firebase key not found, webhook updates disabled");
+}
+const db = admin.firestore?.();
 
 const app = express();
 app.use(cors());
@@ -22,6 +36,14 @@ const mpPublicKey = process.env.MP_PUBLIC_KEY || "APP_USER_ID1234567890";
 // ==================== HEALTH CHECK ====================
 app.get("/health", (req, res) => {
   res.json({ status: "✓ Servidor PIX rodando", timestamp: new Date().toISOString() });
+});
+
+// ==================== CONFIG MERCADO PAGO ====================
+app.get("/config-mercadopago", (req, res) => {
+  res.json({ 
+    publicKey: mpPublicKey,
+    configured: !!process.env.MP_PUBLIC_KEY && !!process.env.MP_ACCESS_TOKEN
+  });
 });
 
 // ==================== GERAR PIX DINÂMICO ====================
@@ -177,6 +199,80 @@ app.post("/webhook-pix", async (req, res) => {
   } catch (error) {
     console.error("[WEBHOOK] Erro:", error.message);
     res.status(500).json({ error: "Erro ao processar webhook" });
+  }
+});
+
+// ==================== VERIFICAR PAGAMENTO E ATUALIZAR FIRESTORE ====================
+app.post("/verificar-pagamento", async (req, res) => {
+  try {
+    const { idPedido } = req.body;
+    if (!idPedido || !db) {
+      return res.status(400).json({ 
+        success: false, 
+        error: "ID do pedido inválido ou Firebase não configurado"
+      });
+    }
+
+    console.log(`[VERIFICAR] Atualizando status de pagamento para pedido: ${idPedido}`);
+
+    // Buscar dados do pedido para decrementar estoque
+    const pedidoRef = db.collection("pedidos").doc(idPedido);
+    const pedidoSnap = await pedidoRef.get();
+
+    if (!pedidoSnap.exists()) {
+      return res.status(404).json({ 
+        success: false, 
+        error: "Pedido não encontrado"
+      });
+    }
+
+    const pedidoData = pedidoSnap.data();
+    const itens = pedidoData.itens || [];
+
+    // Atualizar status do pedido
+    await pedidoRef.update({
+      status: "pagto",
+      pagamentoVerificadoEm: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    console.log(`✓ Pagamento verificado para pedido ${idPedido}`);
+
+    // Decrementar estoque de cada item
+    if (itens.length > 0) {
+      console.log(`[ESTOQUE] Decrementando estoque para ${itens.length} itens...`);
+      
+      for (const item of itens) {
+        try {
+          const produtoRef = db.collection("produtos").doc(item.id);
+          const produtoSnap = await produtoRef.get();
+
+          if (produtoSnap.exists()) {
+            const estoqueAtual = produtoSnap.data().estoque || 0;
+            const novoEstoque = Math.max(0, estoqueAtual - item.quantidade);
+
+            await produtoRef.update({
+              estoque: novoEstoque,
+              ultimaAtualizacaoEstoque: admin.firestore.FieldValue.serverTimestamp()
+            });
+
+            console.log(`  ✓ ${item.nome}: ${estoqueAtual} → ${novoEstoque} unidades`);
+          }
+        } catch (erro) {
+          console.error(`  ✗ Erro ao atualizar estoque de ${item.id}:`, erro.message);
+        }
+      }
+    }
+
+    res.json({ 
+      success: true, 
+      message: "Pagamento verificado e estoque atualizado"
+    });
+  } catch (error) {
+    console.error("[VERIFICAR] Erro:", error.message);
+    res.status(500).json({ 
+      success: false,
+      error: "Erro ao atualizar status de pagamento" 
+    });
   }
 });
 

@@ -7,8 +7,8 @@
   <link rel="stylesheet" href="css/style.css" />
   <style>
     .checkout-wrap { max-width: 1100px; margin: 30px auto; padding: 0 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-    .checkout-card { background: #fff; border-radius: 12px; box-shadow: 0 5px 20px rgba(0,0,0,.06); padding: 20px; }
-    .checkout-card h2 { margin-top: 0; }
+    .checkout-card { background: #fff; border-radius: 8px; border: 1px solid var(--line); padding: 24px; }
+    .checkout-card h2 { margin-top: 0; font-size: 1.3rem; color: var(--ink-deep); border-bottom: 1px solid var(--line); padding-bottom: 16px; margin-bottom: 16px; }
     .checkout-grid { display: grid; gap: 10px; }
     .checkout-grid input, .checkout-grid select { width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #ddd; font-family: inherit; font-size: 14px; }
     .checkout-grid input:focus, .checkout-grid select:focus { outline: none; border-color: #c98d59; box-shadow: 0 0 0 3px rgba(201, 141, 89, 0.1); }
@@ -31,19 +31,48 @@
   </style>
 </head>
 <body>
+  <div class="top-ribbon">
+    Papelaria criativa com acabamento profissional e envio para todo o Brasil.
+  </div>
+
   <header class="header">
-    <div class="container">
+    <div class="container header-shell">
       <div class="logo-area">
-        <img src="img/logo/logo.png" alt="Zuca" />
+        <img src="img/logo/logo.png" alt="Zuca Personalizados">
         <div class="text">
           <h1>Zuca Personalizados</h1>
-          <span>Checkout e conta</span>
+          <span>Personalizados que fazem a diferença</span>
         </div>
       </div>
+
       <nav class="menu">
-        <a href="/">Início</a>
-        <a href="/checkout.html">Checkout</a>
+        <a href="index.html">Início</a>
+        <a href="index.html#produtos">Produtos</a>
+        <a href="index.html#sobre">Sobre</a>
+        <a href="index.html#contato">Contato</a>
       </nav>
+
+      <div class="header-actions">
+        <button id="btn-cart" class="btn-cart-header" type="button" aria-label="Abrir carrinho">
+          <svg class="cart-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <circle cx="9" cy="21" r="1"></circle>
+            <circle cx="20" cy="21" r="1"></circle>
+            <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+          </svg>
+          <span id="cart-count" class="cart-count">0</span>
+        </button>
+
+        <div class="avatar-menu">
+          <button id="btn-avatar" type="button" class="avatar-btn" aria-haspopup="true" aria-expanded="false">
+            <span id="avatar-label">Entrar</span>
+          </button>
+          <div id="avatar-dropdown" class="avatar-dropdown">
+            <button id="btn-login-google" type="button">Entrar com Google</button>
+            <button id="btn-logout-user" type="button">Sair</button>
+            <a href="checkout.html">Minha conta</a>
+          </div>
+        </div>
+      </div>
     </div>
   </header>
 
@@ -113,7 +142,6 @@
 
       <div class="checkout-grid">
         <textarea id="observacoes" placeholder="Observações do pedido (opcional)" style="min-height: 60px; resize: vertical;"></textarea>
-        <input id="cupom" placeholder="Cupom de desconto (opcional)" />
       </div>
 
       <div style="background: #fff8f0; border-left: 4px solid #c98d59; padding: 10px; margin: 15px 0; border-radius: 4px;">
@@ -141,6 +169,32 @@
       <div id="lista-pedidos"></div>
     </aside>
   </main>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <div class="footer-container">
+      <div class="footer-column">
+        <h4>Zuca Personalizados</h4>
+        <p style="font-size: 0.9rem; margin: 8px 0; color: var(--muted);">Personalizados que fazem a diferença</p>
+        <p style="font-size: 0.85rem; margin: 8px 0; color: var(--muted);">📞 (67) 9 8438-1778</p>
+      </div>
+      <div class="footer-column">
+        <h4>Navegação</h4>
+        <a href="index.html">Início</a>
+        <a href="index.html#produtos">Produtos</a>
+        <a href="index.html#sobre">Sobre</a>
+        <a href="index.html#contato">Contato</a>
+      </div>
+      <div class="footer-column">
+        <h4>Suporte</h4>
+        <a href="https://wa.me/5567984381778" target="_blank">WhatsApp</a>
+        <a href="mailto:contato@zuca.com">Email</a>
+      </div>
+    </div>
+    <div style="text-align: center; padding-top: 24px; border-top: 1px solid var(--line); font-size: 0.85rem; color: var(--muted);">
+      © 2026 Zuca Personalizados. Todos os direitos reservados.
+    </div>
+  </footer>
 
   <!-- Mercado Pago SDK -->
   <script src="https://sdk.mercadopago.com/js/v2"></script>

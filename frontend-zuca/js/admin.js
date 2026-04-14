@@ -1,100 +1,64 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { db, auth } from "./firebase.js";
 import {
   getFirestore,
   collection,
   getDocs,
   doc,
-  setDoc,
-  deleteDoc,
-  getDoc,
-  addDoc,
   updateDoc,
   query,
-  orderBy,
-  limit
+  orderBy
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {
-  getAuth,
   signInWithEmailAndPassword,
   onAuthStateChanged,
   signOut,
   sendPasswordResetEmail
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-const firebaseConfig = {
-  apiKey: "AIzaSyDP3XJYquHpbKHNt1gvQOZS1--b0CXfknw",
-  authDomain: "zuca-personalizados.firebaseapp.com",
-  databaseURL: "https://zuca-personalizados-default-rtdb.firebaseio.com",
-  projectId: "zuca-personalizados",
-  storageBucket: "zuca-personalizados.firebasestorage.app",
-  messagingSenderId: "651379669151",
-  appId: "1:651379669151:web:0a0bb2c2047e7558d14aaa",
-  measurementId: "G-PR8E6LTS9K"
-};
+const ADMIN_EMAILS = ["willianzucareli@gmail.com"];
 
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-const auth = getAuth(app);
-
-// Para fallback rápido: informe e-mails permitidos em minúsculo.
-// Se vazio, usa somente claim admin.
-const ADMIN_EMAILS = [
-  "willianzucareli@gmail.com"
-];
-
+// === DOM ELEMENTS ===
 const loginWrapper = document.getElementById("login-wrapper");
 const adminWrapper = document.getElementById("admin-wrapper");
-const loginEmail = document.getElementById("login-email");
-const loginSenha = document.getElementById("login-senha");
 const btnLogin = document.getElementById("btn-login");
 const btnEsqueciSenha = document.getElementById("btn-esqueci-senha");
 const btnLogout = document.getElementById("btn-logout");
+const loginEmail = document.getElementById("login-email");
+const loginSenha = document.getElementById("login-senha");
 const loginStatusEl = document.getElementById("login-status");
+const userInfoEl = document.getElementById("user-info");
+const detailsModal = document.getElementById("details-modal");
+const modalBody = document.getElementById("modal-body");
+const dashboardStats = document.getElementById("dashboard-stats");
+const pedidosList = document.getElementById("pedidos-list");
+const filtroStatus = document.getElementById("filtro-status");
+const btnRecarregar = document.getElementById("btn-recarregar-pedidos");
 
-const form = document.getElementById("form-produto");
-const statusEl = document.getElementById("status");
-const listaEl = document.getElementById("lista-produtos");
-const btnExcluir = document.getElementById("btn-excluir");
-const btnNovo = document.getElementById("btn-novo");
-const btnSubmit = document.getElementById("btn-submit");
-const listaPedidosAdminEl = document.getElementById("lista-pedidos-admin");
-const listaCuponsAdminEl = document.getElementById("lista-cupons-admin");
-const formCupom = document.getElementById("form-cupom");
-
-let produtoEditandoId = null;
+// === STATE ===
 let currentUser = null;
 let isAdminUser = false;
+let allOrders = [];
 
-function setStatus(message, type = "") {
-  statusEl.textContent = message;
-  statusEl.className = `status ${type}`.trim();
-}
-
-function setLoginStatus(message, type = "") {
-  loginStatusEl.textContent = message;
-  loginStatusEl.className = `status ${type}`.trim();
-}
-
+// === AUTH HELPERS ===
 function showLogin() {
-  loginWrapper.hidden = false;
-  adminWrapper.hidden = true;
+  loginWrapper.style.display = "flex";
+  adminWrapper.style.display = "none";
 }
 
 function showAdmin() {
-  loginWrapper.hidden = true;
-  adminWrapper.hidden = false;
+  loginWrapper.style.display = "none";
+  adminWrapper.style.display = "flex";
+  adminWrapper.style.flexDirection = "column";
 }
 
-function isPermissionDenied(error) {
-  return error?.code === "permission-denied";
+function setLoginStatus(message, type = "") {
+  loginStatusEl.className = type ? `status-box ${type}` : "status-box";
+  loginStatusEl.textContent = message;
+  loginStatusEl.style.display = message ? "block" : "none";
 }
 
 function isEmailAdmin(user) {
-  if (!user?.email || ADMIN_EMAILS.length === 0) {
-    return false;
-  }
-
-  return ADMIN_EMAILS.includes(user.email.toLowerCase());
+  return user?.email && ADMIN_EMAILS.includes(user.email.toLowerCase());
 }
 
 async function isClaimAdmin(user) {
@@ -107,199 +71,8 @@ async function validarPermissaoAdmin(user) {
   return byClaim || isEmailAdmin(user);
 }
 
-function handleFirebaseError(error, fallbackMessage) {
-  console.error(error);
-
-  if (isPermissionDenied(error)) {
-    setStatus(
-      "Sem permissão no Firestore. Verifique as regras e claim admin do usuário.",
-      "error"
-    );
-    return;
-  }
-
-  setStatus(error?.message || fallbackMessage, "error");
-}
-
-function limparFormulario(resetStatus = true) {
-  form.reset();
-  produtoEditandoId = null;
-  btnSubmit.textContent = "Salvar produto";
-  btnExcluir.style.display = "none";
-  document.getElementById("id").readOnly = false;
-  if (resetStatus) {
-    setStatus("Pronto para cadastrar.");
-  }
-}
-
-function obterProdutoDoFormulario() {
-  const id = document.getElementById("id").value.trim();
-
-  if (!id) {
-    throw new Error("Informe um ID de produto válido.");
-  }
-
-  return {
-    id,
-    nome: document.getElementById("nome").value.trim(),
-    preco: document.getElementById("preco").value.trim(),
-    categoria: document.getElementById("categoria").value.trim(),
-    tipo: document.getElementById("tipo").value.trim(),
-    tamanho: document.getElementById("tamanho").value.trim(),
-    gramatura: document.getElementById("gramatura").value.trim(),
-    descricaoCurta: document.getElementById("descricaoCurta").value.trim(),
-    descricaoLonga: document.getElementById("descricaoLonga").value.trim(),
-    link: document.getElementById("link").value.trim(),
-    imagens: (document.getElementById("imagens").value || "")
-      .split(",")
-      .map((img) => img.trim())
-      .filter(Boolean),
-    personalizado: document.getElementById("personalizado").checked,
-    atualizadoEm: new Date().toISOString()
-  };
-}
-
-function preencherFormulario(produto) {
-  document.getElementById("id").value = produto.id || "";
-  document.getElementById("nome").value = produto.nome || "";
-  document.getElementById("preco").value = produto.preco || "";
-  document.getElementById("categoria").value = produto.categoria || "";
-  document.getElementById("tipo").value = produto.tipo || "";
-  document.getElementById("tamanho").value = produto.tamanho || "";
-  document.getElementById("gramatura").value = produto.gramatura || "";
-  document.getElementById("descricaoCurta").value = produto.descricaoCurta || "";
-  document.getElementById("descricaoLonga").value = produto.descricaoLonga || "";
-  document.getElementById("link").value = produto.link || "";
-  document.getElementById("imagens").value = Array.isArray(produto.imagens)
-    ? produto.imagens.join(", ")
-    : "";
-  document.getElementById("personalizado").checked = Boolean(produto.personalizado);
-}
-
-async function listarProdutos() {
-  listaEl.innerHTML = "<p class='product-meta'>Carregando produtos...</p>";
-
-  try {
-    const snapshot = await getDocs(collection(db, "produtos"));
-
-    if (snapshot.empty) {
-      listaEl.innerHTML = "<p class='product-meta'>Nenhum produto cadastrado ainda.</p>";
-      return;
-    }
-
-    const produtos = snapshot.docs.map((item) => {
-      const data = item.data();
-      const resolvedId = data.id || item.id;
-      return { ...data, id: resolvedId };
-    });
-
-    produtos.sort((a, b) => (a.nome || "").localeCompare(b.nome || "", "pt-BR"));
-
-    listaEl.innerHTML = produtos
-      .map(
-        (produto) => `
-          <article class="product-item" data-id="${produto.id}">
-            <h3>${produto.nome || "Sem nome"}</h3>
-            <p class="product-meta">ID: ${produto.id || "-"}</p>
-            <p class="product-meta">Categoria: ${produto.categoria || "-"} • Preço: ${produto.preco || "-"}</p>
-            <div class="item-actions">
-              <button type="button" class="btn-secondary" data-action="editar" data-id="${produto.id}">Editar</button>
-            </div>
-          </article>
-        `
-      )
-      .join("");
-  } catch (error) {
-    listaEl.innerHTML = "<p class='product-meta'>Erro ao carregar produtos.</p>";
-    handleFirebaseError(error, "Erro ao carregar lista de produtos.");
-  }
-}
-
-async function carregarProdutoPorId(id) {
-  const referencia = doc(db, "produtos", id);
-  const snapshot = await getDoc(referencia);
-
-  if (!snapshot.exists()) {
-    throw new Error("Produto não encontrado para edição.");
-  }
-
-  const data = snapshot.data();
-  return {
-    ...data,
-    id: data.id || snapshot.id
-  };
-}
-
-async function listarPedidosAdmin() {
-  if (!listaPedidosAdminEl) {
-    return;
-  }
-
-  listaPedidosAdminEl.innerHTML = "<p class='product-meta'>Carregando pedidos...</p>";
-
-  try {
-    const pedidosQuery = query(collection(db, "pedidos"), orderBy("criadoEm", "desc"), limit(30));
-    const snapshot = await getDocs(pedidosQuery);
-
-    if (snapshot.empty) {
-      listaPedidosAdminEl.innerHTML = "<p class='product-meta'>Nenhum pedido encontrado.</p>";
-      return;
-    }
-
-    listaPedidosAdminEl.innerHTML = snapshot.docs.map((docItem) => {
-      const pedido = docItem.data();
-      return `
-        <article class="product-item">
-          <h3>Pedido #${docItem.id.slice(0, 8)}</h3>
-          <p class="product-meta">Cliente: ${pedido?.cliente?.nome || pedido?.cliente?.email || "Não informado"}</p>
-          <p class="product-meta">Total: R$ ${Number(pedido.total || 0).toFixed(2).replace(".", ",")}</p>
-          <div class="item-actions">
-            <select data-status-id="${docItem.id}">
-              ${["recebido", "em_producao", "enviado", "entregue"].map((status) => `
-                <option value="${status}" ${pedido.status === status ? "selected" : ""}>${status.replace("_", " ")}</option>
-              `).join("")}
-            </select>
-            <button type="button" class="btn-secondary" data-action="salvar-status" data-id="${docItem.id}">Salvar status</button>
-          </div>
-        </article>
-      `;
-    }).join("");
-  } catch (error) {
-    console.error(error);
-    listaPedidosAdminEl.innerHTML = "<p class='product-meta'>Erro ao carregar pedidos.</p>";
-  }
-}
-
-async function listarCuponsAdmin() {
-  if (!listaCuponsAdminEl) {
-    return;
-  }
-
-  listaCuponsAdminEl.innerHTML = "<p class='product-meta'>Carregando cupons...</p>";
-
-  try {
-    const snapshot = await getDocs(collection(db, "cupons"));
-    if (snapshot.empty) {
-      listaCuponsAdminEl.innerHTML = "<p class='product-meta'>Nenhum cupom cadastrado.</p>";
-      return;
-    }
-
-    listaCuponsAdminEl.innerHTML = snapshot.docs.map((docItem) => {
-      const cupom = docItem.data();
-      return `
-        <article class="product-item">
-          <h3>${docItem.id}</h3>
-          <p class="product-meta">Tipo: ${cupom.tipo || "percentual"} • Valor: ${cupom.valor || 0}</p>
-        </article>
-      `;
-    }).join("");
-  } catch (error) {
-    console.error(error);
-    listaCuponsAdminEl.innerHTML = "<p class='product-meta'>Erro ao carregar cupons.</p>";
-  }
-}
-
-btnLogin?.addEventListener("click", async () => {
+// === LOGIN HANDLERS ===
+btnLogin.addEventListener("click", async () => {
   try {
     const email = loginEmail.value.trim();
     const senha = loginSenha.value;
@@ -310,19 +83,18 @@ btnLogin?.addEventListener("click", async () => {
     }
 
     await signInWithEmailAndPassword(auth, email, senha);
-    setLoginStatus("Login realizado com sucesso.", "ok");
   } catch (error) {
     console.error(error);
     setLoginStatus("Falha no login. Verifique e-mail e senha.", "error");
   }
 });
 
-btnEsqueciSenha?.addEventListener("click", async () => {
+btnEsqueciSenha.addEventListener("click", async () => {
   try {
     const email = loginEmail.value.trim();
 
     if (!email) {
-      setLoginStatus("Digite seu e-mail para enviar o link de redefinição.", "error");
+      setLoginStatus("Digite seu e-mail para redefinir a senha.", "error");
       return;
     }
 
@@ -330,151 +102,217 @@ btnEsqueciSenha?.addEventListener("click", async () => {
     setLoginStatus("Link de redefinição enviado para seu e-mail.", "ok");
   } catch (error) {
     console.error(error);
-    setLoginStatus("Não foi possível enviar o link de redefinição.", "error");
+    setLoginStatus("Erro ao enviar link de redefinição.", "error");
   }
 });
 
-btnLogout?.addEventListener("click", async () => {
+btnLogout.addEventListener("click", async () => {
   await signOut(auth);
 });
 
-form.addEventListener("submit", async (event) => {
-  event.preventDefault();
+// === ORDER HELPERS ===
+function formatarData(timestamp) {
+  if (!timestamp) return "-";
+  const data = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+  return data.toLocaleString("pt-BR");
+}
 
-  if (!currentUser || !isAdminUser) {
-    setStatus("Sessão inválida. Faça login como admin.", "error");
-    return;
-  }
+function formatarMoeda(valor) {
+  return `R$ ${Number(valor || 0).toFixed(2).replace(".", ",")}`;
+}
 
+function getStatusClass(status) {
+  const map = {
+    pendente: "pendente",
+    pagto: "pagto",
+    em_producao: "em_producao",
+    enviado: "enviado",
+    entregue: "entregue",
+    cancelado: "cancelado"
+  };
+  return map[status] || "pendente";
+}
+
+function getStatusLabel(status) {
+  const map = {
+    pendente: "Pendente",
+    pagto: "Pago",
+    em_producao: "Em produção",
+    enviado: "Enviado",
+    entregue: "Entregue",
+    cancelado: "Cancelado"
+  };
+  return map[status] || status;
+}
+
+function getPaymentMethodLabel(method) {
+  const map = {
+    pix: "PIX",
+    cartao: "Cartão",
+    boleto: "Boleto",
+    transferencia: "Transferência",
+    outro: "Outro"
+  };
+  return map[method] || method;
+}
+
+// === DASHBOARD ===
+async function atualizarDashboard() {
   try {
-    const produto = obterProdutoDoFormulario();
-    const referencia = doc(db, "produtos", produto.id);
+    const snapshot = await getDocs(collection(db, "pedidos"));
+    const pedidos = snapshot.docs.map(d => d.data());
 
-    await setDoc(referencia, produto, { merge: true });
+    const total = pedidos.length;
+    const pendentes = pedidos.filter(p => p.status === "pendente").length;
+    const emproducao = pedidos.filter(p => p.status === "em_producao").length;
+    const entregues = pedidos.filter(p => p.status === "entregue").length;
+    const totalRenda = pedidos.reduce((sum, p) => sum + (Number(p.total) || 0), 0);
 
-    produtoEditandoId = produto.id;
-    document.getElementById("id").readOnly = true;
-    btnExcluir.style.display = "inline-block";
-    btnSubmit.textContent = "Atualizar produto";
-
-    setStatus(`Produto "${produto.nome || produto.id}" salvo com sucesso.`, "ok");
-    await listarProdutos();
-    limparFormulario(false);
+    dashboardStats.innerHTML = `
+      <div class="stat-card"><h3>Total de Pedidos</h3><div class="value">${total}</div></div>
+      <div class="stat-card"><h3>Pendentes</h3><div class="value" style="color: #f39c12;">${pendentes}</div></div>
+      <div class="stat-card"><h3>Em Produção</h3><div class="value" style="color: #3498db;">${emproducao}</div></div>
+      <div class="stat-card"><h3>Entregues</h3><div class="value" style="color: #1f8f4f;">${entregues}</div></div>
+      <div class="stat-card"><h3>Renda Total</h3><div class="value">${formatarMoeda(totalRenda)}</div></div>
+    `;
   } catch (error) {
-    handleFirebaseError(error, "Erro ao salvar produto.");
+    console.error("Erro ao atualizar dashboard:", error);
   }
-});
+}
 
-btnNovo.addEventListener("click", () => {
-  limparFormulario();
-});
-
-btnExcluir.addEventListener("click", async () => {
-  if (!currentUser || !isAdminUser) {
-    setStatus("Sessão inválida. Faça login como admin.", "error");
-    return;
-  }
-
-  const id = produtoEditandoId || document.getElementById("id").value.trim();
-
-  if (!id) {
-    setStatus("Selecione um produto para excluir.", "error");
-    return;
-  }
-
-  const confirmou = window.confirm(`Tem certeza que deseja excluir o produto "${id}"?`);
-
-  if (!confirmou) {
-    return;
-  }
-
+// === ORDERS MANAGEMENT ===
+async function carregarPedidos() {
   try {
-    await deleteDoc(doc(db, "produtos", id));
-    setStatus(`Produto "${id}" excluído com sucesso.`, "ok");
-    limparFormulario();
-    await listarProdutos();
+    const q = query(collection(db, "pedidos"), orderBy("criadoEm", "desc"));
+    const snapshot = await getDocs(q);
+    allOrders = snapshot.docs.map(d => ({
+      id: d.id,
+      ...d.data()
+    }));
+    exibirPedidos();
   } catch (error) {
-    handleFirebaseError(error, "Não foi possível excluir o produto.");
+    console.error("Erro ao carregar pedidos:", error);
+    pedidosList.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 20px;">Erro ao carregar pedidos</td></tr>`;
   }
-});
+}
 
-listaEl.addEventListener("click", async (event) => {
-  const botao = event.target.closest("button[data-action='editar']");
+function exibirPedidos() {
+  const statusFiltro = filtroStatus.value;
+  const pedidosFiltrados = statusFiltro ? allOrders.filter(p => p.status === statusFiltro) : allOrders;
 
-  if (!botao) {
+  if (pedidosFiltrados.length === 0) {
+    pedidosList.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 20px;">Nenhum pedido encontrado</td></tr>`;
     return;
   }
 
-  const id = botao.dataset.id;
-  if (!id) {
-    return;
-  }
+  pedidosList.innerHTML = pedidosFiltrados.map(pedido => `
+    <tr>
+      <td><strong>#${pedido.id.slice(0, 8)}</strong></td>
+      <td>${pedido.cliente?.nome || pedido.cliente?.email || "-"}</td>
+      <td><strong>${formatarMoeda(pedido.total)}</strong></td>
+      <td><span class="status ${getStatusClass(pedido.status)}">${getStatusLabel(pedido.status)}</span></td>
+      <td><span class="status ${pedido.status === "pagto" ? "pagto" : "pendente"}">${pedido.status === "pagto" ? "✓ Verificado" : "○ Pendente"}</span></td>
+      <td>${formatarData(pedido.criadoEm)}</td>
+      <td><div class="table-actions"><button class="btn btn-small btn-secondary" onclick="exibirDetalhes('${pedido.id}')">Ver</button><button class="btn btn-small btn-secondary" onclick="editarStatus('${pedido.id}')">Editar</button></div></td>
+    </tr>
+  `).join("");
+}
 
+window.exibirDetalhes = async (pedidoId) => {
   try {
-    const produto = await carregarProdutoPorId(id);
-    preencherFormulario(produto);
-    produtoEditandoId = id;
-    document.getElementById("id").readOnly = true;
-    btnExcluir.style.display = "inline-block";
-    btnSubmit.textContent = "Atualizar produto";
-    setStatus(`Editando produto "${produto.nome || id}".`);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    const pedido = allOrders.find(p => p.id === pedidoId);
+    if (!pedido) { alert("Pedido não encontrado"); return; }
+
+    const itensHtml = (pedido.itens || []).map(item => `<div class="item-row"><div>${item.nome}</div><div>${item.quantidade || 1}x</div><div style="text-align: right;">${formatarMoeda(item.preco)}</div></div>`).join("");
+
+    modalBody.innerHTML = `
+      <div class="detail-item"><div class="detail-label">ID Pedido</div><div class="detail-value">#${pedido.id.slice(0, 8)}</div></div>
+      <div class="detail-item"><div class="detail-label">Cliente</div><div class="detail-value">${pedido.cliente?.nome || "-"}<br/>${pedido.cliente?.email || ""}<br/>${pedido.cliente?.telefone || ""}</div></div>
+      <div class="detail-item"><div class="detail-label">Método de pago</div><div class="detail-value">${getPaymentMethodLabel(pedido.pagamento)}</div></div>
+      <div class="detail-item"><div class="detail-label">Status Pag.</div><div class="detail-value"><span class="status ${pedido.status === "pagto" ? "pagto" : "pendente"}">${pedido.status === "pagto" ? "✓ Verificado" : "○ Pendente"}</span></div></div>
+      <div class="detail-item"><div class="detail-label">Itens</div><div class="detail-value"><div class="items-list">${itensHtml || "<p>Sem itens</p>"}</div></div></div>
+      <div class="detail-item"><div class="detail-label">Total</div><div class="detail-value" style="font-size: 18px; font-weight: 700;">${formatarMoeda(pedido.total)}</div></div>
+      <div class="detail-item"><div class="detail-label">Criado em</div><div class="detail-value">${formatarData(pedido.criadoEm)}</div></div>
+    `;
+    abrirModal(`Pedido #${pedido.id.slice(0, 8)}`);
   } catch (error) {
-    handleFirebaseError(error, "Não foi possível carregar o produto.");
+    console.error("Erro ao exibir detalhes:", error);
+    alert("Erro ao carregar detalhes do pedido");
   }
-});
+};
 
-listaPedidosAdminEl?.addEventListener("click", async (event) => {
-  const botao = event.target.closest("button[data-action='salvar-status']");
-  if (!botao) {
-    return;
-  }
-
-  const pedidoId = botao.dataset.id;
-  const select = document.querySelector(`select[data-status-id='${pedidoId}']`);
-  const status = select?.value;
-
-  if (!pedidoId || !status) {
-    return;
-  }
-
+window.editarStatus = async (pedidoId) => {
   try {
-    await updateDoc(doc(db, "pedidos", pedidoId), { status });
-    setStatus(`Status do pedido #${pedidoId.slice(0, 8)} atualizado para ${status}.`, "ok");
-    await listarPedidosAdmin();
+    const pedido = allOrders.find(p => p.id === pedidoId);
+    if (!pedido) { alert("Pedido não encontrado"); return; }
+
+    modalBody.innerHTML = `
+      <div style="display: grid; gap: 16px;">
+        <div><label style="display: block; margin-bottom: 8px; font-weight: 700;">Status de Pagamento</label><select id="select-status-pagto" style="padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 6px; width: 100%;"><option value="pendente" ${pedido.status === "pendente" ? "selected" : ""}>Pendente</option><option value="pagto" ${pedido.status === "pagto" ? "selected" : ""}>Pagamento Verificado</option><option value="cancelado" ${pedido.status === "cancelado" ? "selected" : ""}>Cancelado</option></select></div>
+        <div><label style="display: block; margin-bottom: 8px; font-weight: 700;">Status do Pedido</label><select id="select-status-pedido" style="padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 6px; width: 100%;"><option value="pendente" ${pedido.statusPedido === "pendente" ? "selected" : ""}>Pendente</option><option value="em_producao" ${pedido.statusPedido === "em_producao" ? "selected" : ""}>Em produção</option><option value="enviado" ${pedido.statusPedido === "enviado" ? "selected" : ""}>Enviado</option><option value="entregue" ${pedido.statusPedido === "entregue" ? "selected" : ""}>Entregue</option></select></div>
+        <button id="btn-salvar-status" class="btn btn-primary" style="width: 100%; margin-top: 8px;">Salvar Mudanças</button>
+      </div>
+    `;
+
+    document.getElementById("btn-salvar-status").addEventListener("click", async () => {
+      try {
+        const novoStatus = document.getElementById("select-status-pagto").value;
+        const novoStatusPedido = document.getElementById("select-status-pedido").value;
+        await updateDoc(doc(db, "pedidos", pedidoId), { status: novoStatus, statusPedido: novoStatusPedido, atualizadoEm: new Date().toISOString() });
+        fecharModal();
+        await carregarPedidos();
+        await atualizarDashboard();
+        alert("Status atualizado com sucesso!");
+      } catch (error) {
+        console.error("Erro ao atualizar status:", error);
+        alert("Erro ao atualizar status");
+      }
+    });
+
+    abrirModal(`Editar Status - Pedido #${pedido.id.slice(0, 8)}`);
   } catch (error) {
-    handleFirebaseError(error, "Não foi possível atualizar o status do pedido.");
+    console.error("Erro ao editar status:", error);
+    alert("Erro ao editar status");
   }
+};
+
+// === MODAL FUNCTIONS ===
+function abrirModal(titulo) {
+  document.getElementById("modal-title").textContent = titulo;
+  detailsModal.classList.add("active");
+}
+
+window.fecharModal = () => {
+  detailsModal.classList.remove("active");
+};
+
+detailsModal.addEventListener("click", (e) => {
+  if (e.target === detailsModal) window.fecharModal();
 });
 
-formCupom?.addEventListener("submit", async (event) => {
-  event.preventDefault();
-
-  try {
-    const codigo = document.getElementById("cupom-codigo").value.trim().toUpperCase();
-    const tipo = document.getElementById("cupom-tipo").value;
-    const valor = Number(document.getElementById("cupom-valor").value || 0);
-
-    if (!codigo || valor <= 0) {
-      setStatus("Informe código e valor válido para o cupom.", "error");
-      return;
-    }
-
-    await setDoc(doc(db, "cupons", codigo), {
-      codigo,
-      tipo,
-      valor,
-      atualizadoEm: new Date().toISOString()
-    }, { merge: true });
-
-    setStatus(`Cupom ${codigo} salvo com sucesso.`, "ok");
-    formCupom.reset();
-    await listarCuponsAdmin();
-  } catch (error) {
-    handleFirebaseError(error, "Não foi possível salvar o cupom.");
-  }
+// === TAB SWITCHING ===
+document.querySelectorAll(".tab").forEach(tab => {
+  tab.addEventListener("click", () => {
+    const tabName = tab.dataset.tab;
+    document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+    document.querySelectorAll(".tab-content").forEach(content => content.classList.remove("active"));
+    tab.classList.add("active");
+    document.getElementById(`${tabName}-tab`).classList.add("active");
+  });
 });
 
+// === FILTER & REFRESH ===
+filtroStatus.addEventListener("change", exibirPedidos);
+btnRecarregar.addEventListener("click", async () => {
+  btnRecarregar.disabled = true;
+  btnRecarregar.textContent = "🔄 Carregando...";
+  await carregarPedidos();
+  await atualizarDashboard();
+  btnRecarregar.disabled = false;
+  btnRecarregar.textContent = "🔄 Recarregar";
+});
+
+// === AUTH STATE ===
 onAuthStateChanged(auth, async (user) => {
   currentUser = user;
 
@@ -487,26 +325,22 @@ onAuthStateChanged(auth, async (user) => {
 
   try {
     isAdminUser = await validarPermissaoAdmin(user);
-
     if (!isAdminUser) {
       await signOut(auth);
       showLogin();
-      setLoginStatus(
-        "Login ok, mas sem autorização de admin. Verifique claim admin ou ADMIN_EMAILS.",
-        "error"
-      );
+      setLoginStatus("Sem autorização de admin. Verifique ADMIN_EMAILS.", "error");
       return;
     }
 
     showAdmin();
-    limparFormulario();
-    await listarProdutos();
-    await listarPedidosAdmin();
-    await listarCuponsAdmin();
+    userInfoEl.textContent = `Olá, ${user.email}`;
+    setLoginStatus("");
+    await carregarPedidos();
+    await atualizarDashboard();
   } catch (error) {
     console.error(error);
     await signOut(auth);
     showLogin();
-    setLoginStatus("Erro ao validar permissões de administrador.", "error");
+    setLoginStatus("Erro ao validar permissões.", "error");
   }
 });

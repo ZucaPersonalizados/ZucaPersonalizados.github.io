@@ -1,6 +1,5 @@
 # Local Firebase credentials
 js/config.local.js
-js/firebase.config.js
 
 # General
 .DS_Store

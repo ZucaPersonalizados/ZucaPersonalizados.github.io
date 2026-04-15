@@ -7,6 +7,7 @@ backend/.env.*
 backend/src/config/firebase-key.json
 frontend/js/config.local.js
 frontend/js/config.local.*.js
+js/config.local.js
 
 # Dependencies
 node_modules/

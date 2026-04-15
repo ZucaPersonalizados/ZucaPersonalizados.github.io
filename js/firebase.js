@@ -1,44 +1,84 @@
 /**
  * ⚠️ ARQUIVO DE CONFIGURAÇÃO SEGURA PARA FIREBASE
- * 
- * Este arquivo carrega as credenciais do Firebase de um arquivo local (config.local.js)
- * que NÃO deve ser commitado no repositório.
- * 
- * INSTRUÇÃO DE SETUP:
- * 1. Crie o arquivo 'config.local.js' na mesma pasta
- * 2. Não commite 'config.local.js' (está no .gitignore)
- * 3. Coloque suas credenciais reais em config.local.js
- * 4. Veja firebase.config.example.js para o template
+ *
+ * Fontes de configuração (ordem de prioridade):
+ * 1) localStorage["firebase.web.config"] (JSON) - útil para setup rápido local
+ * 2) js/config.local.js (não versionado)
+ * 3) js/firebase.config.js (produção)
  */
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getFirestore } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { getAuth } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import {
+  getFirestore,
+  connectFirestoreEmulator
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {
+  getAuth,
+  connectAuthEmulator
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-// ⚠️ Carrega credenciais: primeiro tenta config.local.js (dev), depois firebase.config.js (produção)
-let firebaseConfig = {};
+const FIREBASE_CONFIG_STORAGE_KEY = "firebase.web.config";
+const FIREBASE_CONFIG_LEGACY_KEY = "zuca_firebase_config";
+const FIREBASE_EMULATOR_FLAG_KEY = "firebase.useEmulator";
+const FIREBASE_EMULATOR_LEGACY_FLAG_KEY = "zuca_use_firebase_emulator";
 
-try {
-  // Tenta importar do arquivo local de desenvolvimento (não commitado)
+function getConfigFromLocalStorage() {
   try {
-    const { firebaseConfig: config } = await import('./config.local.js');
-    firebaseConfig = config;
-    console.log("✅ Firebase configurado com credenciais de DESENVOLVIMENTO (config.local.js)");
-  } catch (localError) {
-    // Se não encontrou, tenta o arquivo de produção (commitado e restrito)
-    const { firebaseConfig: config } = await import('./firebase.config.js');
-    firebaseConfig = config;
-    console.log("✅ Firebase configurado com credenciais de PRODUÇÃO (firebase.config.js)");
+    const raw = localStorage.getItem(FIREBASE_CONFIG_STORAGE_KEY)
+      || localStorage.getItem(FIREBASE_CONFIG_LEGACY_KEY);
+    if (!raw) return null;
+
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return null;
+
+    const required = ["apiKey", "authDomain", "projectId"];
+    const hasRequiredFields = required.every((key) => Boolean(parsed[key]));
+
+    return hasRequiredFields ? parsed : null;
+  } catch (error) {
+    console.warn("Configuração Firebase inválida no localStorage.", error);
+    return null;
   }
-} catch (error) {
-  console.error('❌ ERRO: Firebase não está configurado corretamente');
-  console.error('📝 Solução: Crie o arquivo js/config.local.js com suas credenciais');
-  throw new Error('Configuração de Firebase não encontrada.');
 }
 
-// Inicializa Firebase
+async function loadFirebaseConfig() {
+  const configFromStorage = getConfigFromLocalStorage();
+  if (configFromStorage) {
+    console.log(`Firebase configurado via localStorage (${FIREBASE_CONFIG_STORAGE_KEY}).`);
+    return configFromStorage;
+  }
+
+  try {
+    const { firebaseConfig } = await import("./config.local.js");
+    console.log("✅ Firebase configurado com credenciais locais (config.local.js)");
+    return firebaseConfig;
+  } catch (localError) {
+    try {
+      const { firebaseConfig } = await import("./firebase.config.js");
+      console.log("✅ Firebase configurado com credenciais de produção (firebase.config.js)");
+      return firebaseConfig;
+    } catch (productionError) {
+      console.error("❌ ERRO: Firebase não está configurado corretamente.");
+      console.error("📝 Crie js/config.local.js (veja js/firebase.config.example.js).");
+      throw new Error("Configuração de Firebase não encontrada.");
+    }
+  }
+}
+
+function shouldUseEmulators() {
+  const emulatorFlag = localStorage.getItem(FIREBASE_EMULATOR_FLAG_KEY)
+    || localStorage.getItem(FIREBASE_EMULATOR_LEGACY_FLAG_KEY);
+  return emulatorFlag === "true";
+}
+
+const firebaseConfig = await loadFirebaseConfig();
 const app = initializeApp(firebaseConfig);
 
-// Exporta instâncias
 export const db = getFirestore(app);
 export const auth = getAuth(app);
+
+if (shouldUseEmulators()) {
+  connectFirestoreEmulator(db, "127.0.0.1", 8080);
+  connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });
+  console.log("🧪 Firebase conectado aos emuladores locais (127.0.0.1:8080 / 9099)");
+}

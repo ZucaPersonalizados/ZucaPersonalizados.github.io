@@ -15,8 +15,8 @@ Na raiz do projeto (`/backend-zuca/.env`), adicione:
 
 ```env
 # Credenciais do Mercado Pago
-MP_ACCESS_TOKEN=APP_USR-seu_access_token_long_aqui
-MP_PUBLIC_KEY=APP_USR-sua_public_key_aqui
+MP_ACCESS_TOKEN=SEU_ACCESS_TOKEN_AQUI
+MP_PUBLIC_KEY=SUA_PUBLIC_KEY_AQUI
 
 # Ambiente (local/staging/production)
 NODE_ENV=local

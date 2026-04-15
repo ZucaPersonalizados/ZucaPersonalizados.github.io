@@ -4,6 +4,17 @@ import { doc, setDoc, getDoc, addDoc, collection, query, where, getDocs, serverT
 
 // Helpers
 const el = (id) => document.getElementById(id);
+const escapeHtml = (value = "") =>
+  String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+const sanitizeImageUrl = (value = "") => {
+  const url = String(value).trim();
+  return /^(https?:\/\/|data:image\/)/i.test(url) ? url : "";
+};
 
 // API URL Configuration
 const API_URL = (() => {
@@ -60,7 +71,7 @@ const renderCarrinho = () => {
     div.className = "cart-item";
     div.innerHTML = `
       <span>
-        <strong>${item.nome}</strong><br/>
+        <strong>${escapeHtml(item.nome)}</strong><br/>
         <small>x${quantidade}</small>
       </span>
       <strong>${formatarMoeda(subtotalItem)}</strong>
@@ -159,11 +170,12 @@ const listarPedidos = async (uid) => {
     }
 
     snap.forEach((doc) => {
+      const pedido = doc.data();
       const item = document.createElement("div");
       item.className = "cart-item";
       item.innerHTML = `
-        <span>#${doc.id.slice(0, 8)} • ${doc.data().status || "recebido"}</span>
-        <strong>${formatarMoeda(doc.data().total || 0)}</strong>
+        <span>#${escapeHtml(doc.id.slice(0, 8))} • ${escapeHtml(pedido.status || "recebido")}</span>
+        <strong>${formatarMoeda(pedido.total || 0)}</strong>
       `;
       container.appendChild(item);
     });
@@ -221,13 +233,15 @@ const gerarPixDinamico = async (total, idPedido, cliente) => {
     const data = await res.json();
 
     if (data.success && data.qr_code && data.brcode) {
+      const qrCodeSeguro = sanitizeImageUrl(data.qr_code);
+      const brCodeSeguro = escapeHtml(data.brcode);
       const modal = document.createElement("div");
       modal.style.cssText = "position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:9999;";
       modal.innerHTML = `
         <div style="background:white;padding:30px;border-radius:12px;text-align:center;max-width:400px;">
           <h3 style="color:#c98d59;">✓ PIX Gerado!</h3>
-          <img src="${data.qr_code}" alt="QR" style="width:240px;height:240px;border-radius:8px;margin:20px 0;" />
-          <div style="background:#f5f5f5;padding:12px;border-radius:8px;margin:10px 0;word-break:break-all;font-family:monospace;font-size:0.75em;max-height:100px;overflow-y:auto;">${data.brcode}</div>
+          <img src="${qrCodeSeguro}" alt="QR" style="width:240px;height:240px;border-radius:8px;margin:20px 0;" />
+          <div style="background:#f5f5f5;padding:12px;border-radius:8px;margin:10px 0;word-break:break-all;font-family:monospace;font-size:0.75em;max-height:100px;overflow-y:auto;">${brCodeSeguro}</div>
           <button id="copy-pix" style="background:#c98d59;color:white;border:none;padding:12px 24px;border-radius:999px;cursor:pointer;margin:15px 5px;">📋 Copiar</button>
           <button onclick="this.parentElement.parentElement.remove();" style="background:#ddd;border:none;padding:12px 24px;border-radius:999px;cursor:pointer;">Fechar</button>
         </div>

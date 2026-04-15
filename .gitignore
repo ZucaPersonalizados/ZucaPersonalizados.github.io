@@ -1,0 +1,31 @@
+# Secrets and local environment
+.env
+.env.*
+!.env.example
+backend/.env
+backend/.env.*
+backend/src/config/firebase-key.json
+frontend/js/config.local.js
+frontend/js/config.local.*.js
+
+# Dependencies
+node_modules/
+backend/node_modules/
+frontend/node_modules/
+
+# Logs and temp
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.tmp
+
+# IDE/OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~

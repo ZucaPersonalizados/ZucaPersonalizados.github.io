@@ -3,7 +3,7 @@
 ## STATUS: ⚠️ CRÍTICO - CHAVE EXPOSTA NO GITHUB
 
 **Data do Incidente:** 14 de abril de 2026  
-**Chave Comprometida:** `AIzaSyDP3XJYquHpbKHNt1gvQOZS1--b0CXfknw`  
+**Chave Comprometida:** `[CHAVE_ANTIGA_REVOGADA]`  
 **Severidade:** 🔴 CRÍTICA
 
 ---
@@ -32,7 +32,7 @@ Link: https://console.firebase.google.com
 Passo:
   1. Vá para seu projeto Firebase
   2. Configurações → Chaves de API
-  3. Encontre: AIzaSyDP3XJYquHpbKHNt1gvQOZS1--b0CXfknw
+  3. Encontre a chave antiga comprometida
   4. Clique em "Delete" (Lixo)
   5. Confirme a exclusão
 ```
@@ -121,7 +121,7 @@ http://localhost:3000
 
 ```bash
 # Confirme que chave foi removida:
-grep -r "AIzaSyDP3XJYquHpbKHNt1gvQOZS1--b0CXfknw" js/
+grep -r "AIza" js/
 
 # ESPERADO: nenhum resultado!
 # SE HOUVER RESULTADO: reexecute os passos 1-5

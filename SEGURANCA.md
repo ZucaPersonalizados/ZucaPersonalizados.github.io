@@ -4,7 +4,7 @@
 
 Uma **chave de API do Google** foi detectada no repositório GitHub:
 ```
-AIzaSyDP3XJYquHpbKHNt1gvQOZS1--b0CXfknw
+[CHAVE_ANTIGA_REVOGADA]
 ```
 
 ## ✅ SOLUÇÃO IMPLEMENTADA
@@ -26,7 +26,7 @@ AIzaSyDP3XJYquHpbKHNt1gvQOZS1--b0CXfknw
 ### Passo 1: Revogar a Chave Exposta (CRÍTICO!)
 1. Acesse [Firebase Console](https://console.firebase.google.com)
 2. Vá para **Projeto > Configurações > Chaves de API**
-3. **Delete imediatamente** a chave `AIzaSyDP3XJYquHpbKHNt1gvQOZS1--b0CXfknw`
+3. **Delete imediatamente** a chave antiga comprometida
 4. Gere uma **nova chave de API**
 5. **Restrinja a chave** (ver Passo 3)
 
@@ -120,7 +120,7 @@ nano js/config.local.js
 
 ```bash
 # Confirme que a chave não está mais no repositório
-grep -r "AIzaSyDP3XJYquHpbKHNt1gvQOZS1--b0CXfknw" .
+grep -r "AIza" .
 
 # Resultado esperado: nenhum resultado (arquivo limpo!)
 ```

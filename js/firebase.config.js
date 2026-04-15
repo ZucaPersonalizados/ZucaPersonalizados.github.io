@@ -9,14 +9,14 @@
  */
 
 export const firebaseConfig = {
-  apiKey: "AIzaSyDP3XJYquHpbKHNt1gvQOZS1--b0CXfknw",
+  apiKey: "",
   authDomain: "zuca-personalizados.firebaseapp.com",
   databaseURL: "https://zuca-personalizados-default-rtdb.firebaseio.com",
   projectId: "zuca-personalizados",
   storageBucket: "zuca-personalizados.firebasestorage.app",
   messagingSenderId: "651379669151",
-  appId: "1:651379669151:web:c24d2011fe047863d14aaa",
-  measurementId: "G-464H4KJF8P"
+  appId: "1:651379669151:web:cdd83d5f8d9e5813d14aaa",
+  measurementId: "G-75MRV5TBTL"
 };
 
-console.log("✅ Firebase configurado com sucesso");
+console.warn("⚠️ firebase.config.js está sem apiKey por segurança. Use js/config.local.js");

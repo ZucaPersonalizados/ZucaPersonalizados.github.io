@@ -48,20 +48,26 @@ async function loadFirebaseConfig() {
     return configFromStorage;
   }
 
-  try {
-    const { firebaseConfig } = await import("./config.local.js");
-    console.log("✅ Firebase configurado com credenciais locais (config.local.js)");
-    return firebaseConfig;
-  } catch (localError) {
+  const isLocalhost = ["localhost", "127.0.0.1"].includes(window.location.hostname);
+
+  if (isLocalhost) {
     try {
-      const { firebaseConfig } = await import("./firebase.config.js");
-      console.log("✅ Firebase configurado com credenciais de produção (firebase.config.js)");
+      const { firebaseConfig } = await import("./config.local.js");
+      console.log("✅ Firebase configurado com credenciais locais (config.local.js)");
       return firebaseConfig;
-    } catch (productionError) {
-      console.error("❌ ERRO: Firebase não está configurado corretamente.");
-      console.error("📝 Crie js/config.local.js (veja js/firebase.config.example.js).");
-      throw new Error("Configuração de Firebase não encontrada.");
+    } catch (localError) {
+      // Em localhost, cair para config de produção quando config.local.js não existir.
     }
+  }
+
+  try {
+    const { firebaseConfig } = await import("./firebase.config.js");
+    console.log("✅ Firebase configurado com credenciais de produção (firebase.config.js)");
+    return firebaseConfig;
+  } catch (productionError) {
+    console.error("❌ ERRO: Firebase não está configurado corretamente.");
+    console.error("📝 Crie js/config.local.js (veja js/firebase.config.example.js).");
+    throw new Error("Configuração de Firebase não encontrada.");
   }
 }
 

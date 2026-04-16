@@ -156,6 +156,8 @@ app.get("/config-mercadopago", (req, res) => {
   res.json({
     publicKey: mpPublicKey || null,
     configured: !!mpPublicKey && !!mpAccessToken,
+    pixConfigured: !!mpAccessToken,
+    cardConfigured: !!mpAccessToken && !!mpPublicKey,
   });
 });
 
@@ -582,7 +584,11 @@ app.post("/gerar-pix", async (req, res) => {
     }
 
     if (!mpAccessToken) {
-      return res.status(500).json({ success: false, error: "MP_ACCESS_TOKEN nao configurado" });
+      return res.status(500).json({
+        success: false,
+        error: "MP_ACCESS_TOKEN nao configurado",
+        hint: "Configure MP_ACCESS_TOKEN no Render para habilitar PIX",
+      });
     }
 
     const response = await axios.post(

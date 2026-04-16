@@ -12,6 +12,27 @@ function getApiUrl(path) {
 
 let descontoAtual = 0;
 let cupomAplicado = null;
+let mpConfigCache = null;
+
+async function obterConfigMercadoPago(forceRefresh = false) {
+  if (!forceRefresh && mpConfigCache) {
+    return mpConfigCache;
+  }
+
+  try {
+    const response = await fetch(getApiUrl("/config-mercadopago"));
+    const payload = await response.json();
+    mpConfigCache = {
+      configured: !!payload?.configured,
+      pixConfigured: !!payload?.pixConfigured,
+      cardConfigured: !!payload?.cardConfigured,
+      publicKey: payload?.publicKey || null,
+    };
+    return mpConfigCache;
+  } catch {
+    return null;
+  }
+}
 
 const getCarrinho = () => {
   try {
@@ -238,6 +259,16 @@ async function finalizarPedido() {
   const btn = el("btn-finalizar");
 
   try {
+    const configMP = await obterConfigMercadoPago(true);
+
+    if (metodo === "pix" && configMP && !configMP.pixConfigured) {
+      throw new Error("PIX indisponível no momento. Tente boleto ou transferência.");
+    }
+
+    if (metodo === "cartao" && configMP && !configMP.cardConfigured) {
+      throw new Error("Cartão indisponível no momento. Tente PIX, boleto ou transferência.");
+    }
+
     if (btn) {
       btn.disabled = true;
       btn.textContent = "Processando...";

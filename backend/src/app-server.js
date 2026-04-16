@@ -8,7 +8,7 @@ import fs from "fs";
 import crypto from "crypto";
 import path from "path";
 import { fileURLToPath } from "url";
-import { db } from "./firebase.js";
+import { db, firebaseDebug } from "./firebase.js";
 
 import produtosRoutes from "./routes/produtos.js";
 import uploadRoutes from "./routes/upload.js";
@@ -147,6 +147,7 @@ app.get("/health", (req, res) => {
     status: "ok",
     service: "zuca-backend-only",
     firebase: !!db,
+    firebaseDebug,
     timestamp: new Date().toISOString(),
   });
 });

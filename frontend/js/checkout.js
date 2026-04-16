@@ -349,23 +349,108 @@ function onPagamentoChange() {
   }
 }
 
-function configurarBotoesLoginPlaceholder() {
-  const status = el("auth-status");
-  const texto = "Checkout sem login social. Preencha seus dados para finalizar.";
-  if (status) status.textContent = texto;
+function atualizarAvatarCheckout(nome = "") {
+  const avatarLabel = el("avatar-label");
+  if (!avatarLabel) return;
+  avatarLabel.textContent = nome || "Entrar";
+}
 
-  ["btn-google", "btn-apple"].forEach((id) => {
-    const btn = el(id);
-    if (!btn) return;
-    btn.addEventListener("click", () => {
-      if (status) status.textContent = texto;
-    });
+function setAuthStatus(message, type = "info") {
+  const status = el("auth-status");
+  if (!status) return;
+
+  status.textContent = message;
+  status.style.borderColor = "#ece3da";
+  status.style.background = "#faf7f3";
+  status.style.color = "#555";
+
+  if (type === "ok") {
+    status.style.borderColor = "#d7eadc";
+    status.style.background = "#eef8f1";
+    status.style.color = "#1f8f4f";
+  }
+
+  if (type === "error") {
+    status.style.borderColor = "#f1d2d2";
+    status.style.background = "#fdf1f1";
+    status.style.color = "#b02a37";
+  }
+}
+
+function aplicarLoginLocal(email, providerLabel) {
+  const emailNormalizado = String(email || "").trim().toLowerCase();
+  if (!emailNormalizado) {
+    setAuthStatus("Nao foi possivel identificar o e-mail para login.", "error");
+    return;
+  }
+
+  const nomeAtual = String(el("nome")?.value || "").trim();
+  const nomeSugerido = emailNormalizado.split("@")[0].replace(/[._-]+/g, " ").replace(/\b\w/g, (m) => m.toUpperCase());
+  const nomeFinal = nomeAtual || nomeSugerido;
+
+  if (el("nome") && !nomeAtual) el("nome").value = nomeFinal;
+  if (el("email")) el("email").value = emailNormalizado;
+
+  salvarDadosClienteLocal();
+  atualizarAvatarCheckout(nomeFinal.split(" ")[0]);
+  setAuthStatus(`Conectado localmente com ${providerLabel}: ${emailNormalizado}`, "ok");
+  listarPedidosPorEmail(emailNormalizado);
+}
+
+function solicitarEmail(providerLabel) {
+  const atual = String(el("email")?.value || "").trim();
+  const informado = window.prompt(`Informe seu e-mail ${providerLabel}:`, atual);
+  return String(informado || "").trim().toLowerCase();
+}
+
+function configurarBotoesLoginPlaceholder() {
+  const texto = "Preencha os dados para finalizar. O login nesta tela e local ao navegador.";
+  setAuthStatus(texto);
+
+  const btnGoogle = el("btn-google");
+  btnGoogle?.addEventListener("click", () => {
+    const emailAtual = String(el("email")?.value || "").trim().toLowerCase();
+    const email = emailAtual || solicitarEmail("do Gmail");
+
+    if (!email) {
+      setAuthStatus("Informe um e-mail para continuar.", "error");
+      return;
+    }
+
+    if (!/@gmail\.com$/i.test(email)) {
+      setAuthStatus("Use um e-mail Gmail valido para este botao.", "error");
+      return;
+    }
+
+    aplicarLoginLocal(email, "Gmail");
+  });
+
+  const btnApple = el("btn-apple");
+  btnApple?.addEventListener("click", () => {
+    const emailAtual = String(el("email")?.value || "").trim().toLowerCase();
+    const email = emailAtual || solicitarEmail("do iCloud");
+
+    if (!email) {
+      setAuthStatus("Informe um e-mail para continuar.", "error");
+      return;
+    }
+
+    if (!/@(icloud\.com|me\.com)$/i.test(email)) {
+      setAuthStatus("Use um e-mail iCloud valido para este botao.", "error");
+      return;
+    }
+
+    aplicarLoginLocal(email, "iCloud");
   });
 
   el("btn-logout")?.addEventListener("click", () => {
     localStorage.removeItem("zuca_checkout_cliente");
     localStorage.removeItem("zuca_checkout_cliente_nome");
-    if (status) status.textContent = "Dados locais removidos.";
+    if (el("nome")) el("nome").value = "";
+    if (el("email")) el("email").value = "";
+    atualizarAvatarCheckout("");
+    setAuthStatus("Dados locais removidos.", "ok");
+    el("lista-pedidos") && (el("lista-pedidos").innerHTML = "<p>Nenhum pedido ainda.</p>");
   });
 }
 
@@ -390,6 +475,7 @@ document.querySelectorAll("#nome, #cpfCnpj, #email, #telefone, #cep, #endereco, 
   .forEach((input) => input.addEventListener("change", salvarDadosClienteLocal));
 
 carregarDadosClienteLocal();
+atualizarAvatarCheckout(localStorage.getItem("zuca_checkout_cliente_nome") || "");
 renderCarrinho();
 onPagamentoChange();
 configurarBotoesLoginPlaceholder();

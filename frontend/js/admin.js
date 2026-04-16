@@ -1,11 +1,11 @@
-const API_BASE = (() => {
-  const custom = localStorage.getItem("zuca_api_base_url");
-  if (custom) return custom.replace(/\/$/, "");
-  return window.location.origin;
-})();
-
 const ORIGIN_BASE = window.location.origin.replace(/\/$/, "");
-const API_BASES = [...new Set([API_BASE, ORIGIN_BASE].filter(Boolean))];
+
+// Admin depende de cookie HttpOnly de sessao: manter sempre same-origin evita 401 por cross-domain.
+const API_BASE = ORIGIN_BASE;
+const API_BASES = [ORIGIN_BASE];
+
+// Limpa override legado que possa forcar chamadas para outro dominio.
+localStorage.removeItem("zuca_api_base_url");
 
 function getApiUrl(path, base = API_BASE) {
   return `${base}${path}`;

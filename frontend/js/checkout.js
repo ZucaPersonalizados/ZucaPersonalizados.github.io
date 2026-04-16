@@ -178,12 +178,21 @@ async function listarPedidosPorEmail(email) {
       return;
     }
 
-    container.innerHTML = payload.pedidos.map((pedido) => `
-      <div class="cart-item">
-        <span>#${pedido.id.slice(0, 8)} • ${pedido.status || "pendente"}</span>
-        <strong>${formatarMoeda(pedido.total || 0)}</strong>
+    container.innerHTML = payload.pedidos.map((pedido) => {
+      const status = String(pedido.status || "pendente");
+      const statusLabel = status === "pagto" ? "Pago" : "Pendente";
+      const statusClass = status === "pagto" ? "is-paid" : "is-pending";
+
+      return `
+      <div class="pedido-item ${statusClass}">
+        <div class="pedido-top">
+          <span class="pedido-id">#${pedido.id.slice(0, 8)}</span>
+          <span class="pedido-status">${statusLabel}</span>
+        </div>
+        <div class="pedido-total">${formatarMoeda(pedido.total || 0)}</div>
       </div>
-    `).join("");
+    `;
+    }).join("");
   } catch {
     container.innerHTML = "<p>Não foi possível carregar seus pedidos.</p>";
   }
@@ -196,7 +205,12 @@ async function verificarPagamento(idPedido) {
     body: JSON.stringify({ idPedido }),
   });
   const payload = await response.json();
-  return response.ok && payload.success;
+  return {
+    ok: response.ok,
+    success: !!payload?.success,
+    aprovado: !!payload?.aprovado,
+    payload,
+  };
 }
 
 async function gerarPixDinamico(total, idPedido, cliente) {
@@ -296,11 +310,11 @@ async function finalizarPedido() {
 
     if (metodo === "pix") {
       await gerarPixDinamico(total, pedidoId, cliente);
-      const verificado = await verificarPagamento(pedidoId);
+      const verificacao = await verificarPagamento(pedidoId);
       if (el("checkout-status")) {
-        el("checkout-status").textContent = verificado
-          ? `✓ PIX gerado e pagamento verificado. Pedido #${pedidoId.slice(0, 8)}`
-          : `✓ PIX gerado. Pedido #${pedidoId.slice(0, 8)}`;
+        el("checkout-status").textContent = verificacao.aprovado
+          ? `✓ Pagamento confirmado. Pedido #${pedidoId.slice(0, 8)}`
+          : `✓ PIX gerado para o pedido #${pedidoId.slice(0, 8)}. Aguardando confirmação do pagamento.`;
       }
     } else if (metodo === "cartao") {
       if (el("checkout-status")) {

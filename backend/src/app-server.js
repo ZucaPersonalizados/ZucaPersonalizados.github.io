@@ -233,9 +233,26 @@ app.post("/api/cupons/aplicar", requireDb, async (req, res) => {
 app.post("/api/pedidos", requireDb, async (req, res) => {
   try {
     const { cliente, itens, pagamento, cupom, observacoes } = req.body;
+    const metodoPagamento = String(pagamento || "pix").toLowerCase();
 
     if (!cliente?.nome || !cliente?.email || !Array.isArray(itens) || itens.length === 0) {
       return res.status(400).json({ success: false, error: "Dados obrigatorios ausentes" });
+    }
+
+    if (metodoPagamento === "pix" && !mpAccessToken) {
+      return res.status(503).json({
+        success: false,
+        error: "PIX indisponivel no momento",
+        hint: "MP_ACCESS_TOKEN nao configurado",
+      });
+    }
+
+    if (metodoPagamento === "cartao" && (!mpAccessToken || !mpPublicKey)) {
+      return res.status(503).json({
+        success: false,
+        error: "Cartao indisponivel no momento",
+        hint: "MP_ACCESS_TOKEN/MP_PUBLIC_KEY nao configurados",
+      });
     }
 
     const itensNormalizados = itens.map((item) => ({
@@ -297,11 +314,12 @@ app.post("/api/pedidos", requireDb, async (req, res) => {
       subtotal,
       desconto,
       total,
-      pagamento: String(pagamento || "pix"),
+      pagamento: metodoPagamento,
       cupom: cupom ? String(cupom).toUpperCase() : null,
       observacoes: String(observacoes || ""),
       status: "pendente",
       statusPedido: "pendente",
+      estoqueDebitado: false,
       criadoEm: admin.firestore.FieldValue.serverTimestamp(),
       atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
     });
@@ -737,6 +755,10 @@ app.post("/verificar-pagamento", requireDb, async (req, res) => {
       return res.status(400).json({ success: false, error: "ID do pedido invalido" });
     }
 
+    if (!mpAccessToken) {
+      return res.status(503).json({ success: false, error: "MP_ACCESS_TOKEN nao configurado" });
+    }
+
     const pedidoRef = db.collection("pedidos").doc(idPedido);
     const pedidoSnap = await pedidoRef.get();
     if (!pedidoSnap.exists) {
@@ -744,27 +766,69 @@ app.post("/verificar-pagamento", requireDb, async (req, res) => {
     }
 
     const pedidoData = pedidoSnap.data() || {};
+    const mercadoPagoId = String(pedidoData.mercadoPagoId || "").trim();
+
+    if (!mercadoPagoId) {
+      return res.status(400).json({ success: false, error: "Pagamento ainda nao foi iniciado para este pedido" });
+    }
+
+    const pagamentoRes = await axios.get(`https://api.mercadopago.com/v1/payments/${mercadoPagoId}`, {
+      headers: {
+        Authorization: `Bearer ${mpAccessToken}`,
+      },
+    });
+
+    const pagamentoData = pagamentoRes.data || {};
+    const statusMercadoPago = String(pagamentoData.status || "").toLowerCase();
+
+    if (statusMercadoPago !== "approved") {
+      await pedidoRef.update({
+        status: "pendente",
+        statusMercadoPago,
+        atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      return res.status(202).json({
+        success: false,
+        aprovado: false,
+        statusMercadoPago,
+        message: "Pagamento ainda nao aprovado",
+      });
+    }
+
     const itens = Array.isArray(pedidoData.itens) ? pedidoData.itens : [];
+    const estoqueDebitado = !!pedidoData.estoqueDebitado;
+
+    if (!estoqueDebitado) {
+      for (const item of itens) {
+        const produtoRef = db.collection("produtos").doc(item.id);
+        const produtoSnap = await produtoRef.get();
+        if (!produtoSnap.exists) continue;
+        const estoqueAtual = Number(produtoSnap.data().estoque || 0);
+        const novoEstoque = Math.max(0, estoqueAtual - Number(item.quantidade || 0));
+        await produtoRef.update({
+          estoque: novoEstoque,
+          ultimaAtualizacaoEstoque: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      }
+    }
 
     await pedidoRef.update({
       status: "pagto",
+      statusMercadoPago,
+      estoqueDebitado: true,
       atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
       pagamentoVerificadoEm: admin.firestore.FieldValue.serverTimestamp(),
     });
 
-    for (const item of itens) {
-      const produtoRef = db.collection("produtos").doc(item.id);
-      const produtoSnap = await produtoRef.get();
-      if (!produtoSnap.exists) continue;
-      const estoqueAtual = Number(produtoSnap.data().estoque || 0);
-      const novoEstoque = Math.max(0, estoqueAtual - Number(item.quantidade || 0));
-      await produtoRef.update({
-        estoque: novoEstoque,
-        ultimaAtualizacaoEstoque: admin.firestore.FieldValue.serverTimestamp(),
-      });
-    }
-
-    return res.json({ success: true, message: "Pagamento verificado e estoque atualizado" });
+    return res.json({
+      success: true,
+      aprovado: true,
+      statusMercadoPago,
+      message: estoqueDebitado
+        ? "Pagamento confirmado"
+        : "Pagamento verificado e estoque atualizado",
+    });
   } catch (error) {
     return res.status(500).json({ success: false, error: error.message });
   }

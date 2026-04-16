@@ -5,11 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Admin • Zuca Personalizados</title>
   <style>
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
       --bg-primary: #f8f7f5;
@@ -24,7 +20,7 @@
       --error: #e74c3c;
       --info: #3498db;
       --radius: 12px;
-      --shadow: 0 2px 8px rgba(0,0,0,0.06);
+      --shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
     }
 
     html, body {
@@ -34,10 +30,7 @@
       color: var(--text-primary);
     }
 
-    body {
-      display: flex;
-      flex-direction: column;
-    }
+    body { display: flex; flex-direction: column; }
 
     .header {
       background: var(--bg-secondary);
@@ -52,16 +45,9 @@
       z-index: 100;
     }
 
-    .header h1 {
-      font-size: 24px;
-      font-weight: 700;
-    }
+    .header h1 { font-size: 24px; font-weight: 700; }
 
-    .header-actions {
-      display: flex;
-      gap: 12px;
-      align-items: center;
-    }
+    .header-actions { display: flex; gap: 12px; align-items: center; }
 
     .btn {
       padding: 8px 16px;
@@ -77,14 +63,8 @@
       gap: 8px;
     }
 
-    .btn-primary {
-      background: var(--accent);
-      color: white;
-    }
-
-    .btn-primary:hover {
-      background: var(--accent-dark);
-    }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { background: var(--accent-dark); }
 
     .btn-secondary {
       background: var(--bg-primary);
@@ -92,18 +72,8 @@
       border: 1px solid var(--border-color);
     }
 
-    .btn-secondary:hover {
-      background: var(--border-color);
-    }
-
-    .btn-logout {
-      background: var(--error);
-      color: white;
-    }
-
-    .btn-logout:hover {
-      opacity: 0.9;
-    }
+    .btn-secondary:hover { background: var(--border-color); }
+    .btn-danger { background: var(--error); color: #fff; }
 
     .container {
       flex: 1;
@@ -139,19 +109,19 @@
       margin-bottom: 8px;
     }
 
-    .stat-card .value {
-      font-size: 32px;
-      font-weight: 700;
-      color: var(--accent);
+    .stat-card .value { font-size: 32px; font-weight: 700; color: var(--accent); }
+
+    .panel {
+      background: var(--bg-secondary);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
     }
 
     .tabs {
       display: flex;
-      gap: 0;
       border-bottom: 1px solid var(--border-color);
       background: var(--bg-secondary);
-      border-radius: var(--radius) var(--radius) 0 0;
-      overflow: hidden;
     }
 
     .tab {
@@ -166,36 +136,15 @@
       transition: all 0.2s;
     }
 
-    .tab.active {
-      color: var(--accent);
-      border-bottom-color: var(--accent);
-    }
+    .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+    .tab:hover { background: var(--bg-primary); }
 
-    .tab:hover {
-      background: var(--bg-primary);
-    }
+    .tab-content { display: none; background: var(--bg-secondary); }
+    .tab-content.active { display: block; }
 
-    .tab-content {
-      display: none;
-      background: var(--bg-secondary);
-      border-radius: 0 0 var(--radius) var(--radius);
-      box-shadow: var(--shadow);
-    }
+    .table-wrapper { overflow-x: auto; padding: 20px; }
 
-    .tab-content.active {
-      display: block;
-    }
-
-    .table-wrapper {
-      overflow-x: auto;
-      padding: 20px;
-    }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 14px;
-    }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
 
     th {
       text-align: left;
@@ -209,16 +158,10 @@
       letter-spacing: 0.5px;
     }
 
-    td {
-      padding: 14px 8px;
-      border-bottom: 1px solid var(--border-color);
-    }
+    td { padding: 14px 8px; border-bottom: 1px solid var(--border-color); }
+    tr:hover { background: var(--bg-primary); }
 
-    tr:hover {
-      background: var(--bg-primary);
-    }
-
-    .status {
+    .status-pill {
       display: inline-block;
       padding: 4px 12px;
       border-radius: 20px;
@@ -228,62 +171,70 @@
       letter-spacing: 0.5px;
     }
 
-    .status.pendente {
-      background: #fff3cd;
-      color: #856404;
-    }
+    .status-pill.pendente { background: #fff3cd; color: #856404; }
+    .status-pill.pagto { background: #d4edda; color: #155724; }
+    .status-pill.em_producao { background: #d1ecf1; color: #0c5460; }
+    .status-pill.enviado { background: #cce5ff; color: #004085; }
+    .status-pill.entregue { background: #d4edda; color: #155724; }
+    .status-pill.cancelado { background: #f8d7da; color: #721c24; }
 
-    .status.pagto {
-      background: #d4edda;
-      color: #155724;
-    }
+    .table-actions { display: flex; gap: 8px; align-items: center; }
+    .btn-small { padding: 4px 8px; font-size: 12px; border-radius: 6px; }
 
-    .status.em_producao {
-      background: #d1ecf1;
-      color: #0c5460;
-    }
+    .tab-inner { padding: 20px; display: grid; gap: 20px; }
 
-    .status.enviado {
-      background: #cce5ff;
-      color: #004085;
-    }
-
-    .status.entregue {
-      background: #d4edda;
-      color: #155724;
-    }
-
-    .status.cancelado {
-      background: #f8d7da;
-      color: #721c24;
-    }
-
-    .table-actions {
-      display: flex;
-      gap: 8px;
-      align-items: center;
-    }
-
-    .btn-small {
-      padding: 4px 8px;
-      font-size: 12px;
-      border-radius: 6px;
-    }
-
-    .select-status {
-      padding: 6px 8px;
+    .card {
       border: 1px solid var(--border-color);
-      border-radius: 6px;
-      font-size: 12px;
-      background: var(--bg-primary);
-      cursor: pointer;
+      border-radius: var(--radius);
+      padding: 16px;
+      background: #fff;
     }
+
+    .card h3 { margin-bottom: 12px; }
+
+    .form-grid {
+      display: grid;
+      gap: 12px;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .field { display: grid; gap: 6px; }
+    .field-full { grid-column: 1 / -1; }
+
+    .field label { font-size: 13px; font-weight: 600; color: var(--text-secondary); }
+
+    input, textarea, select {
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 10px 12px;
+      font: inherit;
+      background: #fff;
+      color: var(--text-primary);
+    }
+
+    textarea { min-height: 90px; resize: vertical; }
+
+    .actions { display: flex; gap: 10px; flex-wrap: wrap; }
+
+    .list-grid { display: grid; gap: 10px; }
+
+    .item-card {
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 12px;
+      background: var(--bg-primary);
+      display: grid;
+      gap: 8px;
+    }
+
+    .item-title { font-weight: 700; }
+    .item-meta { color: var(--text-secondary); font-size: 13px; }
 
     .details-modal {
       display: none;
       position: fixed;
       inset: 0;
-      background: rgba(0,0,0,0.5);
+      background: rgba(0, 0, 0, 0.5);
       padding: 20px;
       z-index: 200;
       align-items: center;
@@ -291,9 +242,7 @@
       overflow-y: auto;
     }
 
-    .details-modal.active {
-      display: flex;
-    }
+    .details-modal.active { display: flex; }
 
     .modal-content {
       background: var(--bg-secondary);
@@ -314,26 +263,14 @@
       padding-bottom: 12px;
     }
 
-    .modal-header h2 {
-      font-size: 20px;
-    }
-
     .close-btn {
       background: none;
       border: none;
       font-size: 24px;
       color: var(--text-secondary);
       cursor: pointer;
-      padding: 0;
       width: 32px;
       height: 32px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .close-btn:hover {
-      color: var(--text-primary);
     }
 
     .detail-item {
@@ -345,9 +282,7 @@
       border-bottom: 1px solid var(--border-color);
     }
 
-    .detail-item:last-child {
-      border-bottom: none;
-    }
+    .detail-item:last-child { border-bottom: none; }
 
     .detail-label {
       font-weight: 700;
@@ -355,10 +290,6 @@
       font-size: 12px;
       text-transform: uppercase;
       letter-spacing: 0.5px;
-    }
-
-    .detail-value {
-      color: var(--text-primary);
     }
 
     .items-list {
@@ -378,12 +309,7 @@
       font-size: 13px;
     }
 
-    .item-row:last-child {
-      border-bottom: none;
-    }
-
-    #login-wrapper { display: flex; }
-    #admin-wrapper { display: none; }
+    .item-row:last-child { border-bottom: none; }
 
     .login-page {
       display: flex;
@@ -402,85 +328,29 @@
       box-shadow: var(--shadow);
     }
 
-    .login-card h1 {
-      font-size: 28px;
-      margin-bottom: 20px;
-      text-align: center;
-    }
-
-    .form-group {
-      margin-bottom: 16px;
-    }
-
-    .form-group label {
-      display: block;
-      font-weight: 600;
-      margin-bottom: 6px;
-      font-size: 14px;
-    }
-
-    .form-group input {
-      width: 100%;
-      padding: 10px 12px;
-      border: 1px solid var(--border-color);
-      border-radius: 6px;
-      font-size: 14px;
-    }
-
-    .form-group input:focus {
-      outline: none;
-      border-color: var(--accent);
-      box-shadow: 0 0 0 3px rgba(201,141,89,0.1);
-    }
+    .login-card h1 { font-size: 28px; margin-bottom: 20px; text-align: center; }
+    .form-group { margin-bottom: 16px; }
+    .form-group label { display: block; font-weight: 600; margin-bottom: 6px; font-size: 14px; }
 
     .status-box {
       padding: 12px;
       border-radius: 6px;
       margin-top: 12px;
       font-size: 14px;
+      display: none;
     }
 
-    .status-box.error {
-      background: #f8d7da;
-      color: #721c24;
-      border: 1px solid #f5c6cb;
-    }
+    .status-box.error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+    .status-box.ok { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
 
-    .status-box.ok {
-      background: #d4edda;
-      color: #155724;
-      border: 1px solid #c3e6cb;
-    }
+    #status { color: var(--text-secondary); font-size: 13px; }
 
-    @media (max-width: 768px) {
-      .dashboard-grid {
-        grid-template-columns: 1fr;
-      }
-
-      .header {
-        flex-direction: column;
-        gap: 12px;
-        align-items: flex-start;
-      }
-
-      .table-wrapper {
-        font-size: 12px;
-        padding: 12px;
-      }
-
-      td, th {
-        padding: 8px 4px;
-      }
-
-      .item-row {
-        grid-template-columns: 1fr;
-      }
+    @media (max-width: 900px) {
+      .form-grid { grid-template-columns: 1fr; }
+      .table-wrapper { padding: 12px; }
+      td, th { padding: 8px 4px; }
     }
   </style>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Mulish:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
   <div id="login-wrapper" class="login-page">
@@ -502,52 +372,25 @@
     </div>
   </div>
 
-  <div id="admin-wrapper">
-    <div class="top-ribbon">
-      Painel Administrativo • Zuca Personalizados
-    </div>
-
+  <div id="admin-wrapper" style="display:none;">
     <header class="header">
-      <div class="container header-shell">
-        <div class="logo-area">
-          <img src="img/logo/logo.png" alt="Zuca Personalizados">
-          <div class="text">
-            <h1>Zuca Personalizados</h1>
-            <span>Painel Administrativo</span>
-          </div>
-        </div>
-
-        <nav class="menu">
-          <a href="index.html">Início</a>
-          <a href="index.html#produtos">Produtos</a>
-          <a href="index.html#sobre">Sobre</a>
-          <a href="index.html#contato">Contato</a>
-        </nav>
-
-        <div class="header-actions">
-          <div class="avatar-menu">
-            <button id="btn-avatar" type="button" class="avatar-btn" aria-haspopup="true" aria-expanded="false">
-              <span id="user-info">Admin</span>
-            </button>
-            <div id="avatar-dropdown" class="avatar-dropdown">
-              <button id="btn-logout" type="button">Sair</button>
-            </div>
-          </div>
-        </div>
+      <h1>Zuca Personalizados • Painel Administrativo</h1>
+      <div class="header-actions">
+        <span id="user-info"></span>
+        <button id="btn-logout" class="btn btn-secondary" type="button">Sair</button>
       </div>
     </header>
 
     <div class="container">
       <div class="dashboard-grid" id="dashboard-stats"></div>
 
-      <div style="background: var(--bg-secondary); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden;">
+      <div class="panel">
         <div class="tabs">
-          <button class="tab active" data-tab="pedidos">📦 Pedidos</button>
-          <button class="tab" data-tab="produtos">📚 Produtos</button>
-          <button class="tab" data-tab="cupons">🎁 Cupons</button>
+          <button class="tab active" data-tab="pedidos">Pedidos</button>
+          <button class="tab" data-tab="produtos">Produtos</button>
+          <button class="tab" data-tab="cupons">Cupons</button>
         </div>
 
-        <!-- TAB: PEDIDOS -->
         <div class="tab-content active" id="pedidos-tab">
           <div style="padding: 20px; border-bottom: 1px solid var(--border-color); display: flex; gap: 12px; flex-wrap: wrap;">
             <select id="filtro-status" style="padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 14px;">
@@ -559,7 +402,7 @@
               <option value="entregue">Entregue</option>
               <option value="cancelado">Cancelado</option>
             </select>
-            <button class="btn btn-secondary" id="btn-recarregar-pedidos">🔄 Recarregar</button>
+            <button class="btn btn-secondary" id="btn-recarregar-pedidos" type="button">Recarregar</button>
           </div>
           <div class="table-wrapper">
             <table id="tabela-pedidos">
@@ -579,458 +422,132 @@
           </div>
         </div>
 
-        <!-- TAB: PRODUTOS -->
         <div class="tab-content" id="produtos-tab">
-          <div style="padding: 20px;">
-            <div id="produtos-list"></div>
+          <div class="tab-inner">
+            <div class="card">
+              <h3>Cadastro de Produto</h3>
+              <form id="form-produto" class="form-grid">
+                <div class="field">
+                  <label for="id">ID do produto</label>
+                  <input id="id" type="text" placeholder="ex: planner-a5-rose" required />
+                </div>
+                <div class="field">
+                  <label for="nome">Nome</label>
+                  <input id="nome" type="text" placeholder="Nome do produto" required />
+                </div>
+
+                <div class="field">
+                  <label for="preco">Preço</label>
+                  <input id="preco" type="text" placeholder="59,90" />
+                </div>
+                <div class="field">
+                  <label for="estoque">Estoque</label>
+                  <input id="estoque" type="number" min="0" step="1" placeholder="0" />
+                </div>
+
+                <div class="field">
+                  <label for="categoria">Categoria</label>
+                  <input id="categoria" type="text" />
+                </div>
+                <div class="field">
+                  <label for="tipo">Tipo/Subcategoria</label>
+                  <input id="tipo" type="text" />
+                </div>
+
+                <div class="field">
+                  <label for="tamanho">Tamanho</label>
+                  <input id="tamanho" type="text" />
+                </div>
+                <div class="field">
+                  <label for="gramatura">Gramatura</label>
+                  <input id="gramatura" type="text" />
+                </div>
+
+                <div class="field field-full">
+                  <label for="link">Link de compra</label>
+                  <input id="link" type="url" placeholder="https://..." />
+                </div>
+
+                <div class="field field-full">
+                  <label for="imagens">URLs das imagens (separadas por vírgula)</label>
+                  <input id="imagens" type="text" placeholder="https://.../1.jpg, https://.../2.jpg" />
+                </div>
+
+                <div class="field field-full">
+                  <label for="descricaoCurta">Descrição curta</label>
+                  <textarea id="descricaoCurta"></textarea>
+                </div>
+
+                <div class="field field-full">
+                  <label for="descricaoLonga">Descrição longa</label>
+                  <textarea id="descricaoLonga"></textarea>
+                </div>
+
+                <div class="field field-full" style="display:flex; align-items:center; gap:8px;">
+                  <input id="personalizado" type="checkbox" style="width:auto;" />
+                  <label for="personalizado" style="margin:0;">Produto personalizado?</label>
+                </div>
+
+                <div class="field field-full actions">
+                  <button type="submit" class="btn btn-primary" id="btn-submit">Salvar produto</button>
+                  <button type="button" class="btn btn-secondary" id="btn-novo">Novo</button>
+                  <button type="button" class="btn btn-danger" id="btn-excluir" style="display:none;">Excluir</button>
+                </div>
+              </form>
+              <p id="status">Pronto para cadastrar.</p>
+            </div>
+
+            <div class="card">
+              <h3>Produtos cadastrados</h3>
+              <div id="lista-produtos" class="list-grid"></div>
+            </div>
           </div>
         </div>
 
-        <!-- TAB: CUPONS -->
         <div class="tab-content" id="cupons-tab">
-          <div style="padding: 20px;">
-            <div id="cupons-list"></div>
+          <div class="tab-inner">
+            <div class="card">
+              <h3>Novo cupom</h3>
+              <form class="form-grid" id="form-cupom">
+                <div class="field">
+                  <label for="cupom-codigo">Código</label>
+                  <input id="cupom-codigo" type="text" placeholder="BEMVINDO10" required />
+                </div>
+                <div class="field">
+                  <label for="cupom-tipo">Tipo</label>
+                  <select id="cupom-tipo">
+                    <option value="percentual">Percentual (%)</option>
+                    <option value="fixo">Valor fixo (R$)</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="cupom-valor">Valor</label>
+                  <input id="cupom-valor" type="number" min="0" step="0.01" required />
+                </div>
+                <div class="field" style="display:flex; align-items:flex-end;">
+                  <button type="submit" class="btn btn-primary">Salvar cupom</button>
+                </div>
+              </form>
+            </div>
+
+            <div class="card">
+              <h3>Cupons cadastrados</h3>
+              <div id="lista-cupons-admin" class="list-grid"></div>
+            </div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Modal de detalhes -->
     <div id="details-modal" class="details-modal">
       <div class="modal-content">
         <div class="modal-header">
           <h2 id="modal-title">Detalhes do Pedido</h2>
-          <button class="close-btn" onclick="fecharModal()">✕</button>
+          <button class="close-btn" onclick="fecharModal()">x</button>
         </div>
         <div id="modal-body"></div>
       </div>
     </div>
-  </div>
-
-  <script type="module" src="js/admin.js"></script>
-</body>
-</html>
-      --surface: #ffffff;
-      --text: #2a2522;
-      --muted: #6d635d;
-      --brand: #8a5a44;
-      --brand-dark: #6f4330;
-      --ok: #1f8f4f;
-      --error: #b02a37;
-      --line: #e6dfda;
-      --shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
-      --radius: 14px;
-    }
-
-    * { box-sizing: border-box; }
-
-    body {
-      margin: 0;
-      font-family: "Inter", "Segoe UI", Arial, sans-serif;
-      background: linear-gradient(180deg, #f4f2ef 0%, #efe9e4 100%);
-      color: var(--text);
-      min-height: 100vh;
-      padding: 24px 16px;
-    }
-
-    .admin-layout {
-      max-width: 1200px;
-      margin: 0 auto;
-      display: grid;
-      grid-template-columns: 1.2fr 0.8fr;
-      gap: 20px;
-    }
-
-    .card {
-      background: var(--surface);
-      border: 1px solid var(--line);
-      border-radius: var(--radius);
-      box-shadow: var(--shadow);
-      overflow: hidden;
-    }
-
-    .card-header {
-      padding: 20px 24px 14px;
-      border-bottom: 1px solid var(--line);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      background: #fff;
-    }
-
-    h1 { margin: 0; font-size: 1.4rem; }
-    h2 { margin: 0; font-size: 1.2rem; }
-
-    .subtitle {
-      margin: 8px 0 0;
-      color: var(--muted);
-      font-size: 0.95rem;
-    }
-
-    form { padding: 20px 24px 24px; display: grid; gap: 14px; }
-
-    .grid-2 {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 12px;
-    }
-
-    label {
-      display: block;
-      font-weight: 600;
-      font-size: 0.9rem;
-      margin-bottom: 6px;
-    }
-
-    input, textarea {
-      width: 100%;
-      border: 1px solid #d9d1ca;
-      border-radius: 10px;
-      padding: 10px 12px;
-      font: inherit;
-      color: var(--text);
-      background: #fff;
-      transition: border-color 0.2s, box-shadow 0.2s;
-    }
-
-    input:focus, textarea:focus {
-      outline: none;
-      border-color: var(--brand);
-      box-shadow: 0 0 0 3px rgba(138, 90, 68, 0.16);
-    }
-
-    textarea { min-height: 90px; resize: vertical; }
-
-    .checkbox-row {
-      display: flex;
-      gap: 10px;
-      align-items: center;
-      padding: 8px 0;
-    }
-
-    .actions {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-      margin-top: 8px;
-    }
-
-    button {
-      border: none;
-      border-radius: 10px;
-      font: inherit;
-      font-weight: 600;
-      padding: 11px 16px;
-      cursor: pointer;
-      transition: transform 0.12s ease, opacity 0.2s;
-    }
-
-    button:hover { transform: translateY(-1px); }
-
-    .btn-primary { background: var(--brand); color: #fff; }
-    .btn-primary:hover { background: var(--brand-dark); }
-
-    .btn-secondary {
-      background: #f3eeeb;
-      color: #5a4b43;
-      border: 1px solid #ddcfc5;
-    }
-
-    .btn-danger {
-      background: #fcebec;
-      color: var(--error);
-      border: 1px solid #f5c5ca;
-    }
-
-    .status {
-      margin: 0;
-      border-top: 1px solid var(--line);
-      padding: 12px 24px;
-      font-size: 0.92rem;
-      color: var(--muted);
-      background: #fffcfa;
-      min-height: 48px;
-      display: flex;
-      align-items: center;
-    }
-
-    .status.ok { color: var(--ok); }
-    .status.error { color: var(--error); }
-
-    .list-wrap {
-      padding: 16px;
-      max-height: 75vh;
-      overflow: auto;
-    }
-
-    .product-item {
-      border: 1px solid var(--line);
-      border-radius: 12px;
-      padding: 12px;
-      background: #fff;
-      margin-bottom: 10px;
-    }
-
-    .product-item h3 {
-      margin: 0 0 6px;
-      font-size: 1rem;
-    }
-
-    .product-meta {
-      margin: 0;
-      color: var(--muted);
-      font-size: 0.88rem;
-    }
-
-    .item-actions {
-      margin-top: 10px;
-      display: flex;
-      gap: 8px;
-    }
-
-    .item-actions button {
-      padding: 8px 10px;
-      font-size: 0.85rem;
-    }
-
-    #login-wrapper {
-      max-width: 460px;
-      margin: 32px auto;
-    }
-
-    #login-wrapper[hidden],
-    #admin-wrapper[hidden] {
-      display: none !important;
-    }
-
-    .login-body {
-      padding: 20px 24px 24px;
-      display: grid;
-      gap: 12px;
-    }
-
-    .login-actions {
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-    }
-
-    @media (max-width: 980px) {
-      .admin-layout { grid-template-columns: 1fr; }
-      .list-wrap { max-height: none; }
-    }
-
-    .admin-extra {
-      max-width: 1200px;
-      margin: 0 auto 24px;
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 20px;
-      padding: 0 20px;
-    }
-
-    .admin-extra .card { padding-bottom: 14px; }
-
-    .admin-extra-form {
-      padding: 16px;
-      display: grid;
-      gap: 10px;
-    }
-
-    .admin-extra-form input,
-    .admin-extra-form select {
-      width: 100%;
-    }
-
-    @media (max-width: 620px) {
-      .grid-2 { grid-template-columns: 1fr; }
-      .admin-extra { grid-template-columns: 1fr; padding: 0 16px 16px; }
-    }
-  </style>
-</head>
-<body>
-  <section id="login-wrapper" class="card">
-    <header class="card-header">
-      <div>
-        <h2>Login do Admin</h2>
-        <p class="subtitle">Acesse com seu e-mail e senha.</p>
-      </div>
-    </header>
-
-    <div class="login-body">
-      <div>
-        <label for="login-email">E-mail</label>
-        <input id="login-email" type="email" placeholder="seuemail@dominio.com" />
-      </div>
-
-      <div>
-        <label for="login-senha">Senha</label>
-        <input id="login-senha" type="password" placeholder="********" />
-      </div>
-
-      <div class="login-actions">
-        <button id="btn-login" type="button" class="btn-primary">Entrar</button>
-        <button id="btn-esqueci-senha" type="button" class="btn-secondary">Esqueci minha senha</button>
-      </div>
-
-      <p class="status" id="login-status">Faça login para acessar o painel.</p>
-    </div>
-  </section>
-
-  <div id="admin-wrapper" hidden>
-    <main class="admin-layout">
-      <section class="card">
-        <header class="card-header">
-          <div>
-            <h1>Painel de Produtos</h1>
-            <p class="subtitle">Cadastre, edite e remova produtos do catálogo.</p>
-          </div>
-          <button type="button" id="btn-logout" class="btn-secondary">Sair</button>
-        </header>
-
-        <form id="form-produto">
-          <div class="grid-2">
-            <div>
-              <label for="id">ID do produto</label>
-              <input type="text" id="id" required placeholder="ex: planner-a5-rose" />
-            </div>
-            <div>
-              <label for="nome">Nome</label>
-              <input type="text" id="nome" required placeholder="Nome do produto" />
-            </div>
-          </div>
-
-          <div class="grid-2">
-            <div>
-              <label for="preco">Preço</label>
-              <input type="text" id="preco" required placeholder="ex: 59,90" />
-            </div>
-            <div>
-              <label for="categoria">Categoria</label>
-              <input type="text" id="categoria" placeholder="planner, refil, receituario..." />
-            </div>
-          </div>
-
-          <div class="grid-2">
-            <div>
-              <label for="tipo">Tipo/Subcategoria</label>
-              <input type="text" id="tipo" placeholder="permanente, datado..." />
-            </div>
-            <div>
-              <label for="tamanho">Tamanho</label>
-              <input type="text" id="tamanho" placeholder="A5, A6..." />
-            </div>
-          </div>
-
-          <div class="grid-2">
-            <div>
-              <label for="gramatura">Gramatura</label>
-              <input type="text" id="gramatura" placeholder="90g, 120g..." />
-            </div>
-            <div>
-              <label for="link">Link de compra</label>
-              <input type="url" id="link" placeholder="https://..." />
-            </div>
-          </div>
-
-          <div>
-            <label for="imagens">URLs das imagens (separadas por vírgula)</label>
-            <input type="text" id="imagens" placeholder="https://.../1.jpg, https://.../2.jpg" />
-          </div>
-
-          <div>
-            <label for="descricaoCurta">Descrição curta</label>
-            <textarea id="descricaoCurta" placeholder="Resumo para listagem"></textarea>
-          </div>
-
-          <div>
-            <label for="descricaoLonga">Descrição longa</label>
-            <textarea id="descricaoLonga" placeholder="Descrição completa para a página do produto"></textarea>
-          </div>
-
-          <div class="checkbox-row">
-            <input type="checkbox" id="personalizado" />
-            <label for="personalizado" style="margin:0;font-weight:500;">Produto personalizado?</label>
-          </div>
-
-          <div class="actions">
-            <button type="submit" class="btn-primary" id="btn-submit">Salvar produto</button>
-            <button type="button" class="btn-secondary" id="btn-novo">Limpar formulário</button>
-            <button type="button" class="btn-danger" id="btn-excluir" style="display:none;">Excluir produto</button>
-          </div>
-        </form>
-
-        <p class="status" id="status">Pronto para cadastrar.</p>
-      </section>
-
-      <aside class="card">
-        <header class="card-header">
-          <div>
-            <h1>Produtos cadastrados</h1>
-            <p class="subtitle">Clique em “Editar” para carregar no formulário.</p>
-          </div>
-        </header>
-        <div class="list-wrap" id="lista-produtos"></div>
-      </aside>
-    </main>
-
-    <section class="admin-extra">
-      <article class="card">
-        <header class="card-header">
-          <div>
-            <h1>Pedidos</h1>
-            <p class="subtitle">Acompanhe pedidos e atualize status.</p>
-          </div>
-        </header>
-        <div class="list-wrap" id="lista-pedidos-admin"></div>
-      </article>
-
-      <article class="card">
-        <header class="card-header">
-          <div>
-            <h1>Cupons</h1>
-            <p class="subtitle">Cadastre cupons para promoções.</p>
-          </div>
-        </header>
-        <form class="admin-extra-form" id="form-cupom">
-          <input type="text" id="cupom-codigo" placeholder="Código (ex: BEMVINDO10)" required />
-          <select id="cupom-tipo">
-            <option value="percentual">Percentual (%)</option>
-            <option value="fixo">Valor fixo (R$)</option>
-          </select>
-          <input type="number" id="cupom-valor" placeholder="Valor" required />
-          <button type="submit" class="btn-primary">Salvar cupom</button>
-        </form>
-        <div class="list-wrap" id="lista-cupons-admin"></div>
-      </article>
-    </section>
-
-    <!-- FOOTER -->
-    <footer class="footer">
-      <div class="footer-container">
-        <div class="footer-column">
-          <h4>Zuca Personalizados</h4>
-          <p style="font-size: 0.9rem; margin: 8px 0; color: var(--muted);">Personalizados que fazem a diferença</p>
-          <p style="font-size: 0.85rem; margin: 8px 0; color: var(--muted);">📞 (67) 9 8438-1778</p>
-        </div>
-        <div class="footer-column">
-          <h4>Navegação</h4>
-          <a href="index.html">Início</a>
-          <a href="index.html#produtos">Produtos</a>
-          <a href="index.html#sobre">Sobre</a>
-          <a href="index.html#contato">Contato</a>
-        </div>
-        <div class="footer-column">
-          <h4>Suporte</h4>
-          <a href="https://wa.me/5567984381778" target="_blank">WhatsApp</a>
-          <a href="mailto:contato@zuca.com">Email</a>
-        </div>
-      </div>
-      <div style="text-align: center; padding-top: 24px; border-top: 1px solid var(--line); font-size: 0.85rem; color: var(--muted);">
-        © 2026 Zuca Personalizados. Todos os direitos reservados.
-      </div>
-    </footer>
   </div>
 
   <script type="module" src="js/admin.js"></script>

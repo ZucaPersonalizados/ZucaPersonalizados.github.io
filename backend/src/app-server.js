@@ -408,6 +408,172 @@ app.patch("/api/admin/pedidos/:id/status", adminAuth, requireDb, async (req, res
   }
 });
 
+app.get("/api/admin/produtos", adminAuth, requireDb, async (req, res) => {
+  try {
+    const snap = await db.collection("produtos").get();
+    const produtos = snap.docs
+      .map((doc) => ({ id: doc.id, ...doc.data() }))
+      .sort((a, b) => String(a.nome || "").localeCompare(String(b.nome || ""), "pt-BR"));
+
+    return res.json({ success: true, produtos });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.post("/api/admin/produtos", adminAuth, requireDb, async (req, res) => {
+  try {
+    const id = String(req.body.id || "").trim();
+    const nome = String(req.body.nome || "").trim();
+
+    if (!id || !nome) {
+      return res.status(400).json({ success: false, error: "ID e nome sao obrigatorios" });
+    }
+
+    const produtoRef = db.collection("produtos").doc(id);
+    const existente = await produtoRef.get();
+    if (existente.exists) {
+      return res.status(409).json({ success: false, error: "Ja existe produto com esse ID" });
+    }
+
+    const imagens = Array.isArray(req.body.imagens)
+      ? req.body.imagens.map((img) => String(img || "").trim()).filter(Boolean)
+      : [];
+
+    const produto = {
+      nome,
+      preco: String(req.body.preco || "0,00"),
+      descricaoCurta: String(req.body.descricaoCurta || ""),
+      descricaoLonga: String(req.body.descricaoLonga || ""),
+      categoria: String(req.body.categoria || ""),
+      tipo: String(req.body.tipo || ""),
+      tamanho: String(req.body.tamanho || ""),
+      gramatura: String(req.body.gramatura || ""),
+      link: String(req.body.link || ""),
+      imagens,
+      personalizado: !!req.body.personalizado,
+      estoque: Number(req.body.estoque || 0),
+      atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
+      atualizadoPor: req.adminSession.email,
+    };
+
+    await produtoRef.set(produto);
+    return res.status(201).json({ success: true, produto: { id, ...produto } });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.put("/api/admin/produtos/:id", adminAuth, requireDb, async (req, res) => {
+  try {
+    const id = String(req.params.id || "").trim();
+    if (!id) {
+      return res.status(400).json({ success: false, error: "ID do produto invalido" });
+    }
+
+    const produtoRef = db.collection("produtos").doc(id);
+    const existente = await produtoRef.get();
+    if (!existente.exists) {
+      return res.status(404).json({ success: false, error: "Produto nao encontrado" });
+    }
+
+    const imagens = Array.isArray(req.body.imagens)
+      ? req.body.imagens.map((img) => String(img || "").trim()).filter(Boolean)
+      : [];
+
+    const updates = {
+      nome: String(req.body.nome || "").trim() || "Produto",
+      preco: String(req.body.preco || "0,00"),
+      descricaoCurta: String(req.body.descricaoCurta || ""),
+      descricaoLonga: String(req.body.descricaoLonga || ""),
+      categoria: String(req.body.categoria || ""),
+      tipo: String(req.body.tipo || ""),
+      tamanho: String(req.body.tamanho || ""),
+      gramatura: String(req.body.gramatura || ""),
+      link: String(req.body.link || ""),
+      imagens,
+      personalizado: !!req.body.personalizado,
+      estoque: Number(req.body.estoque || 0),
+      atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
+      atualizadoPor: req.adminSession.email,
+    };
+
+    await produtoRef.update(updates);
+    return res.json({ success: true, produto: { id, ...updates } });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.delete("/api/admin/produtos/:id", adminAuth, requireDb, async (req, res) => {
+  try {
+    const id = String(req.params.id || "").trim();
+    if (!id) {
+      return res.status(400).json({ success: false, error: "ID do produto invalido" });
+    }
+
+    await db.collection("produtos").doc(id).delete();
+    return res.json({ success: true });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.get("/api/admin/cupons", adminAuth, requireDb, async (req, res) => {
+  try {
+    const snap = await db.collection("cupons").get();
+    const cupons = snap.docs
+      .map((doc) => ({ codigo: doc.id, ...doc.data() }))
+      .sort((a, b) => String(a.codigo || "").localeCompare(String(b.codigo || ""), "pt-BR"));
+
+    return res.json({ success: true, cupons });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.post("/api/admin/cupons", adminAuth, requireDb, async (req, res) => {
+  try {
+    const codigo = String(req.body.codigo || "").trim().toUpperCase();
+    const tipo = String(req.body.tipo || "percentual").trim().toLowerCase();
+    const valor = Number(req.body.valor || 0);
+
+    if (!codigo || !(valor > 0)) {
+      return res.status(400).json({ success: false, error: "Codigo e valor valido sao obrigatorios" });
+    }
+
+    if (!["percentual", "fixo"].includes(tipo)) {
+      return res.status(400).json({ success: false, error: "Tipo de cupom invalido" });
+    }
+
+    await db.collection("cupons").doc(codigo).set({
+      tipo,
+      valor,
+      ativo: req.body.ativo !== false,
+      atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
+      atualizadoPor: req.adminSession.email,
+    });
+
+    return res.status(201).json({ success: true, cupom: { codigo, tipo, valor } });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.delete("/api/admin/cupons/:codigo", adminAuth, requireDb, async (req, res) => {
+  try {
+    const codigo = String(req.params.codigo || "").trim().toUpperCase();
+    if (!codigo) {
+      return res.status(400).json({ success: false, error: "Codigo do cupom invalido" });
+    }
+
+    await db.collection("cupons").doc(codigo).delete();
+    return res.json({ success: true });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 app.post("/gerar-pix", async (req, res) => {
   try {
     const { valor, descricao, cliente, idPedido } = req.body;

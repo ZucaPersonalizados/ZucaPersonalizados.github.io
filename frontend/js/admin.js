@@ -4,8 +4,34 @@ const API_BASE = (() => {
   return window.location.origin;
 })();
 
-function getApiUrl(path) {
-  return `${API_BASE}${path}`;
+const ORIGIN_BASE = window.location.origin.replace(/\/$/, "");
+const API_BASES = [...new Set([API_BASE, ORIGIN_BASE].filter(Boolean))];
+
+function getApiUrl(path, base = API_BASE) {
+  return `${base}${path}`;
+}
+
+async function fetchApi(path, options) {
+  let lastResponse = null;
+  let lastError = null;
+
+  for (const base of API_BASES) {
+    try {
+      const response = await fetch(getApiUrl(path, base), options);
+      if (response.ok) {
+        if (base === ORIGIN_BASE && API_BASE !== ORIGIN_BASE) {
+          localStorage.removeItem("zuca_api_base_url");
+        }
+        return response;
+      }
+      lastResponse = response;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  if (lastResponse) return lastResponse;
+  throw lastError || new Error("Falha ao conectar com a API");
 }
 
 const loginWrapper = document.getElementById("login-wrapper");
@@ -24,7 +50,29 @@ const pedidosList = document.getElementById("pedidos-list");
 const filtroStatus = document.getElementById("filtro-status");
 const btnRecarregar = document.getElementById("btn-recarregar-pedidos");
 
+const formProduto = document.getElementById("form-produto");
+const produtoStatusEl = document.getElementById("status");
+const listaProdutosEl = document.getElementById("lista-produtos");
+const btnNovoProduto = document.getElementById("btn-novo");
+const btnExcluirProduto = document.getElementById("btn-excluir");
+const inputProdutoId = document.getElementById("id");
+
+const formCupom = document.getElementById("form-cupom");
+const listaCuponsEl = document.getElementById("lista-cupons-admin");
+
 let allOrders = [];
+let allProducts = [];
+let allCoupons = [];
+let selectedProductId = null;
+
+function escapeHtml(value = "") {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
 
 function showLogin() {
   loginWrapper.style.display = "flex";
@@ -33,14 +81,19 @@ function showLogin() {
 
 function showAdmin() {
   loginWrapper.style.display = "none";
-  adminWrapper.style.display = "flex";
-  adminWrapper.style.flexDirection = "column";
+  adminWrapper.style.display = "block";
 }
 
 function setLoginStatus(message, type = "") {
   loginStatusEl.className = type ? `status-box ${type}` : "status-box";
   loginStatusEl.textContent = message;
   loginStatusEl.style.display = message ? "block" : "none";
+}
+
+function setProdutoStatus(message, type = "") {
+  if (!produtoStatusEl) return;
+  produtoStatusEl.textContent = message;
+  produtoStatusEl.style.color = type === "error" ? "#e74c3c" : type === "ok" ? "#1f8f4f" : "var(--text-secondary)";
 }
 
 function formatarData(timestamp) {
@@ -70,7 +123,7 @@ function getStatusLabel(status) {
   const map = {
     pendente: "Pendente",
     pagto: "Pago",
-    em_producao: "Em produção",
+    em_producao: "Em producao",
     enviado: "Enviado",
     entregue: "Entregue",
     cancelado: "Cancelado",
@@ -81,12 +134,115 @@ function getStatusLabel(status) {
 function getPaymentMethodLabel(method) {
   const map = {
     pix: "PIX",
-    cartao: "Cartão",
+    cartao: "Cartao",
     boleto: "Boleto",
-    transferencia: "Transferência",
+    transferencia: "Transferencia",
     outro: "Outro",
   };
   return map[method] || method;
+}
+
+function parsePreco(preco = "") {
+  const raw = String(preco).replace("R$", "").trim();
+  const number = Number(raw.replace(/\./g, "").replace(",", "."));
+  return Number.isFinite(number) ? number : 0;
+}
+
+function obterProdutoDoFormulario() {
+  return {
+    id: String(document.getElementById("id")?.value || "").trim(),
+    nome: String(document.getElementById("nome")?.value || "").trim(),
+    preco: String(document.getElementById("preco")?.value || "").trim(),
+    estoque: Number(document.getElementById("estoque")?.value || 0),
+    categoria: String(document.getElementById("categoria")?.value || "").trim(),
+    tipo: String(document.getElementById("tipo")?.value || "").trim(),
+    tamanho: String(document.getElementById("tamanho")?.value || "").trim(),
+    gramatura: String(document.getElementById("gramatura")?.value || "").trim(),
+    link: String(document.getElementById("link")?.value || "").trim(),
+    imagens: String(document.getElementById("imagens")?.value || "")
+      .split(",")
+      .map((img) => img.trim())
+      .filter(Boolean),
+    descricaoCurta: String(document.getElementById("descricaoCurta")?.value || "").trim(),
+    descricaoLonga: String(document.getElementById("descricaoLonga")?.value || "").trim(),
+    personalizado: !!document.getElementById("personalizado")?.checked,
+  };
+}
+
+function limparFormularioProduto() {
+  if (!formProduto) return;
+  formProduto.reset();
+  selectedProductId = null;
+  if (inputProdutoId) inputProdutoId.disabled = false;
+  if (btnExcluirProduto) btnExcluirProduto.style.display = "none";
+  setProdutoStatus("Pronto para cadastrar.");
+}
+
+function preencherFormularioProduto(produto) {
+  document.getElementById("id").value = produto.id || "";
+  document.getElementById("nome").value = produto.nome || "";
+  document.getElementById("preco").value = produto.preco || "";
+  document.getElementById("estoque").value = Number(produto.estoque || 0);
+  document.getElementById("categoria").value = produto.categoria || "";
+  document.getElementById("tipo").value = produto.tipo || "";
+  document.getElementById("tamanho").value = produto.tamanho || "";
+  document.getElementById("gramatura").value = produto.gramatura || "";
+  document.getElementById("link").value = produto.link || "";
+  document.getElementById("imagens").value = Array.isArray(produto.imagens) ? produto.imagens.join(", ") : "";
+  document.getElementById("descricaoCurta").value = produto.descricaoCurta || "";
+  document.getElementById("descricaoLonga").value = produto.descricaoLonga || "";
+  document.getElementById("personalizado").checked = !!produto.personalizado;
+
+  selectedProductId = produto.id;
+  if (inputProdutoId) inputProdutoId.disabled = true;
+  if (btnExcluirProduto) btnExcluirProduto.style.display = "inline-flex";
+  setProdutoStatus(`Editando produto ${produto.id}.`);
+}
+
+function renderProdutos() {
+  if (!listaProdutosEl) return;
+
+  if (!allProducts.length) {
+    listaProdutosEl.innerHTML = "<p>Nenhum produto cadastrado.</p>";
+    return;
+  }
+
+  listaProdutosEl.innerHTML = allProducts.map((produto) => {
+    const preco = parsePreco(produto.preco);
+    return `
+      <div class="item-card" data-produto-id="${escapeHtml(produto.id)}">
+        <div class="item-title">${escapeHtml(produto.nome || "Produto")}</div>
+        <div class="item-meta">ID: ${escapeHtml(produto.id)} | Preco: ${formatarMoeda(preco)} | Estoque: ${Number(produto.estoque || 0)}</div>
+        <div class="item-meta">Categoria: ${escapeHtml(produto.categoria || "-")} | Tipo: ${escapeHtml(produto.tipo || "-")}</div>
+        <div class="table-actions">
+          <button class="btn btn-small btn-secondary" type="button" data-action="editar-produto">Editar</button>
+          <button class="btn btn-small btn-danger" type="button" data-action="excluir-produto">Excluir</button>
+        </div>
+      </div>
+    `;
+  }).join("");
+}
+
+function renderCupons() {
+  if (!listaCuponsEl) return;
+
+  if (!allCoupons.length) {
+    listaCuponsEl.innerHTML = "<p>Nenhum cupom cadastrado.</p>";
+    return;
+  }
+
+  listaCuponsEl.innerHTML = allCoupons.map((cupom) => {
+    const sufixo = cupom.tipo === "percentual" ? "%" : "R$";
+    return `
+      <div class="item-card" data-cupom-codigo="${escapeHtml(cupom.codigo)}">
+        <div class="item-title">${escapeHtml(cupom.codigo)}</div>
+        <div class="item-meta">Tipo: ${escapeHtml(cupom.tipo || "-")} | Valor: ${escapeHtml(String(cupom.valor ?? 0))} ${sufixo}</div>
+        <div class="table-actions">
+          <button class="btn btn-small btn-danger" type="button" data-action="excluir-cupom">Excluir</button>
+        </div>
+      </div>
+    `;
+  }).join("");
 }
 
 function renderDashboard(dashboard, pedidos) {
@@ -99,14 +255,16 @@ function renderDashboard(dashboard, pedidos) {
   dashboardStats.innerHTML = `
     <div class="stat-card"><h3>Total de Pedidos</h3><div class="value">${total}</div></div>
     <div class="stat-card"><h3>Pendentes</h3><div class="value" style="color: #f39c12;">${pendentes}</div></div>
-    <div class="stat-card"><h3>Em Produção</h3><div class="value" style="color: #3498db;">${emProducao}</div></div>
+    <div class="stat-card"><h3>Em Producao</h3><div class="value" style="color: #3498db;">${emProducao}</div></div>
     <div class="stat-card"><h3>Entregues</h3><div class="value" style="color: #1f8f4f;">${entregues}</div></div>
     <div class="stat-card"><h3>Renda Total</h3><div class="value">${formatarMoeda(totalRenda)}</div></div>
   `;
 }
 
 function exibirPedidos() {
-  const statusFiltro = filtroStatus.value;
+  if (!pedidosList) return;
+
+  const statusFiltro = filtroStatus?.value || "";
   const pedidosFiltrados = statusFiltro
     ? allOrders.filter((p) => p.status === statusFiltro || p.statusPedido === statusFiltro)
     : allOrders;
@@ -119,15 +277,15 @@ function exibirPedidos() {
   pedidosList.innerHTML = pedidosFiltrados.map((pedido) => `
     <tr>
       <td><strong>#${pedido.id.slice(0, 8)}</strong></td>
-      <td>${pedido.cliente?.nome || pedido.cliente?.email || "-"}</td>
+      <td>${escapeHtml(pedido.cliente?.nome || pedido.cliente?.email || "-")}</td>
       <td><strong>${formatarMoeda(pedido.total)}</strong></td>
-      <td><span class="status ${getStatusClass(pedido.statusPedido || pedido.status)}">${getStatusLabel(pedido.statusPedido || pedido.status)}</span></td>
-      <td><span class="status ${pedido.status === "pagto" ? "pagto" : "pendente"}">${pedido.status === "pagto" ? "✓ Verificado" : "○ Pendente"}</span></td>
+      <td><span class="status-pill ${getStatusClass(pedido.statusPedido || pedido.status)}">${getStatusLabel(pedido.statusPedido || pedido.status)}</span></td>
+      <td><span class="status-pill ${pedido.status === "pagto" ? "pagto" : "pendente"}">${pedido.status === "pagto" ? "Verificado" : "Pendente"}</span></td>
       <td>${formatarData(pedido.criadoEmISO)}</td>
       <td>
         <div class="table-actions">
-          <button class="btn btn-small btn-secondary" onclick="exibirDetalhes('${pedido.id}')">Ver</button>
-          <button class="btn btn-small btn-secondary" onclick="editarStatus('${pedido.id}')">Editar</button>
+          <button class="btn btn-small btn-secondary" type="button" onclick="exibirDetalhes('${pedido.id}')">Ver</button>
+          <button class="btn btn-small btn-secondary" type="button" onclick="editarStatus('${pedido.id}')">Editar</button>
         </div>
       </td>
     </tr>
@@ -135,7 +293,7 @@ function exibirPedidos() {
 }
 
 async function carregarPedidos() {
-  const response = await fetch(getApiUrl("/api/admin/pedidos"), { credentials: "include" });
+  const response = await fetchApi("/api/admin/pedidos", { credentials: "include" });
   const payload = await response.json();
 
   if (!response.ok || !payload.success) {
@@ -147,29 +305,53 @@ async function carregarPedidos() {
   exibirPedidos();
 }
 
+async function carregarProdutos() {
+  const response = await fetchApi("/api/admin/produtos", { credentials: "include" });
+  const payload = await response.json();
+
+  if (!response.ok || !payload.success) {
+    throw new Error(payload.error || "Falha ao carregar produtos");
+  }
+
+  allProducts = Array.isArray(payload.produtos) ? payload.produtos : [];
+  renderProdutos();
+}
+
+async function carregarCupons() {
+  const response = await fetchApi("/api/admin/cupons", { credentials: "include" });
+  const payload = await response.json();
+
+  if (!response.ok || !payload.success) {
+    throw new Error(payload.error || "Falha ao carregar cupons");
+  }
+
+  allCoupons = Array.isArray(payload.cupons) ? payload.cupons : [];
+  renderCupons();
+}
+
 window.exibirDetalhes = async (pedidoId) => {
   const pedido = allOrders.find((item) => item.id === pedidoId);
   if (!pedido) {
-    alert("Pedido não encontrado");
+    alert("Pedido nao encontrado");
     return;
   }
 
   const itensHtml = (pedido.itens || []).map((item) => `
     <div class="item-row">
-      <div>${item.nome}</div>
+      <div>${escapeHtml(item.nome || "Produto")}</div>
       <div>${item.quantidade || 1}x</div>
       <div style="text-align:right;">${formatarMoeda(item.preco)}</div>
     </div>
   `).join("");
 
   modalBody.innerHTML = `
-    <div class="detail-item"><div class="detail-label">ID Pedido</div><div class="detail-value">#${pedido.id.slice(0, 8)}</div></div>
-    <div class="detail-item"><div class="detail-label">Cliente</div><div class="detail-value">${pedido.cliente?.nome || "-"}<br/>${pedido.cliente?.email || ""}<br/>${pedido.cliente?.telefone || ""}</div></div>
-    <div class="detail-item"><div class="detail-label">Método de pago</div><div class="detail-value">${getPaymentMethodLabel(pedido.pagamento)}</div></div>
-    <div class="detail-item"><div class="detail-label">Status Pag.</div><div class="detail-value"><span class="status ${pedido.status === "pagto" ? "pagto" : "pendente"}">${pedido.status === "pagto" ? "✓ Verificado" : "○ Pendente"}</span></div></div>
-    <div class="detail-item"><div class="detail-label">Itens</div><div class="detail-value"><div class="items-list">${itensHtml || "<p>Sem itens</p>"}</div></div></div>
-    <div class="detail-item"><div class="detail-label">Total</div><div class="detail-value" style="font-size:18px; font-weight:700;">${formatarMoeda(pedido.total)}</div></div>
-    <div class="detail-item"><div class="detail-label">Criado em</div><div class="detail-value">${formatarData(pedido.criadoEmISO)}</div></div>
+    <div class="detail-item"><div class="detail-label">ID Pedido</div><div>#${pedido.id.slice(0, 8)}</div></div>
+    <div class="detail-item"><div class="detail-label">Cliente</div><div>${escapeHtml(pedido.cliente?.nome || "-")}<br/>${escapeHtml(pedido.cliente?.email || "")}<br/>${escapeHtml(pedido.cliente?.telefone || "")}</div></div>
+    <div class="detail-item"><div class="detail-label">Metodo de pagto</div><div>${getPaymentMethodLabel(pedido.pagamento)}</div></div>
+    <div class="detail-item"><div class="detail-label">Status Pag.</div><div><span class="status-pill ${pedido.status === "pagto" ? "pagto" : "pendente"}">${pedido.status === "pagto" ? "Verificado" : "Pendente"}</span></div></div>
+    <div class="detail-item"><div class="detail-label">Itens</div><div><div class="items-list">${itensHtml || "<p>Sem itens</p>"}</div></div></div>
+    <div class="detail-item"><div class="detail-label">Total</div><div style="font-size:18px; font-weight:700;">${formatarMoeda(pedido.total)}</div></div>
+    <div class="detail-item"><div class="detail-label">Criado em</div><div>${formatarData(pedido.criadoEmISO)}</div></div>
   `;
 
   document.getElementById("modal-title").textContent = `Pedido #${pedido.id.slice(0, 8)}`;
@@ -179,7 +361,7 @@ window.exibirDetalhes = async (pedidoId) => {
 window.editarStatus = async (pedidoId) => {
   const pedido = allOrders.find((item) => item.id === pedidoId);
   if (!pedido) {
-    alert("Pedido não encontrado");
+    alert("Pedido nao encontrado");
     return;
   }
 
@@ -197,13 +379,13 @@ window.editarStatus = async (pedidoId) => {
         <label style="display:block; margin-bottom:8px; font-weight:700;">Status do Pedido</label>
         <select id="select-status-pedido" style="padding:8px 12px; border:1px solid var(--border-color); border-radius:6px; width:100%;">
           <option value="pendente" ${(pedido.statusPedido || "pendente") === "pendente" ? "selected" : ""}>Pendente</option>
-          <option value="em_producao" ${pedido.statusPedido === "em_producao" ? "selected" : ""}>Em produção</option>
+          <option value="em_producao" ${pedido.statusPedido === "em_producao" ? "selected" : ""}>Em producao</option>
           <option value="enviado" ${pedido.statusPedido === "enviado" ? "selected" : ""}>Enviado</option>
           <option value="entregue" ${pedido.statusPedido === "entregue" ? "selected" : ""}>Entregue</option>
           <option value="cancelado" ${pedido.statusPedido === "cancelado" ? "selected" : ""}>Cancelado</option>
         </select>
       </div>
-      <button id="btn-salvar-status" class="btn btn-primary" style="width:100%; margin-top:8px;">Salvar Mudanças</button>
+      <button id="btn-salvar-status" class="btn btn-primary" style="width:100%; margin-top:8px;" type="button">Salvar Mudancas</button>
     </div>
   `;
 
@@ -215,14 +397,14 @@ window.editarStatus = async (pedidoId) => {
       const status = document.getElementById("select-status-pagto").value;
       const statusPedido = document.getElementById("select-status-pedido").value;
 
-      const response = await fetch(getApiUrl(`/api/admin/pedidos/${pedidoId}/status`), {
+      const response = await fetchApi(`/api/admin/pedidos/${pedidoId}/status`, {
         method: "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status, statusPedido }),
       });
-      const payload = await response.json();
 
+      const payload = await response.json();
       if (!response.ok || !payload.success) {
         throw new Error(payload.error || "Falha ao atualizar");
       }
@@ -240,7 +422,7 @@ window.fecharModal = () => {
   detailsModal.classList.remove("active");
 };
 
-detailsModal.addEventListener("click", (event) => {
+detailsModal?.addEventListener("click", (event) => {
   if (event.target === detailsModal) {
     window.fecharModal();
   }
@@ -256,25 +438,25 @@ document.querySelectorAll(".tab").forEach((tab) => {
   });
 });
 
-filtroStatus.addEventListener("change", exibirPedidos);
-btnRecarregar.addEventListener("click", async () => {
+filtroStatus?.addEventListener("change", exibirPedidos);
+btnRecarregar?.addEventListener("click", async () => {
   try {
     btnRecarregar.disabled = true;
-    btnRecarregar.textContent = "🔄 Carregando...";
+    btnRecarregar.textContent = "Carregando...";
     await carregarPedidos();
   } catch (error) {
     alert(`Erro: ${error.message}`);
   } finally {
     btnRecarregar.disabled = false;
-    btnRecarregar.textContent = "🔄 Recarregar";
+    btnRecarregar.textContent = "Recarregar";
   }
 });
 
-btnEsqueciSenha.addEventListener("click", () => {
-  setLoginStatus("No modo backend-only, redefina a senha do admin via variável ADMIN_PASSWORD no servidor.", "ok");
+btnEsqueciSenha?.addEventListener("click", () => {
+  setLoginStatus("No modo backend-only, redefina a senha do admin via variavel ADMIN_PASSWORD no servidor.", "ok");
 });
 
-btnLogin.addEventListener("click", async () => {
+btnLogin?.addEventListener("click", async () => {
   try {
     const email = loginEmail.value.trim();
     const senha = loginSenha.value;
@@ -284,7 +466,7 @@ btnLogin.addEventListener("click", async () => {
       return;
     }
 
-    const response = await fetch(getApiUrl("/api/admin/login"), {
+    const response = await fetchApi("/api/admin/login", {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
@@ -293,42 +475,199 @@ btnLogin.addEventListener("click", async () => {
 
     const payload = await response.json();
     if (!response.ok || !payload.success) {
-      throw new Error(payload.error || "Credenciais inválidas");
+      throw new Error(payload.error || "Credenciais invalidas");
     }
 
     showAdmin();
     userInfoEl.textContent = payload.user?.email || email;
     setLoginStatus("");
-    await carregarPedidos();
+
+    await Promise.all([carregarPedidos(), carregarProdutos(), carregarCupons()]);
+    limparFormularioProduto();
   } catch (error) {
     showLogin();
     setLoginStatus(error.message, "error");
   }
 });
 
-btnLogout.addEventListener("click", async () => {
-  await fetch(getApiUrl("/api/admin/logout"), { method: "POST", credentials: "include" });
+btnLogout?.addEventListener("click", async () => {
+  await fetchApi("/api/admin/logout", { method: "POST", credentials: "include" });
   showLogin();
-  setLoginStatus("Sessão encerrada.", "ok");
+  setLoginStatus("Sessao encerrada.", "ok");
+});
+
+formProduto?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+
+  try {
+    const produto = obterProdutoDoFormulario();
+    if (!produto.id || !produto.nome) {
+      setProdutoStatus("ID e nome sao obrigatorios.", "error");
+      return;
+    }
+
+    const isEdicao = !!selectedProductId;
+    const url = isEdicao ? `/api/admin/produtos/${encodeURIComponent(selectedProductId)}` : "/api/admin/produtos";
+    const method = isEdicao ? "PUT" : "POST";
+
+    const response = await fetchApi(url, {
+      method,
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(produto),
+    });
+
+    const payload = await response.json();
+    if (!response.ok || !payload.success) {
+      throw new Error(payload.error || "Falha ao salvar produto");
+    }
+
+    await carregarProdutos();
+    if (isEdicao) {
+      setProdutoStatus("Produto atualizado com sucesso.", "ok");
+    } else {
+      limparFormularioProduto();
+      setProdutoStatus("Produto cadastrado com sucesso.", "ok");
+    }
+  } catch (error) {
+    setProdutoStatus(error.message, "error");
+  }
+});
+
+btnNovoProduto?.addEventListener("click", () => {
+  limparFormularioProduto();
+});
+
+btnExcluirProduto?.addEventListener("click", async () => {
+  if (!selectedProductId) return;
+
+  const confirma = window.confirm(`Excluir produto ${selectedProductId}?`);
+  if (!confirma) return;
+
+  try {
+    const response = await fetchApi(`/api/admin/produtos/${encodeURIComponent(selectedProductId)}`, {
+      method: "DELETE",
+      credentials: "include",
+    });
+
+    const payload = await response.json();
+    if (!response.ok || !payload.success) {
+      throw new Error(payload.error || "Falha ao excluir produto");
+    }
+
+    await carregarProdutos();
+    limparFormularioProduto();
+    setProdutoStatus("Produto excluido com sucesso.", "ok");
+  } catch (error) {
+    setProdutoStatus(error.message, "error");
+  }
+});
+
+listaProdutosEl?.addEventListener("click", (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLElement)) return;
+
+  const card = target.closest("[data-produto-id]");
+  if (!card) return;
+
+  const produtoId = card.getAttribute("data-produto-id");
+  if (!produtoId) return;
+
+  const produto = allProducts.find((item) => item.id === produtoId);
+  if (!produto) return;
+
+  if (target.dataset.action === "editar-produto") {
+    preencherFormularioProduto(produto);
+    return;
+  }
+
+  if (target.dataset.action === "excluir-produto") {
+    selectedProductId = produto.id;
+    if (btnExcluirProduto) btnExcluirProduto.style.display = "inline-flex";
+    btnExcluirProduto?.click();
+  }
+});
+
+formCupom?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+
+  try {
+    const codigo = String(document.getElementById("cupom-codigo")?.value || "").trim().toUpperCase();
+    const tipo = String(document.getElementById("cupom-tipo")?.value || "percentual");
+    const valor = Number(document.getElementById("cupom-valor")?.value || 0);
+
+    if (!codigo || !(valor > 0)) {
+      alert("Informe codigo e valor valido para o cupom.");
+      return;
+    }
+
+    const response = await fetchApi("/api/admin/cupons", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ codigo, tipo, valor }),
+    });
+
+    const payload = await response.json();
+    if (!response.ok || !payload.success) {
+      throw new Error(payload.error || "Falha ao salvar cupom");
+    }
+
+    formCupom.reset();
+    await carregarCupons();
+    alert("Cupom salvo com sucesso.");
+  } catch (error) {
+    alert(`Erro ao salvar cupom: ${error.message}`);
+  }
+});
+
+listaCuponsEl?.addEventListener("click", async (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLElement)) return;
+  if (target.dataset.action !== "excluir-cupom") return;
+
+  const card = target.closest("[data-cupom-codigo]");
+  const codigo = card?.getAttribute("data-cupom-codigo");
+  if (!codigo) return;
+
+  const confirma = window.confirm(`Excluir cupom ${codigo}?`);
+  if (!confirma) return;
+
+  try {
+    const response = await fetchApi(`/api/admin/cupons/${encodeURIComponent(codigo)}`, {
+      method: "DELETE",
+      credentials: "include",
+    });
+
+    const payload = await response.json();
+    if (!response.ok || !payload.success) {
+      throw new Error(payload.error || "Falha ao excluir cupom");
+    }
+
+    await carregarCupons();
+  } catch (error) {
+    alert(`Erro ao excluir cupom: ${error.message}`);
+  }
 });
 
 async function bootstrap() {
   try {
-    const response = await fetch(getApiUrl("/api/admin/me"), { credentials: "include" });
+    const response = await fetchApi("/api/admin/me", { credentials: "include" });
     const payload = await response.json();
 
     if (!response.ok || !payload.success) {
       showLogin();
-      setLoginStatus("Faça login para acessar o painel.");
+      setLoginStatus("Faca login para acessar o painel.");
       return;
     }
 
     showAdmin();
     userInfoEl.textContent = payload.user?.email || "Admin";
-    await carregarPedidos();
+    await Promise.all([carregarPedidos(), carregarProdutos(), carregarCupons()]);
+    limparFormularioProduto();
   } catch {
     showLogin();
-    setLoginStatus("Faça login para acessar o painel.");
+    setLoginStatus("Faca login para acessar o painel.");
   }
 }
 

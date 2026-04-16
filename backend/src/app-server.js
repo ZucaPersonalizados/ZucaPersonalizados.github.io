@@ -132,6 +132,72 @@ function parseMoney(value) {
   return Number(sanitized) || 0;
 }
 
+function digitsOnly(value) {
+  return String(value || "").replace(/\D/g, "");
+}
+
+function splitFullName(fullName) {
+  const normalized = String(fullName || "").trim().replace(/\s+/g, " ");
+  if (!normalized) {
+    return { firstName: "Cliente", lastName: "" };
+  }
+
+  const [firstName, ...rest] = normalized.split(" ");
+  return {
+    firstName,
+    lastName: rest.join(" "),
+  };
+}
+
+function buildMercadoPagoPayer(cliente = {}) {
+  const email = String(cliente.email || "").trim().toLowerCase();
+  const { firstName, lastName } = splitFullName(cliente.nome);
+  const phoneDigits = digitsOnly(cliente.telefone);
+  const cpfDigits = digitsOnly(cliente.cpf || cliente.cpfCnpj);
+
+  const payer = {
+    email: email || "cliente@email.com",
+    first_name: firstName,
+    last_name: lastName,
+  };
+
+  // Envia telefone apenas quando tiver formato minimamente valido (DDD + numero)
+  if (phoneDigits.length >= 10) {
+    payer.phone = {
+      area_code: phoneDigits.slice(0, 2),
+      number: phoneDigits.slice(2),
+    };
+  }
+
+  // Para PIX no Brasil, documento valido evita rejeicoes do pagador
+  if (cpfDigits.length === 11) {
+    payer.identification = {
+      type: "CPF",
+      number: cpfDigits,
+    };
+  } else if (cpfDigits.length === 14) {
+    payer.identification = {
+      type: "CNPJ",
+      number: cpfDigits,
+    };
+  }
+
+  return payer;
+}
+
+function buildMercadoPagoHeaders(token, withIdempotency = false) {
+  const headers = {
+    Authorization: `Bearer ${token}`,
+    "Content-Type": "application/json",
+  };
+
+  if (withIdempotency) {
+    headers["X-Idempotency-Key"] = crypto.randomUUID();
+  }
+
+  return headers;
+}
+
 function normalizePedido(docSnap) {
   const data = docSnap.data() || {};
   return {
@@ -609,41 +675,41 @@ app.post("/gerar-pix", async (req, res) => {
       });
     }
 
+    const payer = buildMercadoPagoPayer(cliente);
+
     const response = await axios.post(
       "https://api.mercadopago.com/v1/payments",
       {
         transaction_amount: Number(valor),
         description: descricao || "Compra Zuca Personalizados",
         payment_method_id: "pix",
-        payer: {
-          email: cliente?.email || "cliente@email.com",
-          first_name: cliente?.nome?.split(" ")[0] || "Cliente",
-          last_name: cliente?.nome?.split(" ").slice(1).join(" ") || "",
-          phone: {
-            area_code: String(cliente?.telefone || "11").slice(0, 2),
-            number: String(cliente?.telefone || "999999999").slice(2),
-          },
-          identification: {
-            type: "CPF",
-            number: String(cliente?.cpf || "00000000000").replace(/\D/g, ""),
-          },
-        },
+        payer,
+        external_reference: idPedido ? String(idPedido) : undefined,
       },
       {
-        headers: {
-          Authorization: `Bearer ${mpAccessToken}`,
-          "Content-Type": "application/json",
-        },
+        headers: buildMercadoPagoHeaders(mpAccessToken, true),
       }
     );
 
-    const payment = response.data;
-    if (payment.point_of_interaction?.type !== "PIX_QR_CODE") {
-      throw new Error("PIX indisponivel para este pagamento");
-    }
+    const payment = response.data || {};
+    const poi = payment.point_of_interaction || {};
+    const txData = poi.transaction_data || {};
+    const subTypeData = poi.sub_type_data || {};
 
-    const pixData = payment.point_of_interaction.sub_type_data;
-    const qrCodeImage = await QRCode.toDataURL(pixData.qr_code);
+    const qrCodeText =
+      subTypeData.qr_code ||
+      txData.qr_code ||
+      payment.qr_code ||
+      "";
+
+    const qrCodeImage =
+      txData.qr_code_base64 ||
+      subTypeData.qr_code_base64 ||
+      (qrCodeText ? await QRCode.toDataURL(qrCodeText) : "");
+
+    if (!qrCodeText || !qrCodeImage) {
+      throw new Error(payment.status_detail || "PIX indisponivel para este pagamento");
+    }
 
     if (db && idPedido) {
       await db.collection("pedidos").doc(idPedido).update({
@@ -656,17 +722,29 @@ app.post("/gerar-pix", async (req, res) => {
     return res.json({
       success: true,
       qr_code: qrCodeImage,
-      brcode: pixData.qr_code,
+      brcode: qrCodeText,
       transaction_id: payment.id,
       status: payment.status,
-      expira_em: pixData.expiration_date || Math.floor(Date.now() / 1000) + 1800,
+      expira_em:
+        subTypeData.expiration_date ||
+        txData.expiration_date ||
+        payment.date_of_expiration ||
+        Math.floor(Date.now() / 1000) + 1800,
       valor: Number(valor),
     });
   } catch (error) {
+    const status = error?.response?.status || 500;
+    const details =
+      error?.response?.data?.message ||
+      error?.response?.data?.cause?.[0]?.description ||
+      error?.message ||
+      "Falha na comunicacao com o Mercado Pago";
+
     return res.status(500).json({
       success: false,
       error: "Erro ao gerar PIX",
-      details: error.response?.data?.message || error.message,
+      details,
+      status,
     });
   }
 });
@@ -693,10 +771,7 @@ app.post("/processar-pagamento", async (req, res) => {
         securityCode: cartao.cvc,
       },
       {
-        headers: {
-          Authorization: `Bearer ${mpPublicKey}`,
-          "Content-Type": "application/json",
-        },
+        headers: buildMercadoPagoHeaders(mpPublicKey),
       }
     );
 
@@ -715,10 +790,7 @@ app.post("/processar-pagamento", async (req, res) => {
         installments: 1,
       },
       {
-        headers: {
-          Authorization: `Bearer ${mpAccessToken}`,
-          "Content-Type": "application/json",
-        },
+        headers: buildMercadoPagoHeaders(mpAccessToken, true),
       }
     );
 

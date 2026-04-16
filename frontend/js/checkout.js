@@ -14,6 +14,52 @@ let descontoAtual = 0;
 let cupomAplicado = null;
 let mpConfigCache = null;
 
+function digitsOnly(value = "") {
+  return String(value).replace(/\D/g, "");
+}
+
+function formatarCpfCnpj(value = "") {
+  const digits = digitsOnly(value).slice(0, 14);
+  if (digits.length <= 11) {
+    return digits
+      .replace(/(\d{3})(\d)/, "$1.$2")
+      .replace(/(\d{3})(\d)/, "$1.$2")
+      .replace(/(\d{3})(\d{1,2})$/, "$1-$2");
+  }
+  return digits
+    .replace(/(\d{2})(\d)/, "$1.$2")
+    .replace(/(\d{3})(\d)/, "$1.$2")
+    .replace(/(\d{3})(\d)/, "$1/$2")
+    .replace(/(\d{4})(\d{1,2})$/, "$1-$2");
+}
+
+function formatarTelefone(value = "") {
+  const digits = digitsOnly(value).slice(0, 11);
+  if (digits.length <= 10) {
+    return digits
+      .replace(/(\d{2})(\d)/, "($1) $2")
+      .replace(/(\d{4})(\d{1,4})$/, "$1-$2");
+  }
+  return digits
+    .replace(/(\d{2})(\d)/, "($1) $2")
+    .replace(/(\d{5})(\d{1,4})$/, "$1-$2");
+}
+
+function formatarCep(value = "") {
+  const digits = digitsOnly(value).slice(0, 8);
+  return digits.replace(/(\d{5})(\d{1,3})$/, "$1-$2");
+}
+
+function setCheckoutStatus(message, type = "info") {
+  const box = el("checkout-status");
+  if (!box) return;
+  box.textContent = message;
+  box.classList.remove("is-info", "is-success", "is-error");
+  if (type === "success") box.classList.add("is-success");
+  else if (type === "error") box.classList.add("is-error");
+  else box.classList.add("is-info");
+}
+
 async function obterConfigMercadoPago(forceRefresh = false) {
   if (!forceRefresh && mpConfigCache) {
     return mpConfigCache;
@@ -178,7 +224,7 @@ function fecharCarrinhoSidebar() {
 async function aplicarCupom() {
   const cupom = el("cupom")?.value.trim().toUpperCase();
   if (!cupom) {
-    if (el("checkout-status")) el("checkout-status").textContent = "Informe um cupom.";
+    setCheckoutStatus("Informe um cupom.", "info");
     return;
   }
 
@@ -194,18 +240,16 @@ async function aplicarCupom() {
       descontoAtual = 0;
       cupomAplicado = null;
       renderCarrinho();
-      if (el("checkout-status")) el("checkout-status").textContent = payload.error || "Cupom inválido.";
+      setCheckoutStatus(payload.error || "Cupom invalido.", "error");
       return;
     }
 
     descontoAtual = Number(payload.desconto || 0);
     cupomAplicado = cupom;
     renderCarrinho();
-    if (el("checkout-status")) {
-      el("checkout-status").textContent = `✓ Cupom aplicado: -${formatarMoeda(descontoAtual)}`;
-    }
+    setCheckoutStatus(`Cupom aplicado: -${formatarMoeda(descontoAtual)}`, "success");
   } catch (error) {
-    if (el("checkout-status")) el("checkout-status").textContent = `Erro ao validar cupom: ${error.message}`;
+    setCheckoutStatus(`Erro ao validar cupom: ${error.message}`, "error");
   }
 }
 
@@ -281,7 +325,7 @@ async function gerarPixDinamico(total, idPedido, cliente) {
 
   const data = await response.json();
   if (!response.ok || !data.success) {
-    throw new Error(data.error || "Falha ao gerar PIX");
+    throw new Error(data.details || data.error || "Falha ao gerar PIX");
   }
 
   const qrContainer = el("pix-qrcode");
@@ -294,6 +338,7 @@ async function gerarPixDinamico(total, idPedido, cliente) {
 
 function validarCamposCliente(cliente) {
   if (!cliente.nome) return "Informe seu nome.";
+  if (!cliente.cpfCnpj) return "Informe seu CPF ou CNPJ para pagamento.";
   if (!cliente.email) return "Informe seu e-mail.";
   if (!cliente.telefone) return "Informe seu telefone.";
   if (!cliente.endereco) return "Informe seu endereço.";
@@ -306,14 +351,14 @@ function validarCamposCliente(cliente) {
 async function finalizarPedido() {
   const itens = getCarrinho();
   if (itens.length === 0) {
-    if (el("checkout-status")) el("checkout-status").textContent = "Carrinho vazio.";
+    setCheckoutStatus("Carrinho vazio.", "error");
     return;
   }
 
   const cliente = salvarDadosClienteLocal();
   const erro = validarCamposCliente(cliente);
   if (erro) {
-    if (el("checkout-status")) el("checkout-status").textContent = erro;
+    setCheckoutStatus(erro, "error");
     return;
   }
 
@@ -360,17 +405,16 @@ async function finalizarPedido() {
     if (metodo === "pix") {
       await gerarPixDinamico(total, pedidoId, cliente);
       const verificacao = await verificarPagamento(pedidoId);
-      if (el("checkout-status")) {
-        el("checkout-status").textContent = verificacao.aprovado
-          ? `✓ Pagamento confirmado. Pedido #${pedidoId.slice(0, 8)}`
-          : `✓ PIX gerado para o pedido #${pedidoId.slice(0, 8)}. Aguardando confirmação do pagamento.`;
-      }
+      setCheckoutStatus(
+        verificacao.aprovado
+          ? `Pagamento confirmado. Pedido #${pedidoId.slice(0, 8)}`
+          : `PIX gerado para o pedido #${pedidoId.slice(0, 8)}. Aguardando confirmacao do pagamento.`,
+        verificacao.aprovado ? "success" : "info"
+      );
     } else if (metodo === "cartao") {
-      if (el("checkout-status")) {
-        el("checkout-status").textContent = "Cartão requer integração do formulário seguro do Mercado Pago. Use PIX temporariamente.";
-      }
+      setCheckoutStatus("Cartao requer formulario seguro do Mercado Pago. Use PIX temporariamente.", "info");
     } else if (metodo === "boleto") {
-      if (el("checkout-status")) el("checkout-status").textContent = `✓ Pedido #${pedidoId.slice(0, 8)} criado. Boleto será enviado por e-mail.`;
+      setCheckoutStatus(`Pedido #${pedidoId.slice(0, 8)} criado. Boleto sera enviado por e-mail.`, "success");
     }
 
     localStorage.removeItem("zuca_carrinho");
@@ -379,7 +423,7 @@ async function finalizarPedido() {
     renderCarrinho();
     await listarPedidosPorEmail(cliente.email);
   } catch (error) {
-    if (el("checkout-status")) el("checkout-status").textContent = `Erro: ${error.message}`;
+    setCheckoutStatus(`Erro: ${error.message}`, "error");
   } finally {
     if (btn) {
       btn.disabled = false;
@@ -543,7 +587,36 @@ function configurarCopiarPix() {
     const value = el("pix-brcode")?.value || "";
     if (!value) return;
     await navigator.clipboard.writeText(value);
-    if (el("checkout-status")) el("checkout-status").textContent = "Chave PIX copiada.";
+    setCheckoutStatus("Chave PIX copiada.", "success");
+  });
+}
+
+function configurarMascarasFormulario() {
+  const cpfCnpj = el("cpfCnpj");
+  const telefone = el("telefone");
+  const cep = el("cep");
+  const estado = el("estado");
+
+  cpfCnpj?.addEventListener("input", (event) => {
+    event.target.value = formatarCpfCnpj(event.target.value);
+  });
+
+  telefone?.addEventListener("input", (event) => {
+    event.target.value = formatarTelefone(event.target.value);
+  });
+
+  cep?.addEventListener("input", (event) => {
+    event.target.value = formatarCep(event.target.value);
+  });
+
+  estado?.addEventListener("input", (event) => {
+    event.target.value = String(event.target.value || "").replace(/[^a-zA-Z]/g, "").slice(0, 2).toUpperCase();
+  });
+}
+
+function configurarAcoesPagamento() {
+  el("btn-pagar-cartao")?.addEventListener("click", () => {
+    setCheckoutStatus("O pagamento por cartao sera liberado em breve. No momento use PIX para concluir o pedido.", "info");
   });
 }
 
@@ -565,6 +638,8 @@ onPagamentoChange();
 configurarBotoesLoginPlaceholder();
 configurarHeaderCheckout();
 configurarCopiarPix();
+configurarMascarasFormulario();
+configurarAcoesPagamento();
 renderizarCarrinhoSidebar();
 
 if (el("email")?.value) {

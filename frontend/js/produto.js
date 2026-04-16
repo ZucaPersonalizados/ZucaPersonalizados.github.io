@@ -8,6 +8,109 @@ function getApiUrl(path) {
   return `${API_BASE}${path}`;
 }
 
+function getCarrinho() {
+  try {
+    return JSON.parse(localStorage.getItem("zuca_carrinho") || "[]");
+  } catch {
+    return [];
+  }
+}
+
+function atualizarContadorCarrinho() {
+  const count = getCarrinho().reduce((acc, item) => acc + Number(item.quantidade || 1), 0);
+  const cartCount = document.getElementById("cart-count");
+  if (cartCount) cartCount.textContent = String(count);
+}
+
+function renderizarCarrinhoSidebar() {
+  const container = document.getElementById("cart-sidebar-items");
+  const totalEl = document.getElementById("cart-sidebar-total");
+  if (!container || !totalEl) return;
+
+  const itens = getCarrinho();
+  if (!itens.length) {
+    container.innerHTML = "<p style='text-align:center; color: var(--muted); padding: 20px;'>Seu carrinho está vazio.</p>";
+    totalEl.textContent = "R$ 0,00";
+    return;
+  }
+
+  let total = 0;
+  container.innerHTML = itens.map((item) => {
+    const subtotal = Number(String(item.preco || "0").replace("R$", "").replace(/\./g, "").replace(",", ".")) * Number(item.quantidade || 1);
+    total += subtotal;
+    return `
+      <div class="cart-item">
+        <div>
+          <p class="cart-item-name">${item.nome || "Produto"}</p>
+          <p class="cart-item-price">x${item.quantidade || 1}</p>
+        </div>
+        <strong>${formatarMoeda(subtotal)}</strong>
+      </div>
+    `;
+  }).join("");
+
+  totalEl.textContent = formatarMoeda(total);
+}
+
+function configurarHeaderProduto() {
+  const sidebar = document.getElementById("cart-sidebar");
+  const overlay = document.getElementById("cart-overlay");
+  const btnCart = document.getElementById("btn-cart");
+  const btnClose = document.getElementById("btn-close-cart");
+  const btnAvatar = document.getElementById("btn-avatar");
+  const dropdown = document.getElementById("avatar-dropdown");
+  const btnLoginGoogle = document.getElementById("btn-login-google");
+  const btnLogoutUser = document.getElementById("btn-logout-user");
+  const avatarLabel = document.getElementById("avatar-label");
+
+  const abrirCarrinho = () => {
+    sidebar?.classList.add("ativo");
+    overlay?.classList.add("ativo");
+  };
+
+  const fecharCarrinho = () => {
+    sidebar?.classList.remove("ativo");
+    overlay?.classList.remove("ativo");
+  };
+
+  btnCart?.addEventListener("click", abrirCarrinho);
+  btnClose?.addEventListener("click", fecharCarrinho);
+  overlay?.addEventListener("click", fecharCarrinho);
+
+  btnAvatar?.addEventListener("click", () => {
+    const ativo = dropdown?.classList.toggle("ativo");
+    btnAvatar.setAttribute("aria-expanded", ativo ? "true" : "false");
+  });
+
+  document.addEventListener("click", (event) => {
+    if (!dropdown || !btnAvatar) return;
+    const target = event.target;
+    if (target instanceof Node && !dropdown.contains(target) && !btnAvatar.contains(target)) {
+      dropdown.classList.remove("ativo");
+      btnAvatar.setAttribute("aria-expanded", "false");
+    }
+  });
+
+  btnLoginGoogle?.addEventListener("click", () => {
+    window.location.href = "checkout.html";
+  });
+
+  btnLogoutUser?.addEventListener("click", () => {
+    localStorage.removeItem("zuca_checkout_cliente");
+    localStorage.removeItem("zuca_checkout_cliente_nome");
+    if (avatarLabel) avatarLabel.textContent = "Entrar";
+    dropdown?.classList.remove("ativo");
+  });
+
+  if (avatarLabel) {
+    const salvo = localStorage.getItem("zuca_checkout_cliente_nome");
+    avatarLabel.textContent = salvo || "Entrar";
+  }
+
+  atualizarContadorCarrinho();
+  renderizarCarrinhoSidebar();
+}
+
 function formatarMoeda(valor) {
   return new Intl.NumberFormat("pt-BR", {
     style: "currency",
@@ -87,6 +190,8 @@ function adicionarAoCarrinhoComEstoque(produto, estoqueDisponivel) {
   }
 
   localStorage.setItem("zuca_carrinho", JSON.stringify(carrinho));
+  atualizarContadorCarrinho();
+  renderizarCarrinhoSidebar();
 
   const btn = document.getElementById("btn-adicionar-carrinho");
   if (!btn) return;
@@ -168,3 +273,4 @@ async function carregarProduto() {
 }
 
 carregarProduto();
+configurarHeaderProduto();

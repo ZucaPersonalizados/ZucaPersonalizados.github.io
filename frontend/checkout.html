@@ -248,6 +248,19 @@
     </div>
   </header>
 
+  <aside id="cart-sidebar" class="cart-sidebar" aria-label="Carrinho">
+    <div class="cart-sidebar-header">
+      <h3>Seu carrinho</h3>
+      <button id="btn-close-cart" type="button" aria-label="Fechar carrinho">✕</button>
+    </div>
+    <div id="cart-sidebar-items" class="cart-sidebar-items"></div>
+    <div class="cart-sidebar-footer">
+      <p>Total: <strong id="cart-sidebar-total">R$ 0,00</strong></p>
+      <a href="checkout.html" class="btn">Ir para checkout</a>
+    </div>
+  </aside>
+  <div id="cart-overlay" class="cart-overlay"></div>
+
   <main class="checkout-wrap">
     <section class="checkout-card">
       <h2>Login do cliente</h2>
@@ -274,7 +287,6 @@
           <option value="pix">PIX - Sem taxa</option>
           <option value="cartao">Cartão de Crédito</option>
           <option value="boleto">Boleto - 2-3 dias</option>
-          <option value="transferencia">Transferência bancária</option>
         </select>
       </div>
 
@@ -299,12 +311,6 @@
       <div class="payment-option" id="boleto-section">
         <p><strong>Boleto - Prazo 2-3 dias</strong></p>
         <p style="font-size: 13px; color: #999;">O boleto será gerado após confirmar a compra. Você receberá o código por e-mail.</p>
-      </div>
-
-      <!-- Método Transferência -->
-      <div class="payment-option" id="transferencia-section">
-        <p><strong>Transferência Bancária</strong></p>
-        <p style="font-size: 13px; color: #999;">Dados bancários serão enviados por e-mail após finalizar o pedido.</p>
       </div>
 
       <div class="checkout-grid" style="margin-top: 15px;">

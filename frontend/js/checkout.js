@@ -124,6 +124,55 @@ function renderCarrinho() {
   if (el("subtotal")) el("subtotal").textContent = formatarMoeda(subtotal);
   if (el("desconto")) el("desconto").textContent = formatarMoeda(descontoAtual);
   if (el("total-final")) el("total-final").textContent = formatarMoeda(total);
+
+  atualizarContadorCarrinho();
+  renderizarCarrinhoSidebar();
+}
+
+function atualizarContadorCarrinho() {
+  const count = getCarrinho().reduce((acc, item) => acc + Number(item.quantidade || 1), 0);
+  const cartCount = el("cart-count");
+  if (cartCount) cartCount.textContent = String(count);
+}
+
+function renderizarCarrinhoSidebar() {
+  const container = el("cart-sidebar-items");
+  const totalEl = el("cart-sidebar-total");
+  if (!container || !totalEl) return;
+
+  const itens = getCarrinho();
+  if (!itens.length) {
+    container.innerHTML = "<p style='text-align:center; color: var(--muted); padding: 20px;'>Seu carrinho está vazio.</p>";
+    totalEl.textContent = "R$ 0,00";
+    return;
+  }
+
+  let total = 0;
+  container.innerHTML = itens.map((item) => {
+    const subtotal = precoNumero(item.preco) * Number(item.quantidade || 1);
+    total += subtotal;
+    return `
+      <div class="cart-item">
+        <div>
+          <p class="cart-item-name">${item.nome || "Produto"}</p>
+          <p class="cart-item-price">x${item.quantidade || 1}</p>
+        </div>
+        <strong>${formatarMoeda(subtotal)}</strong>
+      </div>
+    `;
+  }).join("");
+
+  totalEl.textContent = formatarMoeda(total);
+}
+
+function abrirCarrinhoSidebar() {
+  el("cart-sidebar")?.classList.add("ativo");
+  el("cart-overlay")?.classList.add("ativo");
+}
+
+function fecharCarrinhoSidebar() {
+  el("cart-sidebar")?.classList.remove("ativo");
+  el("cart-overlay")?.classList.remove("ativo");
 }
 
 async function aplicarCupom() {
@@ -276,11 +325,11 @@ async function finalizarPedido() {
     const configMP = await obterConfigMercadoPago(true);
 
     if (metodo === "pix" && configMP && !configMP.pixConfigured) {
-      throw new Error("PIX indisponível no momento. Tente boleto ou transferência.");
+      throw new Error("PIX indisponível no momento. Tente boleto.");
     }
 
     if (metodo === "cartao" && configMP && !configMP.cardConfigured) {
-      throw new Error("Cartão indisponível no momento. Tente PIX, boleto ou transferência.");
+      throw new Error("Cartão indisponível no momento. Tente PIX ou boleto.");
     }
 
     if (btn) {
@@ -322,8 +371,6 @@ async function finalizarPedido() {
       }
     } else if (metodo === "boleto") {
       if (el("checkout-status")) el("checkout-status").textContent = `✓ Pedido #${pedidoId.slice(0, 8)} criado. Boleto será enviado por e-mail.`;
-    } else {
-      if (el("checkout-status")) el("checkout-status").textContent = `✓ Pedido #${pedidoId.slice(0, 8)} criado. Enviaremos os dados para transferência.`;
     }
 
     localStorage.removeItem("zuca_carrinho");
@@ -443,7 +490,7 @@ function configurarBotoesLoginPlaceholder() {
     aplicarLoginLocal(email, "iCloud");
   });
 
-  el("btn-logout")?.addEventListener("click", () => {
+  const executarLogout = () => {
     localStorage.removeItem("zuca_checkout_cliente");
     localStorage.removeItem("zuca_checkout_cliente_nome");
     if (el("nome")) el("nome").value = "";
@@ -451,6 +498,43 @@ function configurarBotoesLoginPlaceholder() {
     atualizarAvatarCheckout("");
     setAuthStatus("Dados locais removidos.", "ok");
     el("lista-pedidos") && (el("lista-pedidos").innerHTML = "<p>Nenhum pedido ainda.</p>");
+  };
+
+  el("btn-logout")?.addEventListener("click", executarLogout);
+  el("btn-logout-user")?.addEventListener("click", () => {
+    executarLogout();
+    el("avatar-dropdown")?.classList.remove("ativo");
+  });
+
+  el("btn-login-google")?.addEventListener("click", () => {
+    el("btn-google")?.click();
+    el("avatar-dropdown")?.classList.remove("ativo");
+  });
+}
+
+function configurarHeaderCheckout() {
+  const btnCart = el("btn-cart");
+  const btnClose = el("btn-close-cart");
+  const overlay = el("cart-overlay");
+  const btnAvatar = el("btn-avatar");
+  const dropdown = el("avatar-dropdown");
+
+  btnCart?.addEventListener("click", abrirCarrinhoSidebar);
+  btnClose?.addEventListener("click", fecharCarrinhoSidebar);
+  overlay?.addEventListener("click", fecharCarrinhoSidebar);
+
+  btnAvatar?.addEventListener("click", () => {
+    const ativo = dropdown?.classList.toggle("ativo");
+    btnAvatar.setAttribute("aria-expanded", ativo ? "true" : "false");
+  });
+
+  document.addEventListener("click", (event) => {
+    if (!dropdown || !btnAvatar) return;
+    const target = event.target;
+    if (target instanceof Node && !dropdown.contains(target) && !btnAvatar.contains(target)) {
+      dropdown.classList.remove("ativo");
+      btnAvatar.setAttribute("aria-expanded", "false");
+    }
   });
 }
 
@@ -479,7 +563,9 @@ atualizarAvatarCheckout(localStorage.getItem("zuca_checkout_cliente_nome") || ""
 renderCarrinho();
 onPagamentoChange();
 configurarBotoesLoginPlaceholder();
+configurarHeaderCheckout();
 configurarCopiarPix();
+renderizarCarrinhoSidebar();
 
 if (el("email")?.value) {
   listarPedidosPorEmail(el("email").value.trim().toLowerCase());

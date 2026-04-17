@@ -647,6 +647,14 @@ async function carregarProduto() {
 
       adicionarAoCarrinhoComEstoque(produtoParaCarrinho, estoque, quantidade);
     });
+
+    // Populate tabs
+    popularAbas(produto);
+    configurarAbas();
+
+    // Load related products
+    carregarRelacionados(produto.categoria, id);
+
   } catch (error) {
     console.error("Erro ao carregar produto:", error);
     document.body.innerHTML = "<div style='text-align:center; padding: 100px;'><h2>Erro ao carregar produto</h2><p><a href='/'>Voltar para início</a></p></div>";
@@ -656,3 +664,99 @@ async function carregarProduto() {
 normalizarUrlSemExtensao();
 carregarProduto();
 configurarHeaderProduto();
+
+/* ========== Tabs ========== */
+function configurarAbas() {
+  document.querySelectorAll(".tab-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
+      document.querySelectorAll(".tab-content").forEach((c) => c.classList.remove("active"));
+      btn.classList.add("active");
+      const target = document.getElementById(`tab-${btn.dataset.tab}`);
+      if (target) target.classList.add("active");
+    });
+  });
+}
+
+function popularAbas(produto) {
+  // Description tab
+  const descEl = document.getElementById("descricao-longa-texto");
+  if (descEl) {
+    descEl.textContent = produto.descricaoLonga || produto.descricaoCurta || "Descrição não disponível.";
+  }
+
+  // Specs tab
+  const specsGrid = document.getElementById("specs-grid");
+  if (specsGrid) {
+    const specs = [
+      ["Categoria", produto.categoria],
+      ["Tipo", produto.tipo],
+      ["Material", produto.material],
+      ["Tamanho", produto.tamanho],
+      ["Gramatura", produto.gramatura],
+      ["Personalizado", produto.personalizado ? "Sim" : "Não"],
+    ].filter(([, v]) => v !== undefined && v !== null && v !== "");
+
+    if (specs.length) {
+      specsGrid.innerHTML = specs.map(([label, value]) =>
+        `<div class="spec-row"><span class="spec-label">${escapeHtml(label)}</span><span class="spec-value">${escapeHtml(String(value))}</span></div>`
+      ).join("");
+    } else {
+      specsGrid.innerHTML = '<p style="color: var(--muted); padding: 12px;">Nenhuma especificação disponível.</p>';
+    }
+  }
+}
+
+/* ========== Related Products ========== */
+async function carregarRelacionados(categoria, idAtual) {
+  const container = document.getElementById("produtos-relacionados");
+  if (!container) return;
+
+  try {
+    const response = await fetch(getApiUrl("/api/produtos"));
+    if (!response.ok) return;
+    const data = await response.json();
+    const produtos = Array.isArray(data) ? data : (data?.produtos || []);
+
+    let relacionados = produtos
+      .filter((p) => p.id !== idAtual && p.categoria && p.categoria === categoria)
+      .slice(0, 4);
+
+    // Fallback: if less than 2 from same category, fill with random
+    if (relacionados.length < 2) {
+      const outros = produtos.filter((p) => p.id !== idAtual && !relacionados.find((r) => r.id === p.id));
+      relacionados = [...relacionados, ...outros.slice(0, 4 - relacionados.length)];
+    }
+
+    if (!relacionados.length) {
+      container.closest("section")?.remove();
+      return;
+    }
+
+    container.innerHTML = relacionados.map((p) => {
+      const preco = precoParaNumero(p.preco ?? p.valor ?? 0);
+      const img = obterImagensProduto(p)[0] || "img/logo/logo.png";
+      return `
+        <a href="/produto?id=${encodeURIComponent(p.id)}" class="produto" style="text-decoration: none; color: inherit;">
+          <img src="${escapeHtml(img)}" alt="${escapeHtml(p.nome || '')}" style="width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: var(--radius-md);" loading="lazy">
+          <h3 style="font-size: 14px; margin: 8px 0 4px; font-weight: 600;">${escapeHtml(p.nome || "Produto")}</h3>
+          <p style="font-weight: 700; color: var(--accent); margin: 0;">${formatarMoeda(preco)}</p>
+        </a>
+      `;
+    }).join("");
+  } catch {
+    container.closest("section")?.remove();
+  }
+}
+
+// Search bar redirect to index
+document.getElementById("btn-search")?.addEventListener("click", () => {
+  const q = document.getElementById("search-input")?.value.trim();
+  if (q) window.location.href = `/?q=${encodeURIComponent(q)}`;
+});
+document.getElementById("search-input")?.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") {
+    const q = e.target.value.trim();
+    if (q) window.location.href = `/?q=${encodeURIComponent(q)}`;
+  }
+});

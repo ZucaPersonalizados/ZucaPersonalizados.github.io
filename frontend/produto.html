@@ -227,6 +227,10 @@
       background: rgba(201, 141, 89, 0.06);
     }
 
+    .produto-personalizacao[hidden] {
+      display: none !important;
+    }
+
     .produto-personalizacao h3 {
       margin: 0;
       font-size: 0.95rem;
@@ -378,6 +382,11 @@
       <a href="/#contato">Contato</a>
     </nav>
 
+    <div class="search-bar">
+      <input type="text" id="search-input" placeholder="Buscar produtos..." aria-label="Buscar produtos">
+      <button id="btn-search" type="button" aria-label="Buscar">🔍</button>
+    </div>
+
     <div class="header-actions">
       <button id="btn-cart" class="btn-cart-header" type="button" aria-label="Abrir carrinho">
         <svg class="cart-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
@@ -499,6 +508,34 @@
 
   </div>
 </main>
+
+<!-- Abas de conteúdo -->
+<section class="container" style="margin-top: 32px;">
+  <div class="produto-tabs">
+    <button class="tab-btn active" data-tab="descricao">Descrição</button>
+    <button class="tab-btn" data-tab="especificacoes">Especificações</button>
+    <button class="tab-btn" data-tab="avaliacoes">Avaliações</button>
+  </div>
+  <div class="tab-content active" id="tab-descricao">
+    <div id="descricao-longa" style="line-height: 1.7; color: var(--text);">
+      <p id="descricao-longa-texto">Carregando descrição...</p>
+    </div>
+  </div>
+  <div class="tab-content" id="tab-especificacoes">
+    <div id="specs-grid" class="specs-grid"></div>
+  </div>
+  <div class="tab-content" id="tab-avaliacoes">
+    <div id="avaliacoes-container">
+      <p style="color: var(--muted); text-align: center; padding: 24px;">Ainda não há avaliações para este produto.</p>
+    </div>
+  </div>
+</section>
+
+<!-- Produtos Relacionados -->
+<section class="container" style="margin: 40px auto;">
+  <h2 style="font-family: 'DM Serif Display', serif; margin-bottom: 20px;">Você também pode gostar</h2>
+  <div id="produtos-relacionados" class="grid-produtos" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 20px;"></div>
+</section>
 
 <!-- FOOTER -->
 <footer class="footer">

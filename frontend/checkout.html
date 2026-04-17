@@ -362,129 +362,208 @@
   <main class="checkout-wrap">
     <section class="checkout-card">
       <p class="checkout-kicker">Checkout seguro</p>
-      <p class="checkout-intro">Finalize seu pedido em poucos passos. Seus dados ficam apenas nesta compra e o pagamento e processado no ambiente do Mercado Pago.</p>
+      <p class="checkout-intro">Finalize seu pedido em poucos passos. Seus dados ficam apenas nesta compra e o pagamento é processado no ambiente do Mercado Pago.</p>
 
       <div class="trust-strip">
-        <div class="trust-badge">Pagamento seguro</div>
-        <div class="trust-badge">Entrega para todo Brasil</div>
-        <div class="trust-badge">Suporte por WhatsApp</div>
+        <div class="trust-badge">🔒 Pagamento seguro</div>
+        <div class="trust-badge">📦 Entrega para todo Brasil</div>
+        <div class="trust-badge">💬 Suporte por WhatsApp</div>
       </div>
 
-      <h2>Login do cliente</h2>
-      <div class="checkout-actions">
-        <button id="btn-google" class="checkout-btn primary">Entrar com Gmail</button>
-        <button id="btn-apple" class="checkout-btn secondary">Entrar com iCloud (Apple)</button>
-        <button id="btn-logout" class="checkout-btn secondary">Sair</button>
+      <!-- Step Indicator -->
+      <div class="checkout-steps" id="checkout-steps">
+        <div class="step active" data-step="1"><span class="step-num">1</span><span class="step-label">Dados</span></div>
+        <div class="step-line"></div>
+        <div class="step" data-step="2"><span class="step-num">2</span><span class="step-label">Envio</span></div>
+        <div class="step-line"></div>
+        <div class="step" data-step="3"><span class="step-num">3</span><span class="step-label">Pagamento</span></div>
+        <div class="step-line"></div>
+        <div class="step" data-step="4"><span class="step-num">4</span><span class="step-label">Confirmar</span></div>
       </div>
-      <p class="status-box" id="auth-status">Faça login para continuar.</p>
 
-      <h2>Dados de envio e nota fiscal</h2>
-      <div class="checkout-grid two-columns">
-        <div class="field-group">
-          <label for="nome">Nome completo</label>
-          <input id="nome" placeholder="Como no documento" autocomplete="name" />
+      <!-- STEP 1: Login + Dados pessoais -->
+      <div class="checkout-step-content" id="step-1">
+        <h2>Login do cliente</h2>
+        <div class="checkout-actions">
+          <button id="btn-google" class="checkout-btn primary">Entrar com Gmail</button>
+          <button id="btn-apple" class="checkout-btn secondary">Entrar com iCloud (Apple)</button>
+          <button id="btn-logout" class="checkout-btn secondary">Sair</button>
         </div>
-        <div class="field-group">
-          <label for="cpfCnpj">CPF/CNPJ</label>
-          <input id="cpfCnpj" placeholder="Somente numeros" inputmode="numeric" />
+        <p class="status-box" id="auth-status">Faça login para continuar.</p>
+
+        <h2>Dados de envio e nota fiscal</h2>
+        <div class="checkout-grid two-columns">
+          <div class="field-group">
+            <label for="nome">Nome completo</label>
+            <input id="nome" placeholder="Como no documento" autocomplete="name" />
+            <span class="field-error" id="nome-error"></span>
+          </div>
+          <div class="field-group">
+            <label for="cpfCnpj">CPF/CNPJ</label>
+            <input id="cpfCnpj" placeholder="Somente numeros" inputmode="numeric" />
+            <span class="field-error" id="cpfCnpj-error"></span>
+          </div>
+          <div class="field-group">
+            <label for="email">E-mail</label>
+            <input id="email" placeholder="voce@email.com" autocomplete="email" />
+            <span class="field-error" id="email-error"></span>
+          </div>
+          <div class="field-group">
+            <label for="telefone">Telefone</label>
+            <input id="telefone" placeholder="(67) 99999-9999" inputmode="tel" autocomplete="tel" />
+            <span class="field-error" id="telefone-error"></span>
+          </div>
         </div>
-        <div class="field-group">
-          <label for="email">E-mail</label>
-          <input id="email" placeholder="voce@email.com" autocomplete="email" />
+        <div class="step-nav">
+          <span></span>
+          <button type="button" class="btn step-next" data-next="2">Continuar para Envio →</button>
         </div>
-        <div class="field-group">
-          <label for="telefone">Telefone</label>
-          <input id="telefone" placeholder="(67) 99999-9999" inputmode="tel" autocomplete="tel" />
-        </div>
-        <div class="field-group">
-          <label for="cep">CEP</label>
-          <input id="cep" placeholder="79000-000" inputmode="numeric" autocomplete="postal-code" />
+      </div>
+
+      <!-- STEP 2: Endereço + Frete -->
+      <div class="checkout-step-content" id="step-2" style="display:none;">
+        <h2>Endereço de entrega</h2>
+        <div class="checkout-grid two-columns">
+          <div class="field-group">
+            <label for="cep">CEP</label>
+            <div style="display: flex; gap: 8px; align-items: stretch;">
+              <input id="cep" placeholder="79000-000" inputmode="numeric" autocomplete="postal-code" style="flex: 1;" />
+              <button type="button" id="btn-calcular-frete" class="btn btn-sm" style="white-space: nowrap; padding: 0 16px; font-size: 13px;">Calcular Frete</button>
+            </div>
+            <span class="field-error" id="cep-error"></span>
+          </div>
+
+          <div class="field-group">
+            <label for="endereco">Endereço</label>
+            <input id="endereco" placeholder="Rua, avenida, travessa" autocomplete="street-address" />
+            <span class="field-error" id="endereco-error"></span>
+          </div>
+          <div class="field-group">
+            <label for="numero">Número</label>
+            <input id="numero" placeholder="123" />
+            <span class="field-error" id="numero-error"></span>
+          </div>
+          <div class="field-group">
+            <label for="bairro">Bairro</label>
+            <input id="bairro" placeholder="Seu bairro" />
+          </div>
+          <div class="field-group">
+            <label for="cidade">Cidade</label>
+            <input id="cidade" placeholder="Sua cidade" />
+            <span class="field-error" id="cidade-error"></span>
+          </div>
+          <div class="field-group">
+            <label for="estado">Estado</label>
+            <input id="estado" placeholder="UF" maxlength="2" />
+            <span class="field-error" id="estado-error"></span>
+          </div>
         </div>
 
         <!-- Shipping options -->
         <div id="frete-options" class="frete-options"></div>
 
-        <div class="field-group">
-          <label for="endereco">Endereco</label>
-          <input id="endereco" placeholder="Rua, avenida, travessa" autocomplete="street-address" />
-        </div>
-        <div class="field-group">
-          <label for="numero">Numero</label>
-          <input id="numero" placeholder="123" />
-        </div>
-        <div class="field-group">
-          <label for="bairro">Bairro</label>
-          <input id="bairro" placeholder="Seu bairro" />
-        </div>
-        <div class="field-group">
-          <label for="cidade">Cidade</label>
-          <input id="cidade" placeholder="Sua cidade" />
-        </div>
-        <div class="field-group">
-          <label for="estado">Estado</label>
-          <input id="estado" placeholder="UF" maxlength="2" />
-        </div>
-        <div class="field-group" style="grid-column: 1 / -1;">
-          <label for="pagamento">Forma de pagamento</label>
-          <select id="pagamento">
-            <option value="pix">PIX - Sem taxa</option>
-            <option value="cartao">Cartao de Credito</option>
-            <option value="boleto">Boleto - 2-3 dias</option>
-          </select>
+        <div class="step-nav">
+          <button type="button" class="btn btn-outline step-prev" data-prev="1">← Voltar</button>
+          <button type="button" class="btn step-next" data-next="3">Continuar para Pagamento →</button>
         </div>
       </div>
 
-      <!-- Método PIX -->
-      <div class="payment-option active" id="pix-section">
-        <p><strong>✨ PIX - Sem taxa (Recomendado)</strong></p>
-        <p style="font-size: 13px; color: #999;">QR code dinâmico gerado após confirmar. Valor válido por 30 minutos.</p>
-        <div id="pix-qrcode" style="text-align: center; margin-top: 10px;"></div>
-        <input id="pix-brcode" placeholder="Ou copie a chave PIX" readonly style="margin-top: 5px; background: #f0f0f0;" />
-        <button type="button" class="checkout-btn secondary" id="btn-copiar-pix" style="width: 100%; margin-top: 8px;">Copiar chave PIX</button>
+      <!-- STEP 3: Pagamento -->
+      <div class="checkout-step-content" id="step-3" style="display:none;">
+        <h2>Forma de pagamento</h2>
+        <div class="checkout-grid">
+          <div class="field-group" style="grid-column: 1 / -1;">
+            <select id="pagamento">
+              <option value="pix">PIX - Sem taxa</option>
+              <option value="cartao">Cartão de Crédito</option>
+              <option value="boleto">Boleto - 2-3 dias</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Método PIX -->
+        <div class="payment-option active" id="pix-section">
+          <p><strong>✨ PIX - Sem taxa (Recomendado)</strong></p>
+          <p style="font-size: 13px; color: #999;">QR code dinâmico gerado após confirmar. Valor válido por 30 minutos.</p>
+          <div id="pix-qrcode" style="text-align: center; margin-top: 10px;"></div>
+          <input id="pix-brcode" placeholder="Ou copie a chave PIX" readonly style="margin-top: 5px; background: #f0f0f0;" />
+          <button type="button" class="checkout-btn secondary" id="btn-copiar-pix" style="width: 100%; margin-top: 8px;">Copiar chave PIX</button>
+        </div>
+
+        <!-- Método Cartão via Mercado Pago -->
+        <div class="payment-option" id="cartao-section">
+          <p><strong>💳 Cartão de Crédito/Débito (Mercado Pago)</strong></p>
+          <p style="font-size: 12px; color: #999; margin-bottom: 10px;">🔒 Integrado com Mercado Pago - dados protegidos</p>
+          <div id="form_checkout"></div>
+          <button type="button" class="checkout-btn primary" id="btn-pagar-cartao" style="width: 100%; margin-top: 10px;">Pagar com Cartão</button>
+        </div>
+
+        <!-- Método Boleto -->
+        <div class="payment-option" id="boleto-section">
+          <p><strong>Boleto - Prazo 2-3 dias</strong></p>
+          <p style="font-size: 13px; color: #999;">O boleto será gerado após confirmar a compra. Você receberá o código por e-mail.</p>
+        </div>
+
+        <div class="checkout-grid" style="margin-top: 15px;">
+          <input id="cupom" placeholder="Cupom de desconto (opcional)" />
+        </div>
+
+        <div class="checkout-grid">
+          <textarea id="observacoes" placeholder="Observações do pedido (opcional)" style="min-height: 60px; resize: vertical;"></textarea>
+        </div>
+
+        <div class="step-nav">
+          <button type="button" class="btn btn-outline step-prev" data-prev="2">← Voltar</button>
+          <button type="button" class="btn step-next" data-next="4">Revisar Pedido →</button>
+        </div>
       </div>
 
-      <!-- Método Cartão via Mercado Pago -->
-      <div class="payment-option" id="cartao-section">
-        <p><strong>💳 Cartão de Crédito/Débito (Mercado Pago)</strong></p>
-        <p style="font-size: 12px; color: #999; margin-bottom: 10px;">🔒 Integrado com Mercado Pago - dados protegidos</p>
-        <div id="form_checkout"></div>
-        <button type="button" class="checkout-btn primary" id="btn-pagar-cartao" style="width: 100%; margin-top: 10px;">Pagar com Cartao</button>
+      <!-- STEP 4: Revisão + Finalizar -->
+      <div class="checkout-step-content" id="step-4" style="display:none;">
+        <h2>Resumo do pedido</h2>
+
+        <div class="summary-box">
+          <p style="margin: 0; font-size: 13px;">
+            <strong>Resumo:</strong><br/>
+            Subtotal: <span id="subtotal">R$ 0,00</span><br/>
+            Desconto: <span id="desconto">R$ 0,00</span><br/>
+            Frete: <span id="frete">R$ 0,00</span> <span id="frete-prazo-resumo"></span><br/>
+            <strong style="font-size: 16px;">Total: <span id="total-final">R$ 0,00</span></strong>
+            <span id="parcelas-resumo" class="parcelas-badge" style="display: block; margin-top: 4px;"></span>
+          </p>
+        </div>
+
+        <div style="margin: 12px 0;">
+          <label style="display: flex; align-items: flex-start; gap: 8px; cursor: pointer; font-size: 13px; color: var(--text);">
+            <input type="checkbox" id="termos-check" style="margin-top: 3px; accent-color: var(--accent);">
+            Ao finalizar, concordo com os <a href="#" onclick="event.preventDefault(); document.getElementById('modal-termos').showModal();">termos de venda</a> e política de trocas para produtos personalizados.
+          </label>
+        </div>
+
+        <div class="checkout-actions" style="margin-top: 15px;">
+          <button id="btn-aplicar-cupom" class="checkout-btn secondary" type="button">Aplicar cupom</button>
+          <button id="btn-finalizar" class="checkout-btn primary" type="button" style="flex: 1;" disabled>✓ Finalizar Compra</button>
+        </div>
+
+        <p class="status-box is-info" id="checkout-status" aria-live="polite">Aceite os termos e clique em Finalizar Compra.</p>
+
+        <div class="step-nav">
+          <button type="button" class="btn btn-outline step-prev" data-prev="3">← Voltar</button>
+          <span></span>
+        </div>
       </div>
 
-      <!-- Método Boleto -->
-      <div class="payment-option" id="boleto-section">
-        <p><strong>Boleto - Prazo 2-3 dias</strong></p>
-        <p style="font-size: 13px; color: #999;">O boleto será gerado após confirmar a compra. Você receberá o código por e-mail.</p>
-      </div>
-
-      <div class="checkout-grid" style="margin-top: 15px;">
-        <input id="cupom" placeholder="Cupom de desconto (opcional)" />
-      </div>
-      <hr style="border: 1px solid #eee; margin: 15px 0;" />
-
-      <div class="checkout-grid">
-        <textarea id="observacoes" placeholder="Observações do pedido (opcional)" style="min-height: 60px; resize: vertical;"></textarea>
-      </div>
-
-      <div class="summary-box">
-        <p style="margin: 0; font-size: 13px;">
-          <strong>Resumo:</strong><br/>
-          Subtotal: <span id="subtotal">R$ 0,00</span><br/>
-          Desconto: <span id="desconto">R$ 0,00</span><br/>
-          Frete: <span id="frete">R$ 0,00</span> <span id="frete-prazo-resumo"></span><br/>
-          <strong style="font-size: 16px;">Total: <span id="total-final">R$ 0,00</span></strong>
-          <span id="parcelas-resumo" class="parcelas-badge" style="display: block; margin-top: 4px;"></span>
-        </p>
-      </div>
-
-      <p class="checkout-note">Ao finalizar, voce concorda com os termos de venda e politica de trocas para produtos personalizados.</p>
-
-      <div class="checkout-actions" style="margin-top: 15px;">
-        <button id="btn-aplicar-cupom" class="checkout-btn secondary" type="button">Aplicar cupom</button>
-        <button id="btn-finalizar" class="checkout-btn primary" type="button" style="flex: 1;">✓ Finalizar Compra</button>
-      </div>
-
-      <p class="status-box is-info" id="checkout-status" aria-live="polite">Preencha seus dados e selecione a forma de pagamento.</p>
+      <!-- Modal de termos -->
+      <dialog id="modal-termos" style="max-width: 540px; border-radius: var(--radius-md); border: 1px solid var(--line); padding: 24px;">
+        <h3 style="margin: 0 0 12px;">Termos de Venda</h3>
+        <div style="font-size: 13px; color: var(--muted); max-height: 300px; overflow-y: auto; line-height: 1.6;">
+          <p>Produtos personalizados são feitos sob encomenda e não podem ser trocados ou devolvidos, salvo defeito de fabricação.</p>
+          <p>O prazo de entrega é contado a partir da confirmação do pagamento. Para PIX, a confirmação é imediata. Para boleto, até 3 dias úteis.</p>
+          <p>O prazo de produção é de até 7 dias úteis para produtos personalizados. O frete é calculado pelo Melhor Envio com base no CEP de destino.</p>
+          <p>Garantimos a qualidade de todos os nossos produtos. Em caso de defeito, entre em contato pelo WhatsApp em até 7 dias após o recebimento.</p>
+        </div>
+        <button type="button" class="btn" style="margin-top: 16px; width: 100%;" onclick="this.closest('dialog').close();">Entendido</button>
+      </dialog>
     </section> 
     <aside class="checkout-card">
       <h2>Carrinho</h2>

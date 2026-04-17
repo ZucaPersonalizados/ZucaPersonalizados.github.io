@@ -1040,6 +1040,23 @@ function configurarMascarasFormulario() {
     await recalcularFrete();
   });
 
+  // Botão explícito "Calcular Frete"
+  el("btn-calcular-frete")?.addEventListener("click", async () => {
+    const cepVal = el("cep")?.value || "";
+    await preencherEnderecoPorCep(cepVal);
+    await recalcularFrete();
+  });
+
+  // Enter no campo CEP também calcula
+  cep?.addEventListener("keydown", async (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      const cepVal = el("cep")?.value || "";
+      await preencherEnderecoPorCep(cepVal);
+      await recalcularFrete();
+    }
+  });
+
   estado?.addEventListener("input", (event) => {
     event.target.value = String(event.target.value || "").replace(/[^a-zA-Z]/g, "").slice(0, 2).toUpperCase();
   });
@@ -1074,6 +1091,9 @@ configurarMascarasFormulario();
 configurarAcoesPagamento();
 renderizarCarrinhoSidebar();
 tratarRetornoPagamento();
+configurarSteps();
+configurarValidacao();
+configurarTermos();
 
 if (el("email")?.value) {
   listarPedidosPorEmail(el("email").value.trim().toLowerCase());
@@ -1081,4 +1101,183 @@ if (el("email")?.value) {
 
 if (isCepValido(el("cep")?.value || "")) {
   recalcularFrete();
+}
+
+/* ========== Checkout Steps Navigation ========== */
+let currentStep = 1;
+
+function configurarSteps() {
+  document.querySelectorAll(".step-next").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const next = Number(btn.dataset.next);
+      if (validarStep(currentStep)) {
+        goToStep(next);
+      }
+    });
+  });
+
+  document.querySelectorAll(".step-prev").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      goToStep(Number(btn.dataset.prev));
+    });
+  });
+
+  // Click on step indicators
+  document.querySelectorAll(".checkout-steps .step").forEach((stepEl) => {
+    stepEl.addEventListener("click", () => {
+      const target = Number(stepEl.dataset.step);
+      if (target < currentStep) goToStep(target);
+    });
+  });
+}
+
+function goToStep(step) {
+  // Hide all
+  document.querySelectorAll(".checkout-step-content").forEach((s) => s.style.display = "none");
+  // Show target
+  const target = document.getElementById(`step-${step}`);
+  if (target) target.style.display = "block";
+
+  // Update indicators
+  document.querySelectorAll(".checkout-steps .step").forEach((s) => {
+    const n = Number(s.dataset.step);
+    s.classList.remove("active", "done");
+    if (n < step) s.classList.add("done");
+    if (n === step) s.classList.add("active");
+  });
+
+  // Update lines
+  const lines = document.querySelectorAll(".checkout-steps .step-line");
+  lines.forEach((line, i) => {
+    line.classList.toggle("done", i < step - 1);
+  });
+
+  currentStep = step;
+
+  // Auto-update summary when entering step 4
+  if (step === 4) {
+    atualizarResumo(obterSubtotal());
+  }
+
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function validarStep(step) {
+  if (step === 1) {
+    return validarCampo("nome") & validarCampo("cpfCnpj") & validarCampo("email") & validarCampo("telefone");
+  }
+  if (step === 2) {
+    return validarCampo("cep") & validarCampo("endereco") & validarCampo("numero") & validarCampo("cidade") & validarCampo("estado");
+  }
+  if (step === 3) {
+    return true;
+  }
+  return true;
+}
+
+/* ========== Real-time Validation ========== */
+function configurarValidacao() {
+  const campos = ["nome", "cpfCnpj", "email", "telefone", "cep", "endereco", "numero", "cidade", "estado"];
+  campos.forEach((id) => {
+    el(id)?.addEventListener("blur", () => validarCampo(id));
+    el(id)?.addEventListener("input", () => {
+      const input = el(id);
+      if (input?.classList.contains("is-invalid")) {
+        validarCampo(id);
+      }
+    });
+  });
+}
+
+function validarCampo(id) {
+  const input = el(id);
+  const errorEl = el(`${id}-error`);
+  if (!input) return true;
+
+  const val = input.value.trim();
+  let erro = "";
+
+  switch (id) {
+    case "nome":
+      if (!val) erro = "Informe seu nome completo.";
+      else if (val.length < 3) erro = "Nome muito curto.";
+      break;
+    case "cpfCnpj":
+      if (!val) erro = "Informe CPF ou CNPJ.";
+      else if (!validarCPF(val) && !validarCNPJ(val)) erro = "CPF/CNPJ inválido.";
+      break;
+    case "email":
+      if (!val) erro = "Informe seu e-mail.";
+      else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)) erro = "E-mail inválido.";
+      break;
+    case "telefone":
+      if (!val) erro = "Informe seu telefone.";
+      else if (val.replace(/\D/g, "").length < 10) erro = "Telefone inválido.";
+      break;
+    case "cep":
+      if (!val) erro = "Informe o CEP.";
+      else if (val.replace(/\D/g, "").length !== 8) erro = "CEP deve ter 8 dígitos.";
+      break;
+    case "endereco":
+      if (!val) erro = "Informe o endereço.";
+      break;
+    case "numero":
+      if (!val) erro = "Informe o número.";
+      break;
+    case "cidade":
+      if (!val) erro = "Informe a cidade.";
+      break;
+    case "estado":
+      if (!val) erro = "Informe o estado.";
+      else if (val.length !== 2) erro = "Use a sigla do estado (ex: MS).";
+      break;
+  }
+
+  input.classList.toggle("is-invalid", !!erro);
+  input.classList.toggle("is-valid", !erro && val.length > 0);
+  if (errorEl) errorEl.textContent = erro;
+  return !erro;
+}
+
+function validarCPF(cpf) {
+  cpf = cpf.replace(/\D/g, "");
+  if (cpf.length !== 11 || /^(\d)\1+$/.test(cpf)) return false;
+  let soma = 0;
+  for (let i = 0; i < 9; i++) soma += Number(cpf[i]) * (10 - i);
+  let resto = (soma * 10) % 11;
+  if (resto === 10) resto = 0;
+  if (resto !== Number(cpf[9])) return false;
+  soma = 0;
+  for (let i = 0; i < 10; i++) soma += Number(cpf[i]) * (11 - i);
+  resto = (soma * 10) % 11;
+  if (resto === 10) resto = 0;
+  return resto === Number(cpf[10]);
+}
+
+function validarCNPJ(cnpj) {
+  cnpj = cnpj.replace(/\D/g, "");
+  if (cnpj.length !== 14 || /^(\d)\1+$/.test(cnpj)) return false;
+  const pesos1 = [5,4,3,2,9,8,7,6,5,4,3,2];
+  const pesos2 = [6,5,4,3,2,9,8,7,6,5,4,3,2];
+  let soma = 0;
+  for (let i = 0; i < 12; i++) soma += Number(cnpj[i]) * pesos1[i];
+  let resto = soma % 11;
+  const d1 = resto < 2 ? 0 : 11 - resto;
+  if (Number(cnpj[12]) !== d1) return false;
+  soma = 0;
+  for (let i = 0; i < 13; i++) soma += Number(cnpj[i]) * pesos2[i];
+  resto = soma % 11;
+  const d2 = resto < 2 ? 0 : 11 - resto;
+  return Number(cnpj[13]) === d2;
+}
+
+/* ========== Termos & Conditions ========== */
+function configurarTermos() {
+  const check = el("termos-check");
+  const btnFinalizar = el("btn-finalizar");
+  if (check && btnFinalizar) {
+    check.addEventListener("change", () => {
+      btnFinalizar.disabled = !check.checked;
+    });
+  }
 }

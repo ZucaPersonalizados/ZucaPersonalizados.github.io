@@ -1040,6 +1040,14 @@ atualizarContadorCarrinho();
 // Search
 let searchDebounce = null;
 const searchInput = document.getElementById("search-input");
+
+// Pre-fill from URL query param
+const urlSearchQ = new URLSearchParams(window.location.search).get("q");
+if (urlSearchQ && searchInput) {
+  searchInput.value = urlSearchQ;
+  searchQuery = urlSearchQ;
+}
+
 searchInput?.addEventListener("input", () => {
   clearTimeout(searchDebounce);
   searchDebounce = setTimeout(() => {

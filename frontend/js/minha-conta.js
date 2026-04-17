@@ -32,6 +32,22 @@ function setStatus(message, type = "info") {
   if (type === "error") box.classList.add("is-error");
 }
 
+function showToast(msg, type = "info") {
+  const c = document.getElementById("toast-container");
+  if (!c) { setStatus(msg, type); return; }
+  const t = document.createElement("div");
+  t.className = `toast ${type}`;
+  t.textContent = msg;
+  c.appendChild(t);
+  setTimeout(() => { t.remove(); }, 3500);
+}
+
+function escapeHtml(str) {
+  const d = document.createElement("div");
+  d.appendChild(document.createTextNode(String(str)));
+  return d.innerHTML;
+}
+
 function persistirAvatar(url) {
   avatarSelecionado = url;
   localStorage.setItem("zuca_avatar_url", avatarSelecionado);
@@ -211,18 +227,21 @@ async function listarPedidos(email) {
     list.innerHTML = pedidos.map((pedido) => {
       const status = String(pedido.status || "pendente").toLowerCase();
       const paid = status === "pagto";
+      const timeline = renderTimeline(status);
       return `
         <article class="pedido-item ${paid ? "is-paid" : "is-pending"}">
           <div class="pedido-top">
-            <strong>#${pedido.id.slice(0, 8)}</strong>
+            <strong>#${escapeHtml(pedido.id.slice(0, 8))}</strong>
             <span class="pedido-status">${paid ? "Pago" : "Pendente"}</span>
           </div>
           <div>Total: R$ ${Number(pedido.total || 0).toFixed(2).replace(".", ",")}</div>
-          <div>Pagamento: ${String(pedido.pagamento || "pix").toUpperCase()}</div>
-          ${paid ? "" : `<div style="display:flex; gap:8px; flex-wrap:wrap;">
-            <button type="button" class="checkout-btn secondary btn-verificar" data-id="${pedido.id}">Verificar pagamento</button>
-            <button type="button" class="checkout-btn secondary btn-pagar" data-id="${pedido.id}" data-pag="${String(pedido.pagamento || "pix").toLowerCase()}">Pagar agora</button>
-          </div>`}
+          <div>Pagamento: ${escapeHtml(String(pedido.pagamento || "pix").toUpperCase())}</div>
+          ${timeline}
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            ${paid ? "" : `<button type="button" class="checkout-btn secondary btn-verificar" data-id="${escapeHtml(pedido.id)}">Verificar pagamento</button>
+            <button type="button" class="checkout-btn secondary btn-pagar" data-id="${escapeHtml(pedido.id)}" data-pag="${escapeHtml(String(pedido.pagamento || "pix").toLowerCase())}">Pagar agora</button>`}
+            ${paid ? `<button type="button" class="checkout-btn secondary btn-recomprar" data-itens='${escapeHtml(JSON.stringify(pedido.itens || []))}'>🔁 Comprar novamente</button>` : ""}
+          </div>
         </article>
       `;
     }).join("");
@@ -255,6 +274,26 @@ async function listarPedidos(email) {
         }
       });
     });
+
+    list.querySelectorAll(".btn-recomprar").forEach((button) => {
+      button.addEventListener("click", () => {
+        try {
+          const itens = JSON.parse(button.getAttribute("data-itens") || "[]");
+          if (!itens.length) { showToast("Nenhum item encontrado neste pedido.", "error"); return; }
+          const carrinho = JSON.parse(localStorage.getItem("zuca_carrinho") || "[]");
+          for (const item of itens) {
+            const exists = carrinho.find((c) => c.id === item.id);
+            if (exists) { exists.quantidade = (exists.quantidade || 1) + (item.quantidade || 1); }
+            else { carrinho.push({ ...item, quantidade: item.quantidade || 1 }); }
+          }
+          localStorage.setItem("zuca_carrinho", JSON.stringify(carrinho));
+          showToast("Itens adicionados ao carrinho!", "success");
+          setTimeout(() => { window.location.href = "/checkout"; }, 1200);
+        } catch {
+          showToast("Erro ao adicionar itens ao carrinho.", "error");
+        }
+      });
+    });
   } catch {
     list.innerHTML = "<p>Nao foi possivel carregar seus pedidos.</p>";
   }
@@ -273,3 +312,88 @@ el("email")?.addEventListener("blur", (event) => {
 
 renderAvatarOptions();
 carregarPerfil();
+
+/* ========== Timeline ========== */
+const TIMELINE_STEPS = [
+  { key: "pendente", label: "Pedido" },
+  { key: "pagto", label: "Pago" },
+  { key: "producao", label: "Produção" },
+  { key: "enviado", label: "Enviado" },
+  { key: "entregue", label: "Entregue" },
+];
+
+function renderTimeline(currentStatus) {
+  const idx = TIMELINE_STEPS.findIndex((s) => s.key === currentStatus);
+  const activeIdx = idx >= 0 ? idx : 0;
+
+  let html = '<div class="pedido-timeline">';
+  TIMELINE_STEPS.forEach((step, i) => {
+    const cls = i < activeIdx ? "done" : i === activeIdx ? "active" : "";
+    if (i > 0) {
+      html += `<div class="timeline-line ${i <= activeIdx ? "done" : ""}"></div>`;
+    }
+    html += `<div class="timeline-step ${cls}">
+      <div class="timeline-dot">${i < activeIdx ? "✓" : i + 1}</div>
+      <span class="timeline-label">${step.label}</span>
+    </div>`;
+  });
+  html += "</div>";
+  return html;
+}
+
+/* ========== Favoritos ========== */
+async function renderFavoritos() {
+  const container = document.getElementById("favoritos-container");
+  if (!container) return;
+
+  const wishlist = JSON.parse(localStorage.getItem("zuca_wishlist") || "[]");
+  if (!wishlist.length) {
+    container.innerHTML = '<p style="color: #999;">Você ainda não tem favoritos. Adicione produtos clicando no ♡</p>';
+    return;
+  }
+
+  try {
+    const response = await fetch(getApiUrl("/api/produtos"));
+    if (!response.ok) throw new Error();
+    const data = await response.json();
+    const produtos = Array.isArray(data) ? data : (data?.produtos || []);
+
+    const favoritos = produtos.filter((p) => wishlist.includes(p.id));
+
+    if (!favoritos.length) {
+      container.innerHTML = '<p style="color: #999;">Os produtos favoritados não estão mais disponíveis.</p>';
+      return;
+    }
+
+    container.innerHTML = favoritos.map((p) => {
+      const img = p.imagem || p.imagemCapa || (Array.isArray(p.imagens) ? p.imagens[0] : "") || "img/logo/logo.png";
+      const preco = Number(p.preco || p.valor || 0);
+      return `
+        <div class="fav-card">
+          <a href="/produto?id=${encodeURIComponent(p.id)}" style="text-decoration:none; color:inherit;">
+            <img src="${escapeHtml(img)}" alt="${escapeHtml(p.nome || '')}" loading="lazy">
+            <div class="fav-card-info">
+              <h4>${escapeHtml(p.nome || "Produto")}</h4>
+              <span class="fav-price">R$ ${preco.toFixed(2).replace(".", ",")}</span>
+            </div>
+          </a>
+          <button class="fav-remove-btn" data-id="${escapeHtml(p.id)}">✕ Remover</button>
+        </div>
+      `;
+    }).join("");
+
+    container.querySelectorAll(".fav-remove-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const id = btn.getAttribute("data-id");
+        const wl = JSON.parse(localStorage.getItem("zuca_wishlist") || "[]").filter((x) => x !== id);
+        localStorage.setItem("zuca_wishlist", JSON.stringify(wl));
+        showToast("Removido dos favoritos.", "info");
+        renderFavoritos();
+      });
+    });
+  } catch {
+    container.innerHTML = '<p style="color: #999;">Não foi possível carregar os favoritos.</p>';
+  }
+}
+
+renderFavoritos();

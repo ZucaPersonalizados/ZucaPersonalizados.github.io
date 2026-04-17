@@ -150,7 +150,6 @@ p {
   backdrop-filter: blur(4px);
   background: rgba(255, 250, 242, 0.96);
   border-bottom: 1px solid rgba(171, 143, 118, 0.22);
-  isolation: isolate;
 }
 
 .header-shell {
@@ -959,7 +958,7 @@ p {
   background: #fff;
   border-left: 1px solid var(--line);
   box-shadow: -6px 0 16px rgba(0, 0, 0, 0.08);
-  z-index: 3500;
+  z-index: 10000;
   display: flex;
   flex-direction: column;
   transition: right 0.24s ease;
@@ -973,7 +972,7 @@ p {
   position: fixed;
   inset: 0;
   background: rgba(17, 31, 42, 0.4);
-  z-index: 3400;
+  z-index: 9999;
   display: none;
 }
 
@@ -2495,5 +2494,209 @@ p {
   }
   .produto-actions {
     flex-direction: column;
+  }
+}
+
+/* ========== Checkout Steps ========== */
+.checkout-steps {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  margin: 20px 0 24px;
+  padding: 0 10px;
+}
+
+.checkout-steps .step {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.checkout-steps .step-num {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 13px;
+  background: var(--line);
+  color: var(--muted);
+  transition: all 0.3s;
+  flex-shrink: 0;
+}
+
+.checkout-steps .step-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  transition: color 0.3s;
+}
+
+.checkout-steps .step.active .step-num {
+  background: var(--accent);
+  color: white;
+}
+
+.checkout-steps .step.active .step-label {
+  color: var(--ink-deep);
+}
+
+.checkout-steps .step.done .step-num {
+  background: var(--mint);
+  color: white;
+}
+
+.checkout-steps .step.done .step-label {
+  color: var(--mint);
+}
+
+.checkout-steps .step-line {
+  flex: 1;
+  height: 2px;
+  background: var(--line);
+  margin: 0 8px;
+  min-width: 20px;
+  transition: background 0.3s;
+}
+
+.checkout-steps .step-line.done {
+  background: var(--mint);
+}
+
+.checkout-step-content {
+  animation: fadeIn 0.3s ease;
+}
+
+.step-nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 20px;
+  gap: 12px;
+}
+
+.step-nav .btn {
+  min-width: 160px;
+}
+
+/* ========== Field Validation ========== */
+.field-error {
+  display: block;
+  font-size: 12px;
+  color: #e74c3c;
+  min-height: 16px;
+  margin-top: 2px;
+}
+
+.field-group input.is-invalid,
+.field-group select.is-invalid {
+  border-color: #e74c3c !important;
+  box-shadow: 0 0 0 2px rgba(231, 76, 60, 0.15);
+}
+
+.field-group input.is-valid {
+  border-color: var(--mint) !important;
+}
+
+@media (max-width: 600px) {
+  .checkout-steps .step-label {
+    display: none;
+  }
+  .checkout-steps .step-num {
+    width: 28px;
+    height: 28px;
+    font-size: 12px;
+  }
+  .step-nav {
+    flex-direction: column;
+  }
+  .step-nav .btn {
+    width: 100%;
+  }
+}
+
+/* ========== Product Tabs ========== */
+.produto-tabs {
+  display: flex;
+  border-bottom: 2px solid var(--line);
+  gap: 0;
+  margin-bottom: 0;
+}
+
+.tab-btn {
+  padding: 12px 24px;
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--muted);
+  transition: all 0.2s;
+  margin-bottom: -2px;
+}
+
+.tab-btn:hover {
+  color: var(--ink);
+}
+
+.tab-btn.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+.tab-content {
+  display: none;
+  padding: 24px 0;
+  animation: fadeIn 0.3s ease;
+}
+
+.tab-content.active {
+  display: block;
+}
+
+.specs-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+}
+
+.specs-grid .spec-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+  grid-column: 1 / -1;
+}
+
+.specs-grid .spec-row:nth-child(odd) {
+  background: rgba(201, 141, 89, 0.04);
+}
+
+.spec-label {
+  font-weight: 600;
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.spec-value {
+  color: var(--text);
+  font-size: 13px;
+}
+
+@media (max-width: 600px) {
+  .produto-tabs {
+    overflow-x: auto;
+  }
+  .tab-btn {
+    padding: 10px 16px;
+    font-size: 13px;
+    white-space: nowrap;
   }
 }

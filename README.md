@@ -36,7 +36,7 @@ backend-zuca/
 ## Requisitos
 
 - Node.js 20+
-- Credenciais Firebase Admin (`backend/src/config/firebase-key.json`)
+- Credenciais Firebase Admin (arquivo local ou variável `FIREBASE_SERVICE_ACCOUNT_JSON`)
 - Credenciais Mercado Pago
 
 ## Configuração
@@ -58,11 +58,12 @@ cp .env.example .env
 3. Preencha no `backend/.env`:
 
 - `FIREBASE_KEY_PATH=./src/config/firebase-key.json`
+- `FIREBASE_SERVICE_ACCOUNT_JSON={...}` (recomendado no Render)
 - `MP_ACCESS_TOKEN=...`
 - `MP_PUBLIC_KEY=...`
 - `ADMIN_EMAIL=...`
 - `ADMIN_PASSWORD=...`
-- `CORS_ORIGINS=http://localhost:3000,http://localhost:8000,https://seu-dominio.com`
+- `CORS_ORIGINS=http://localhost:3000,http://localhost:8000,https://zuca-personalizados.onrender.com,https://zucapersonalizados.com.br,https://www.zucapersonalizados.com.br`
 
 ## Execução
 

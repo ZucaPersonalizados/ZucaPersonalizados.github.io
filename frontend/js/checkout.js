@@ -16,6 +16,7 @@ function normalizarUrlSemExtensao() {
     "/index.html": "/",
     "/produto.html": "/produto",
     "/checkout.html": "/checkout",
+    "/minha-conta.html": "/minha-conta",
     "/admin.html": "/admin",
   };
 
@@ -29,6 +30,11 @@ let descontoAtual = 0;
 let cupomAplicado = null;
 let mpConfigCache = null;
 let monitorPagamentoTimer = null;
+let freteAtual = {
+  valor: 0,
+  servico: "",
+  prazoDias: null,
+};
 
 function digitsOnly(value = "") {
   return String(value).replace(/\D/g, "");
@@ -76,6 +82,10 @@ function setCheckoutStatus(message, type = "info") {
   else box.classList.add("is-info");
 }
 
+function setActionFeedback(message, type = "info") {
+  setCheckoutStatus(message, type);
+}
+
 async function obterConfigMercadoPago(forceRefresh = false) {
   if (!forceRefresh && mpConfigCache) {
     return mpConfigCache;
@@ -106,6 +116,19 @@ const getCarrinho = () => {
 
 const formatarMoeda = (v) => `R$ ${Number(v || 0).toFixed(2).replace(".", ",")}`;
 const precoNumero = (p) => Number(String(p || "0").replace("R$", "").replace(/\./g, "").replace(",", ".")) || 0;
+
+function isCepValido(value = "") {
+  return digitsOnly(value).length === 8;
+}
+
+function atualizarResumo(subtotal) {
+  const total = Math.max(0, subtotal - descontoAtual + Number(freteAtual.valor || 0));
+  if (el("subtotal")) el("subtotal").textContent = formatarMoeda(subtotal);
+  if (el("desconto")) el("desconto").textContent = formatarMoeda(descontoAtual);
+  if (el("frete")) el("frete").textContent = formatarMoeda(freteAtual.valor || 0);
+  if (el("total-final")) el("total-final").textContent = formatarMoeda(total);
+  if (el("total-carrinho")) el("total-carrinho").textContent = formatarMoeda(total);
+}
 
 function salvarDadosClienteLocal() {
   const dados = {
@@ -155,10 +178,8 @@ function renderCarrinho() {
 
   if (itens.length === 0) {
     container.innerHTML = "<p style='color:#999;font-size:14px;'>Seu carrinho está vazio.</p>";
-    totalEl.textContent = "R$ 0,00";
-    if (el("subtotal")) el("subtotal").textContent = "R$ 0,00";
-    if (el("desconto")) el("desconto").textContent = "R$ 0,00";
-    if (el("total-final")) el("total-final").textContent = "R$ 0,00";
+    freteAtual = { valor: 0, servico: "", prazoDias: null };
+    atualizarResumo(0);
     return;
   }
 
@@ -181,14 +202,75 @@ function renderCarrinho() {
     container.appendChild(div);
   });
 
-  const total = Math.max(0, subtotal - descontoAtual);
-  totalEl.textContent = formatarMoeda(total);
-  if (el("subtotal")) el("subtotal").textContent = formatarMoeda(subtotal);
-  if (el("desconto")) el("desconto").textContent = formatarMoeda(descontoAtual);
-  if (el("total-final")) el("total-final").textContent = formatarMoeda(total);
+  atualizarResumo(subtotal);
 
   atualizarContadorCarrinho();
   renderizarCarrinhoSidebar();
+}
+
+async function preencherEnderecoPorCep(cep) {
+  const cepLimpo = digitsOnly(cep).slice(0, 8);
+  if (cepLimpo.length !== 8) return;
+
+  try {
+    const response = await fetch(getApiUrl(`/api/cep/${cepLimpo}`));
+    const payload = await response.json();
+    if (!response.ok || !payload.success) {
+      throw new Error(payload.error || "CEP nao encontrado");
+    }
+
+    if (el("endereco") && !el("endereco").value.trim()) el("endereco").value = payload.logradouro || "";
+    if (el("bairro") && !el("bairro").value.trim()) el("bairro").value = payload.bairro || "";
+    if (el("cidade") && !el("cidade").value.trim()) el("cidade").value = payload.localidade || "";
+    if (el("estado") && !el("estado").value.trim()) el("estado").value = payload.uf || "";
+    salvarDadosClienteLocal();
+  } catch {
+    // Nao bloqueia checkout quando o CEP falhar.
+  }
+}
+
+async function recalcularFrete() {
+  const cep = el("cep")?.value || "";
+  if (!isCepValido(cep)) {
+    freteAtual = { valor: 0, servico: "", prazoDias: null };
+    atualizarResumo(obterSubtotal());
+    return;
+  }
+
+  try {
+    const itens = getCarrinho().map((item) => ({
+      id: item.id,
+      nome: item.nome,
+      preco: precoNumero(item.preco),
+      quantidade: Number(item.quantidade || 1),
+    }));
+
+    const url = new URL(getApiUrl("/api/frete/calcular"));
+    url.searchParams.set("cep", digitsOnly(cep));
+    url.searchParams.set("itens", JSON.stringify(itens));
+
+    const response = await fetch(url.toString());
+    const payload = await response.json();
+    if (!response.ok || !payload.success || !Array.isArray(payload.options) || !payload.options.length) {
+      throw new Error(payload.error || "Nao foi possivel calcular o frete");
+    }
+
+    const melhor = [...payload.options].sort((a, b) => Number(a.price || 0) - Number(b.price || 0))[0];
+    freteAtual = {
+      valor: Number(melhor.price || 0),
+      servico: String(melhor.service || "Entrega"),
+      prazoDias: Number(melhor.delivery_time || 0) || null,
+    };
+
+    atualizarResumo(obterSubtotal());
+    setActionFeedback(
+      `Frete atualizado: ${freteAtual.servico} (${formatarMoeda(freteAtual.valor)}${freteAtual.prazoDias ? `, ${freteAtual.prazoDias} dias` : ""}).`,
+      "info"
+    );
+  } catch {
+    freteAtual = { valor: 0, servico: "", prazoDias: null };
+    atualizarResumo(obterSubtotal());
+  }
 }
 
 function atualizarContadorCarrinho() {
@@ -329,7 +411,7 @@ async function listarPedidosPorEmail(email) {
         const pedidoId = btn.getAttribute("data-pedido-id") || "";
         if (!pedidoId) return;
         const verificacao = await verificarPagamento(pedidoId);
-        setCheckoutStatus(
+        setActionFeedback(
           verificacao.aprovado
             ? `Pagamento confirmado para o pedido #${pedidoId.slice(0, 8)}.`
             : (verificacao.payload?.message || "Pagamento ainda pendente."),
@@ -421,7 +503,7 @@ function iniciarMonitoramentoPagamento(idPedido, email = "") {
     const verificacao = await verificarPagamento(idPedido);
     if (verificacao.aprovado) {
       pararMonitoramentoPagamento();
-      setCheckoutStatus(`Pagamento confirmado para o pedido #${idPedido.slice(0, 8)}.`, "success");
+      setActionFeedback(`Pagamento confirmado para o pedido #${idPedido.slice(0, 8)}.`, "success");
       if (email) {
         await listarPedidosPorEmail(email);
       }
@@ -494,7 +576,38 @@ function validarCamposCliente(cliente) {
   if (!cliente.numero) return "Informe o número.";
   if (!cliente.cidade) return "Informe sua cidade.";
   if (!cliente.estado) return "Informe seu estado.";
+  if (!isCepValido(cliente.cep)) return "Informe um CEP valido para calcular o frete.";
   return "";
+}
+
+async function tratarRetornoPagamento() {
+  const params = new URLSearchParams(window.location.search);
+  const pedidoId = String(params.get("pedido") || "").trim();
+  const retorno = String(params.get("retorno") || "").trim().toLowerCase();
+
+  if (!pedidoId) return;
+
+  const msgBase = `Pedido #${pedidoId.slice(0, 8)}`;
+  if (retorno === "failure") {
+    setActionFeedback(`${msgBase}: pagamento nao aprovado. Voce pode tentar novamente abaixo.`, "error");
+    return;
+  }
+
+  setActionFeedback(`${msgBase}: verificando status do pagamento...`, "info");
+  const verificacao = await verificarPagamento(pedidoId);
+  if (verificacao.aprovado) {
+    localStorage.removeItem("zuca_carrinho");
+    descontoAtual = 0;
+    renderCarrinho();
+    setActionFeedback(`${msgBase}: pagamento confirmado com sucesso.`, "success");
+  } else if (retorno === "success") {
+    setActionFeedback(
+      verificacao.payload?.message || `${msgBase}: ainda aguardando confirmacao do pagamento.`,
+      "info"
+    );
+    const email = String(el("email")?.value || "").trim().toLowerCase();
+    iniciarMonitoramentoPagamento(pedidoId, email);
+  }
 }
 
 async function finalizarPedido() {
@@ -538,6 +651,11 @@ async function finalizarPedido() {
         cliente,
         itens,
         pagamento: metodo,
+        frete: {
+          valor: Number(freteAtual.valor || 0),
+          servico: freteAtual.servico,
+          prazoDias: freteAtual.prazoDias,
+        },
         cupom: cupomAplicado,
         observacoes,
       }),
@@ -760,6 +878,12 @@ function configurarMascarasFormulario() {
     event.target.value = formatarCep(event.target.value);
   });
 
+  cep?.addEventListener("blur", async (event) => {
+    const value = String(event.target.value || "");
+    await preencherEnderecoPorCep(value);
+    await recalcularFrete();
+  });
+
   estado?.addEventListener("input", (event) => {
     event.target.value = String(event.target.value || "").replace(/[^a-zA-Z]/g, "").slice(0, 2).toUpperCase();
   });
@@ -793,7 +917,12 @@ configurarCopiarPix();
 configurarMascarasFormulario();
 configurarAcoesPagamento();
 renderizarCarrinhoSidebar();
+tratarRetornoPagamento();
 
 if (el("email")?.value) {
   listarPedidosPorEmail(el("email").value.trim().toLowerCase());
+}
+
+if (isCepValido(el("cep")?.value || "")) {
+  recalcularFrete();
 }

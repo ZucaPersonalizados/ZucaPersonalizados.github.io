@@ -27,6 +27,9 @@ const pixProvider = String(process.env.PIX_PROVIDER || "mercadopago").trim().toL
 const pixNubankKey = String(process.env.PIX_NUBANK_KEY || "").trim();
 const pixNubankBeneficiaryName = String(process.env.PIX_NUBANK_BENEFICIARY_NAME || "").trim();
 const pixNubankCity = String(process.env.PIX_NUBANK_CITY || "").trim();
+const publicAppUrl = String(process.env.PUBLIC_APP_URL || "").trim().replace(/\/$/, "");
+const melhorEnvioToken = String(process.env.MELHOR_ENVIO_TOKEN || "").trim();
+const melhorEnvioOriginCep = String(process.env.MELHOR_ENVIO_ORIGIN_CEP || "").trim();
 const adminEmail = String(process.env.ADMIN_EMAIL || "").toLowerCase();
 const adminPassword = String(process.env.ADMIN_PASSWORD || "");
 const cookieName = "zuca_admin_session";
@@ -200,6 +203,132 @@ function buildMercadoPagoHeaders(token, withIdempotency = false) {
   }
 
   return headers;
+}
+
+function inferAppBaseUrl(req) {
+  if (publicAppUrl) return publicAppUrl;
+  const origin = String(req?.headers?.origin || "").trim().replace(/\/$/, "");
+  if (origin) return origin;
+  const forwardedProto = String(req?.headers?.["x-forwarded-proto"] || "https");
+  const forwardedHost = String(req?.headers?.["x-forwarded-host"] || req?.headers?.host || "").trim();
+  if (!forwardedHost) return "";
+  return `${forwardedProto}://${forwardedHost}`.replace(/\/$/, "");
+}
+
+async function buscarPagamentoMercadoPagoPorReferencia(referencia) {
+  const ref = String(referencia || "").trim();
+  if (!ref || !mpAccessToken) return null;
+
+  const response = await axios.get("https://api.mercadopago.com/v1/payments/search", {
+    params: {
+      external_reference: ref,
+      sort: "date_created",
+      criteria: "desc",
+      limit: 1,
+    },
+    headers: {
+      Authorization: `Bearer ${mpAccessToken}`,
+    },
+  });
+
+  const results = Array.isArray(response.data?.results) ? response.data.results : [];
+  return results[0] || null;
+}
+
+async function calcularFreteFallback({ cepDestino, itens }) {
+  const destino = digitsOnly(cepDestino).slice(0, 8);
+  if (destino.length !== 8) {
+    throw new Error("CEP invalido para calculo de frete");
+  }
+
+  const quantidade = Array.isArray(itens)
+    ? itens.reduce((acc, item) => acc + Math.max(1, Number(item.quantidade || 1)), 0)
+    : 1;
+
+  const distancia = Math.abs(Number(destino[0]) - Number((melhorEnvioOriginCep || "79000000")[0] || 7));
+  const valor = Math.max(12, 14 + distancia * 2 + quantidade * 1.5);
+  const prazo = Math.max(3, 4 + distancia);
+
+  return {
+    provider: "fallback",
+    options: [
+      {
+        service: "Entrega padrao",
+        price: Number(valor.toFixed(2)),
+        delivery_time: prazo,
+      },
+    ],
+  };
+}
+
+async function calcularFreteMelhorEnvio({ cepDestino, itens }) {
+  if (!melhorEnvioToken || !melhorEnvioOriginCep) {
+    return calcularFreteFallback({ cepDestino, itens });
+  }
+
+  const cepOrigem = digitsOnly(melhorEnvioOriginCep).slice(0, 8);
+  const cepDestinoNormalizado = digitsOnly(cepDestino).slice(0, 8);
+
+  if (cepOrigem.length !== 8 || cepDestinoNormalizado.length !== 8) {
+    return calcularFreteFallback({ cepDestino, itens });
+  }
+
+  const produtos = (Array.isArray(itens) && itens.length ? itens : [{ nome: "Pedido", quantidade: 1, preco: 0 }]).map((item, index) => ({
+    id: String(item.id || index + 1),
+    name: String(item.nome || "Produto"),
+    width: Number(item.largura || 15),
+    height: Number(item.altura || 2),
+    length: Number(item.comprimento || 20),
+    weight: Number(item.peso || 0.3),
+    insurance_value: Number(item.preco || 0),
+    quantity: Math.max(1, Number(item.quantidade || 1)),
+  }));
+
+  try {
+    const response = await axios.post(
+      "https://melhorenvio.com.br/api/v2/me/shipment/calculate",
+      {
+        from: { postal_code: cepOrigem },
+        to: { postal_code: cepDestinoNormalizado },
+        products: produtos,
+        services: "1,2",
+        options: {
+          receipt: false,
+          own_hand: false,
+          collect: false,
+        },
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${melhorEnvioToken}`,
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          "User-Agent": "ZucaPersonalizados (contato@zuca.com)",
+        },
+      }
+    );
+
+    const lista = Array.isArray(response.data) ? response.data : [];
+    const opcoes = lista
+      .filter((item) => !item.error && Number(item.price || 0) > 0)
+      .map((item) => ({
+        service: String(item.name || "Entrega"),
+        company: String(item.company?.name || "Melhor Envio"),
+        price: Number(item.price || 0),
+        delivery_time: Number(item.delivery_time || 0),
+      }));
+
+    if (!opcoes.length) {
+      return calcularFreteFallback({ cepDestino, itens });
+    }
+
+    return {
+      provider: "melhorenvio",
+      options: opcoes,
+    };
+  } catch {
+    return calcularFreteFallback({ cepDestino, itens });
+  }
 }
 
 function removeAccents(value = "") {
@@ -376,7 +505,7 @@ async function createPixCharge({ valor, descricao, cliente, pedidoId }) {
   return createMercadoPagoPixCharge({ valor, descricao, cliente, pedidoId });
 }
 
-async function createCheckoutProPreference({ pedidoId, pedidoData }) {
+async function createCheckoutProPreference({ pedidoId, pedidoData, appBaseUrl }) {
   if (!mpAccessToken) {
     throw new Error("Credenciais do Mercado Pago nao configuradas");
   }
@@ -387,9 +516,21 @@ async function createCheckoutProPreference({ pedidoId, pedidoData }) {
   }
 
   const externalReference = String(pedidoId || "");
+  const retornoBase = String(appBaseUrl || "").replace(/\/$/, "");
+  const backUrls = retornoBase
+    ? {
+        success: `${retornoBase}/checkout?pedido=${encodeURIComponent(externalReference)}&retorno=success`,
+        pending: `${retornoBase}/checkout?pedido=${encodeURIComponent(externalReference)}&retorno=pending`,
+        failure: `${retornoBase}/checkout?pedido=${encodeURIComponent(externalReference)}&retorno=failure`,
+      }
+    : undefined;
+
   const payload = {
     external_reference: externalReference,
     statement_descriptor: "ZUCA",
+    auto_return: "approved",
+    back_urls: backUrls,
+    notification_url: retornoBase ? `${retornoBase}/webhook/mercadopago` : undefined,
     payer: {
       email: String(pedidoData?.cliente?.email || "cliente@email.com"),
       name: String(pedidoData?.cliente?.nome || "Cliente"),
@@ -464,6 +605,10 @@ if (fs.existsSync(frontendDir)) {
   app.get("/produto", (req, res) => {
     res.sendFile(path.join(frontendDir, "produto.html"));
   });
+
+  app.get("/minha-conta", (req, res) => {
+    res.sendFile(path.join(frontendDir, "minha-conta.html"));
+  });
 }
 
 app.get("/api/produtos", requireDb, async (req, res) => {
@@ -520,7 +665,7 @@ app.post("/api/cupons/aplicar", requireDb, async (req, res) => {
 
 app.post("/api/pedidos", requireDb, async (req, res) => {
   try {
-    const { cliente, itens, pagamento, cupom, observacoes } = req.body;
+    const { cliente, itens, pagamento, cupom, observacoes, frete } = req.body;
     const metodoPagamento = String(pagamento || "pix").toLowerCase();
 
     if (!cliente?.nome || !cliente?.email || !Array.isArray(itens) || itens.length === 0) {
@@ -584,7 +729,8 @@ app.post("/api/pedidos", requireDb, async (req, res) => {
       }
     }
 
-    const total = Math.max(0, subtotal - desconto);
+    const freteValor = Math.max(0, Number(frete?.valor || 0));
+    const total = Math.max(0, subtotal - desconto + freteValor);
     const pedidoRef = await db.collection("pedidos").add({
       cliente: {
         nome: String(cliente.nome || ""),
@@ -601,6 +747,11 @@ app.post("/api/pedidos", requireDb, async (req, res) => {
       itens: itensNormalizados,
       subtotal,
       desconto,
+      frete: {
+        valor: freteValor,
+        servico: String(frete?.servico || "").trim(),
+        prazoDias: Number(frete?.prazoDias || 0) || null,
+      },
       total,
       pagamento: metodoPagamento,
       cupom: cupom ? String(cupom).toUpperCase() : null,
@@ -612,7 +763,14 @@ app.post("/api/pedidos", requireDb, async (req, res) => {
       atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
     });
 
-    return res.status(201).json({ success: true, pedidoId: pedidoRef.id, subtotal, desconto, total });
+    return res.status(201).json({
+      success: true,
+      pedidoId: pedidoRef.id,
+      subtotal,
+      desconto,
+      frete: freteValor,
+      total,
+    });
   } catch (error) {
     return res.status(500).json({ success: false, error: error.message });
   }
@@ -960,7 +1118,11 @@ app.post("/api/pedidos/:id/checkout-cartao", requireDb, async (req, res) => {
       return res.status(409).json({ success: false, error: "Pedido ja esta pago" });
     }
 
-    const preference = await createCheckoutProPreference({ pedidoId, pedidoData: pedido });
+    const preference = await createCheckoutProPreference({
+      pedidoId,
+      pedidoData: pedido,
+      appBaseUrl: inferAppBaseUrl(req),
+    });
 
     if (!preference.initPoint && !preference.sandboxInitPoint) {
       throw new Error("Nao foi possivel gerar checkout do cartao");
@@ -1041,7 +1203,11 @@ app.post("/api/pedidos/:id/pagar-agora", requireDb, async (req, res) => {
       });
     }
 
-    const preference = await createCheckoutProPreference({ pedidoId, pedidoData: pedido });
+    const preference = await createCheckoutProPreference({
+      pedidoId,
+      pedidoData: pedido,
+      appBaseUrl: inferAppBaseUrl(req),
+    });
     await pedidoRef.update({
       pagamento: "cartao",
       pagamentoProvider: "mercadopago",
@@ -1131,6 +1297,107 @@ app.post("/processar-pagamento", async (req, res) => {
   }
 });
 
+app.get("/api/frete/calcular", async (req, res) => {
+  try {
+    const cepDestino = String(req.query.cep || "").trim();
+    const itensRaw = String(req.query.itens || "").trim();
+
+    if (!cepDestino) {
+      return res.status(400).json({ success: false, error: "CEP de destino e obrigatorio" });
+    }
+
+    let itens = [];
+    if (itensRaw) {
+      try {
+        const parsed = JSON.parse(itensRaw);
+        if (Array.isArray(parsed)) itens = parsed;
+      } catch {
+        // mantém fallback de itens vazio
+      }
+    }
+
+    const resultado = await calcularFreteMelhorEnvio({ cepDestino, itens });
+    return res.json({ success: true, ...resultado });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.get("/api/cep/:cep", async (req, res) => {
+  try {
+    const cep = digitsOnly(req.params.cep).slice(0, 8);
+    if (cep.length !== 8) {
+      return res.status(400).json({ success: false, error: "CEP invalido" });
+    }
+
+    const response = await axios.get(`https://viacep.com.br/ws/${cep}/json/`);
+    const data = response.data || {};
+    if (data.erro) {
+      return res.status(404).json({ success: false, error: "CEP nao encontrado" });
+    }
+
+    return res.json({
+      success: true,
+      cep: String(data.cep || ""),
+      logradouro: String(data.logradouro || ""),
+      complemento: String(data.complemento || ""),
+      bairro: String(data.bairro || ""),
+      localidade: String(data.localidade || ""),
+      uf: String(data.uf || ""),
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: "Falha ao consultar CEP" });
+  }
+});
+
+app.post("/webhook/mercadopago", requireDb, async (req, res) => {
+  try {
+    const type = String(req.body?.type || req.query?.type || "").toLowerCase();
+    const topic = String(req.body?.topic || req.query?.topic || "").toLowerCase();
+    const dataId = String(req.body?.data?.id || req.query?.["data.id"] || "").trim();
+
+    if (type !== "payment" && topic !== "payment") {
+      return res.status(200).json({ received: true, ignored: true });
+    }
+
+    if (!dataId || !mpAccessToken) {
+      return res.status(200).json({ received: true, ignored: true });
+    }
+
+    const pagamentoRes = await axios.get(`https://api.mercadopago.com/v1/payments/${dataId}`, {
+      headers: {
+        Authorization: `Bearer ${mpAccessToken}`,
+      },
+    });
+
+    const pagamento = pagamentoRes.data || {};
+    const referencia = String(pagamento.external_reference || "").trim();
+    if (!referencia) {
+      return res.status(200).json({ received: true, ignored: true });
+    }
+
+    const pedidoRef = db.collection("pedidos").doc(referencia);
+    const pedidoSnap = await pedidoRef.get();
+    if (!pedidoSnap.exists) {
+      return res.status(200).json({ received: true, ignored: true });
+    }
+
+    const statusMercadoPago = String(pagamento.status || "").toLowerCase();
+    const statusPedido = statusMercadoPago === "approved" ? "pagto" : "pendente";
+    await pedidoRef.update({
+      mercadoPagoId: String(pagamento.id || ""),
+      statusMercadoPago,
+      status: statusPedido,
+      atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
+      pagamentoVerificadoEm: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    return res.status(200).json({ received: true, updated: true });
+  } catch {
+    return res.status(200).json({ received: true });
+  }
+});
+
 app.post("/verificar-pagamento", requireDb, async (req, res) => {
   try {
     const { idPedido } = req.body;
@@ -1149,7 +1416,7 @@ app.post("/verificar-pagamento", requireDb, async (req, res) => {
     }
 
     const pedidoData = pedidoSnap.data() || {};
-    const mercadoPagoId = String(pedidoData.mercadoPagoId || "").trim();
+    let mercadoPagoId = String(pedidoData.mercadoPagoId || "").trim();
     const pagamentoProvider = String(pedidoData.pagamentoProvider || "").toLowerCase();
 
     if (!mercadoPagoId) {
@@ -1161,7 +1428,22 @@ app.post("/verificar-pagamento", requireDb, async (req, res) => {
           message: "Aguardando confirmacao manual do PIX na conta Nubank",
         });
       }
-      return res.status(400).json({ success: false, error: "Pagamento ainda nao foi iniciado para este pedido" });
+      const pagamentoReferencia = await buscarPagamentoMercadoPagoPorReferencia(idPedido);
+      if (!pagamentoReferencia?.id) {
+        return res.status(202).json({
+          success: false,
+          aprovado: false,
+          statusMercadoPago: "pending",
+          message: "Pagamento ainda nao encontrado. Aguarde alguns segundos e tente novamente.",
+        });
+      }
+
+      mercadoPagoId = String(pagamentoReferencia.id);
+      await pedidoRef.update({
+        mercadoPagoId,
+        statusMercadoPago: String(pagamentoReferencia.status || "pending").toLowerCase(),
+        atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
+      });
     }
 
     const pagamentoRes = await axios.get(`https://api.mercadopago.com/v1/payments/${mercadoPagoId}`, {

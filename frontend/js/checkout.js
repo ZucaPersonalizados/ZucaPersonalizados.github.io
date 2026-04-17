@@ -28,6 +28,7 @@ function normalizarUrlSemExtensao() {
 let descontoAtual = 0;
 let cupomAplicado = null;
 let mpConfigCache = null;
+let monitorPagamentoTimer = null;
 
 function digitsOnly(value = "") {
   return String(value).replace(/\D/g, "");
@@ -290,6 +291,12 @@ async function listarPedidosPorEmail(email) {
       const status = String(pedido.status || "pendente");
       const statusLabel = status === "pagto" ? "Pago" : "Pendente";
       const statusClass = status === "pagto" ? "is-paid" : "is-pending";
+      const pagamento = String(pedido.pagamento || "pix").toLowerCase();
+      const pagamentoLabel = pagamento === "cartao"
+        ? "Cartao"
+        : pagamento === "boleto"
+          ? "Boleto"
+          : "PIX";
 
       return `
       <div class="pedido-item ${statusClass}">
@@ -297,10 +304,42 @@ async function listarPedidosPorEmail(email) {
           <span class="pedido-id">#${pedido.id.slice(0, 8)}</span>
           <span class="pedido-status">${statusLabel}</span>
         </div>
+        <small>Pagamento: ${pagamentoLabel}</small>
         <div class="pedido-total">${formatarMoeda(pedido.total || 0)}</div>
+        ${status !== "pagto" ? `
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button type="button" class="checkout-btn secondary btn-pagar-pendente" data-pedido-id="${pedido.id}" data-pagamento="${pagamento}">Pagar agora</button>
+            <button type="button" class="checkout-btn secondary btn-verificar-pendente" data-pedido-id="${pedido.id}">Verificar pagamento</button>
+          </div>
+        ` : ""}
       </div>
     `;
     }).join("");
+
+    container.querySelectorAll(".btn-pagar-pendente").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const pedidoId = btn.getAttribute("data-pedido-id") || "";
+        const pagamento = btn.getAttribute("data-pagamento") || "pix";
+        pagarPedidoPendente(pedidoId, pagamento, email);
+      });
+    });
+
+    container.querySelectorAll(".btn-verificar-pendente").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const pedidoId = btn.getAttribute("data-pedido-id") || "";
+        if (!pedidoId) return;
+        const verificacao = await verificarPagamento(pedidoId);
+        setCheckoutStatus(
+          verificacao.aprovado
+            ? `Pagamento confirmado para o pedido #${pedidoId.slice(0, 8)}.`
+            : (verificacao.payload?.message || "Pagamento ainda pendente."),
+          verificacao.aprovado ? "success" : "info"
+        );
+        if (verificacao.aprovado) {
+          await listarPedidosPorEmail(email);
+        }
+      });
+    });
   } catch {
     container.innerHTML = "<p>Não foi possível carregar seus pedidos.</p>";
   }
@@ -349,6 +388,101 @@ async function gerarPixDinamico(total, idPedido, cliente) {
   if (brCodeInput) brCodeInput.value = data.brcode || "";
 
   return data;
+}
+
+function mostrarPixNaTela(data = {}) {
+  const qrContainer = el("pix-qrcode");
+  const brCodeInput = el("pix-brcode");
+  if (qrContainer && data.qr_code) {
+    qrContainer.innerHTML = `<img src="${data.qr_code}" alt="QR PIX" style="max-width:220px;">`;
+  }
+  if (brCodeInput) {
+    brCodeInput.value = data.brcode || "";
+  }
+
+  if (el("pagamento")) {
+    el("pagamento").value = "pix";
+    onPagamentoChange();
+  }
+}
+
+function pararMonitoramentoPagamento() {
+  if (monitorPagamentoTimer) {
+    clearInterval(monitorPagamentoTimer);
+    monitorPagamentoTimer = null;
+  }
+}
+
+function iniciarMonitoramentoPagamento(idPedido, email = "") {
+  pararMonitoramentoPagamento();
+  let tentativas = 0;
+  monitorPagamentoTimer = setInterval(async () => {
+    tentativas += 1;
+    const verificacao = await verificarPagamento(idPedido);
+    if (verificacao.aprovado) {
+      pararMonitoramentoPagamento();
+      setCheckoutStatus(`Pagamento confirmado para o pedido #${idPedido.slice(0, 8)}.`, "success");
+      if (email) {
+        await listarPedidosPorEmail(email);
+      }
+      return;
+    }
+
+    if (tentativas >= 24) {
+      pararMonitoramentoPagamento();
+    }
+  }, 10000);
+}
+
+async function iniciarCheckoutCartao(pedidoId, email) {
+  const response = await fetch(getApiUrl(`/api/pedidos/${encodeURIComponent(pedidoId)}/checkout-cartao`), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+  const payload = await response.json();
+
+  if (!response.ok || !payload.success || !payload.checkoutUrl) {
+    throw new Error(payload.error || "Nao foi possivel iniciar pagamento por cartao");
+  }
+
+  window.location.href = payload.checkoutUrl;
+}
+
+async function pagarPedidoPendente(idPedido, metodoOriginal, email) {
+  if (!idPedido) return;
+
+  try {
+    setCheckoutStatus(`Preparando pagamento do pedido #${idPedido.slice(0, 8)}...`, "info");
+    const metodo = metodoOriginal === "cartao" ? "cartao" : "pix";
+    const response = await fetch(getApiUrl(`/api/pedidos/${encodeURIComponent(idPedido)}/pagar-agora`), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, metodo }),
+    });
+
+    const payload = await response.json();
+    if (!response.ok || !payload.success) {
+      throw new Error(payload.error || "Nao foi possivel gerar nova cobranca");
+    }
+
+    if (payload.action === "pix") {
+      mostrarPixNaTela(payload);
+      setCheckoutStatus(`PIX atualizado para o pedido #${idPedido.slice(0, 8)}.`, "success");
+      iniciarMonitoramentoPagamento(idPedido, email);
+      return;
+    }
+
+    if (payload.action === "checkout_pro" && payload.checkoutUrl) {
+      setCheckoutStatus("Redirecionando para pagamento seguro do Mercado Pago...", "info");
+      window.location.href = payload.checkoutUrl;
+      return;
+    }
+
+    throw new Error("Resposta de pagamento invalida");
+  } catch (error) {
+    setCheckoutStatus(`Erro: ${error.message}`, "error");
+  }
 }
 
 function validarCamposCliente(cliente) {
@@ -418,24 +552,26 @@ async function finalizarPedido() {
     const total = Number(pedidoPayload.total || 0);
 
     if (metodo === "pix") {
-      await gerarPixDinamico(total, pedidoId, cliente);
-      const verificacao = await verificarPagamento(pedidoId);
+      const pix = await gerarPixDinamico(total, pedidoId, cliente);
+      mostrarPixNaTela(pix);
       setCheckoutStatus(
-        verificacao.aprovado
-          ? `Pagamento confirmado. Pedido #${pedidoId.slice(0, 8)}`
-          : `PIX gerado para o pedido #${pedidoId.slice(0, 8)}. Aguardando confirmacao do pagamento.`,
-        verificacao.aprovado ? "success" : "info"
+        `PIX gerado para o pedido #${pedidoId.slice(0, 8)}. Aguardando confirmacao do pagamento.`,
+        "success"
       );
+      iniciarMonitoramentoPagamento(pedidoId, cliente.email);
     } else if (metodo === "cartao") {
-      setCheckoutStatus("Cartao requer formulario seguro do Mercado Pago. Use PIX temporariamente.", "info");
+      setCheckoutStatus("Redirecionando para pagamento seguro do Mercado Pago...", "info");
+      await iniciarCheckoutCartao(pedidoId, cliente.email);
     } else if (metodo === "boleto") {
       setCheckoutStatus(`Pedido #${pedidoId.slice(0, 8)} criado. Boleto sera enviado por e-mail.`, "success");
     }
 
-    localStorage.removeItem("zuca_carrinho");
-    descontoAtual = 0;
-    cupomAplicado = null;
-    renderCarrinho();
+    if (metodo !== "cartao") {
+      localStorage.removeItem("zuca_carrinho");
+      descontoAtual = 0;
+      cupomAplicado = null;
+      renderCarrinho();
+    }
     await listarPedidosPorEmail(cliente.email);
   } catch (error) {
     setCheckoutStatus(`Erro: ${error.message}`, "error");
@@ -631,7 +767,7 @@ function configurarMascarasFormulario() {
 
 function configurarAcoesPagamento() {
   el("btn-pagar-cartao")?.addEventListener("click", () => {
-    setCheckoutStatus("O pagamento por cartao sera liberado em breve. No momento use PIX para concluir o pedido.", "info");
+    setCheckoutStatus("Para pagar com cartao, finalize o pedido com a forma Cartao selecionada.", "info");
   });
 }
 

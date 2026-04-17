@@ -23,6 +23,10 @@ const app = express();
 const PORT = Number(process.env.PORT || 3000);
 const mpAccessToken = process.env.MP_ACCESS_TOKEN || "";
 const mpPublicKey = process.env.MP_PUBLIC_KEY || "";
+const pixProvider = String(process.env.PIX_PROVIDER || "mercadopago").trim().toLowerCase();
+const pixNubankKey = String(process.env.PIX_NUBANK_KEY || "").trim();
+const pixNubankBeneficiaryName = String(process.env.PIX_NUBANK_BENEFICIARY_NAME || "").trim();
+const pixNubankCity = String(process.env.PIX_NUBANK_CITY || "").trim();
 const adminEmail = String(process.env.ADMIN_EMAIL || "").toLowerCase();
 const adminPassword = String(process.env.ADMIN_PASSWORD || "");
 const cookieName = "zuca_admin_session";
@@ -198,6 +202,222 @@ function buildMercadoPagoHeaders(token, withIdempotency = false) {
   return headers;
 }
 
+function removeAccents(value = "") {
+  return String(value)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+function normalizePixName(value = "") {
+  const sanitized = removeAccents(value).replace(/[^A-Za-z0-9 ]/g, " ").replace(/\s+/g, " ").trim().toUpperCase();
+  return sanitized.slice(0, 25) || "ZUCA PERSONALIZADOS";
+}
+
+function normalizePixCity(value = "") {
+  const sanitized = removeAccents(value).replace(/[^A-Za-z ]/g, " ").replace(/\s+/g, " ").trim().toUpperCase();
+  return sanitized.slice(0, 15) || "CAMPO GRANDE";
+}
+
+function emvField(id, value) {
+  const content = String(value || "");
+  return `${id}${String(content.length).padStart(2, "0")}${content}`;
+}
+
+function crc16(payload) {
+  let crc = 0xFFFF;
+  for (let i = 0; i < payload.length; i += 1) {
+    crc ^= payload.charCodeAt(i) << 8;
+    for (let j = 0; j < 8; j += 1) {
+      if (crc & 0x8000) {
+        crc = ((crc << 1) ^ 0x1021) & 0xFFFF;
+      } else {
+        crc = (crc << 1) & 0xFFFF;
+      }
+    }
+  }
+  return crc.toString(16).toUpperCase().padStart(4, "0");
+}
+
+function isNubankPixConfigured() {
+  return !!pixNubankKey && !!pixNubankBeneficiaryName && !!pixNubankCity;
+}
+
+function isMercadoPagoPixConfigured() {
+  return !!mpAccessToken;
+}
+
+function isPixAvailable() {
+  if (pixProvider === "nubank") {
+    return isNubankPixConfigured() || isMercadoPagoPixConfigured();
+  }
+  return isMercadoPagoPixConfigured() || isNubankPixConfigured();
+}
+
+function buildNubankPixPayload({ valor, descricao, pedidoId }) {
+  const amount = Number(valor || 0);
+  if (!(amount > 0)) {
+    throw new Error("Valor invalido para PIX");
+  }
+
+  const txidRaw = String(pedidoId || crypto.randomUUID().replace(/-/g, "")).replace(/[^A-Za-z0-9]/g, "");
+  const txid = (txidRaw.slice(0, 25) || "PEDIDOZUCA").toUpperCase();
+
+  const merchantAccountInfo = (() => {
+    const gui = emvField("00", "br.gov.bcb.pix");
+    const key = emvField("01", pixNubankKey);
+    const description = descricao ? emvField("02", String(descricao).slice(0, 72)) : "";
+    return emvField("26", `${gui}${key}${description}`);
+  })();
+
+  const payloadSemCrc = [
+    emvField("00", "01"),
+    emvField("01", "12"),
+    merchantAccountInfo,
+    emvField("52", "0000"),
+    emvField("53", "986"),
+    emvField("54", amount.toFixed(2)),
+    emvField("58", "BR"),
+    emvField("59", normalizePixName(pixNubankBeneficiaryName)),
+    emvField("60", normalizePixCity(pixNubankCity)),
+    emvField("62", emvField("05", txid)),
+    "6304",
+  ].join("");
+
+  const crc = crc16(payloadSemCrc);
+  return `${payloadSemCrc}${crc}`;
+}
+
+async function createMercadoPagoPixCharge({ valor, descricao, cliente, pedidoId }) {
+  const payer = buildMercadoPagoPayer(cliente);
+
+  const response = await axios.post(
+    "https://api.mercadopago.com/v1/payments",
+    {
+      transaction_amount: Number(valor),
+      description: descricao || "Compra Zuca Personalizados",
+      payment_method_id: "pix",
+      payer,
+      external_reference: pedidoId ? String(pedidoId) : undefined,
+    },
+    {
+      headers: buildMercadoPagoHeaders(mpAccessToken, true),
+    }
+  );
+
+  const payment = response.data || {};
+  const poi = payment.point_of_interaction || {};
+  const txData = poi.transaction_data || {};
+  const subTypeData = poi.sub_type_data || {};
+
+  const qrCodeText =
+    subTypeData.qr_code ||
+    txData.qr_code ||
+    payment.qr_code ||
+    "";
+
+  const qrCodeImage =
+    txData.qr_code_base64 ||
+    subTypeData.qr_code_base64 ||
+    (qrCodeText ? await QRCode.toDataURL(qrCodeText) : "");
+
+  if (!qrCodeText || !qrCodeImage) {
+    throw new Error(payment.status_detail || "PIX indisponivel para este pagamento");
+  }
+
+  return {
+    provider: "mercadopago",
+    qrCode: qrCodeImage,
+    copiaECola: qrCodeText,
+    mercadoPagoId: payment.id,
+    statusMercadoPago: payment.status,
+    expiraEm:
+      subTypeData.expiration_date ||
+      txData.expiration_date ||
+      payment.date_of_expiration ||
+      Math.floor(Date.now() / 1000) + 1800,
+  };
+}
+
+async function createPixCharge({ valor, descricao, cliente, pedidoId }) {
+  if (isNubankPixConfigured() && pixProvider === "nubank") {
+    const copiaECola = buildNubankPixPayload({
+      valor,
+      descricao,
+      pedidoId,
+    });
+    const qrCode = await QRCode.toDataURL(copiaECola);
+
+    return {
+      provider: "nubank",
+      qrCode,
+      copiaECola,
+      mercadoPagoId: null,
+      statusMercadoPago: null,
+      expiraEm: null,
+    };
+  }
+
+  if (!isMercadoPagoPixConfigured()) {
+    if (isNubankPixConfigured()) {
+      const copiaECola = buildNubankPixPayload({ valor, descricao, pedidoId });
+      const qrCode = await QRCode.toDataURL(copiaECola);
+      return {
+        provider: "nubank",
+        qrCode,
+        copiaECola,
+        mercadoPagoId: null,
+        statusMercadoPago: null,
+        expiraEm: null,
+      };
+    }
+    throw new Error("PIX indisponivel no momento");
+  }
+
+  return createMercadoPagoPixCharge({ valor, descricao, cliente, pedidoId });
+}
+
+async function createCheckoutProPreference({ pedidoId, pedidoData }) {
+  if (!mpAccessToken) {
+    throw new Error("Credenciais do Mercado Pago nao configuradas");
+  }
+
+  const itens = Array.isArray(pedidoData?.itens) ? pedidoData.itens : [];
+  if (!itens.length) {
+    throw new Error("Pedido sem itens para pagamento");
+  }
+
+  const externalReference = String(pedidoId || "");
+  const payload = {
+    external_reference: externalReference,
+    statement_descriptor: "ZUCA",
+    payer: {
+      email: String(pedidoData?.cliente?.email || "cliente@email.com"),
+      name: String(pedidoData?.cliente?.nome || "Cliente"),
+    },
+    items: itens.map((item) => ({
+      id: String(item.id || ""),
+      title: String(item.nome || "Produto"),
+      quantity: Number(item.quantidade || 1),
+      currency_id: "BRL",
+      unit_price: Number(item.preco || 0),
+      picture_url: String(item.imagem || ""),
+    })),
+  };
+
+  const response = await axios.post(
+    "https://api.mercadopago.com/checkout/preferences",
+    payload,
+    { headers: buildMercadoPagoHeaders(mpAccessToken, true) }
+  );
+
+  const pref = response.data || {};
+  return {
+    preferenceId: pref.id || null,
+    initPoint: pref.init_point || null,
+    sandboxInitPoint: pref.sandbox_init_point || null,
+  };
+}
+
 function normalizePedido(docSnap) {
   const data = docSnap.data() || {};
   return {
@@ -222,8 +442,10 @@ app.get("/config-mercadopago", (req, res) => {
   res.json({
     publicKey: mpPublicKey || null,
     configured: !!mpPublicKey && !!mpAccessToken,
-    pixConfigured: !!mpAccessToken,
+    pixConfigured: isPixAvailable(),
     cardConfigured: !!mpAccessToken && !!mpPublicKey,
+    pixProvider: isNubankPixConfigured() && pixProvider === "nubank" ? "nubank" : "mercadopago",
+    pixNubankConfigured: isNubankPixConfigured(),
   });
 });
 
@@ -305,11 +527,11 @@ app.post("/api/pedidos", requireDb, async (req, res) => {
       return res.status(400).json({ success: false, error: "Dados obrigatorios ausentes" });
     }
 
-    if (metodoPagamento === "pix" && !mpAccessToken) {
+    if (metodoPagamento === "pix" && !isPixAvailable()) {
       return res.status(503).json({
         success: false,
         error: "PIX indisponivel no momento",
-        hint: "MP_ACCESS_TOKEN nao configurado",
+        hint: "Configure MP_ACCESS_TOKEN ou PIX_NUBANK_* no Render",
       });
     }
 
@@ -667,69 +889,32 @@ app.post("/gerar-pix", async (req, res) => {
       return res.status(400).json({ success: false, error: "Valor invalido" });
     }
 
-    if (!mpAccessToken) {
-      return res.status(500).json({
-        success: false,
-        error: "MP_ACCESS_TOKEN nao configurado",
-        hint: "Configure MP_ACCESS_TOKEN no Render para habilitar PIX",
-      });
-    }
-
-    const payer = buildMercadoPagoPayer(cliente);
-
-    const response = await axios.post(
-      "https://api.mercadopago.com/v1/payments",
-      {
-        transaction_amount: Number(valor),
-        description: descricao || "Compra Zuca Personalizados",
-        payment_method_id: "pix",
-        payer,
-        external_reference: idPedido ? String(idPedido) : undefined,
-      },
-      {
-        headers: buildMercadoPagoHeaders(mpAccessToken, true),
-      }
-    );
-
-    const payment = response.data || {};
-    const poi = payment.point_of_interaction || {};
-    const txData = poi.transaction_data || {};
-    const subTypeData = poi.sub_type_data || {};
-
-    const qrCodeText =
-      subTypeData.qr_code ||
-      txData.qr_code ||
-      payment.qr_code ||
-      "";
-
-    const qrCodeImage =
-      txData.qr_code_base64 ||
-      subTypeData.qr_code_base64 ||
-      (qrCodeText ? await QRCode.toDataURL(qrCodeText) : "");
-
-    if (!qrCodeText || !qrCodeImage) {
-      throw new Error(payment.status_detail || "PIX indisponivel para este pagamento");
-    }
+    const pix = await createPixCharge({
+      valor: Number(valor),
+      descricao,
+      cliente,
+      pedidoId: idPedido,
+    });
 
     if (db && idPedido) {
       await db.collection("pedidos").doc(idPedido).update({
-        mercadoPagoId: payment.id,
-        statusMercadoPago: payment.status,
+        pagamentoProvider: pix.provider,
+        mercadoPagoId: pix.mercadoPagoId,
+        statusMercadoPago: pix.statusMercadoPago,
+        pixCopiaECola: pix.copiaECola,
+        pixExpiraEm: pix.expiraEm,
         atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
       });
     }
 
     return res.json({
       success: true,
-      qr_code: qrCodeImage,
-      brcode: qrCodeText,
-      transaction_id: payment.id,
-      status: payment.status,
-      expira_em:
-        subTypeData.expiration_date ||
-        txData.expiration_date ||
-        payment.date_of_expiration ||
-        Math.floor(Date.now() / 1000) + 1800,
+      provider: pix.provider,
+      qr_code: pix.qrCode,
+      brcode: pix.copiaECola,
+      transaction_id: pix.mercadoPagoId,
+      status: pix.statusMercadoPago || "pending",
+      expira_em: pix.expiraEm,
       valor: Number(valor),
     });
   } catch (error) {
@@ -746,6 +931,132 @@ app.post("/gerar-pix", async (req, res) => {
       details,
       status,
     });
+  }
+});
+
+app.post("/api/pedidos/:id/checkout-cartao", requireDb, async (req, res) => {
+  try {
+    const pedidoId = String(req.params.id || "").trim();
+    const email = String(req.body.email || "").trim().toLowerCase();
+
+    if (!pedidoId) {
+      return res.status(400).json({ success: false, error: "ID do pedido invalido" });
+    }
+
+    const pedidoRef = db.collection("pedidos").doc(pedidoId);
+    const pedidoSnap = await pedidoRef.get();
+    if (!pedidoSnap.exists) {
+      return res.status(404).json({ success: false, error: "Pedido nao encontrado" });
+    }
+
+    const pedido = pedidoSnap.data() || {};
+    const pedidoEmail = String(pedido?.cliente?.email || "").trim().toLowerCase();
+
+    if (email && pedidoEmail && email !== pedidoEmail) {
+      return res.status(403).json({ success: false, error: "Pedido nao pertence ao e-mail informado" });
+    }
+
+    if (String(pedido.status || "").toLowerCase() === "pagto") {
+      return res.status(409).json({ success: false, error: "Pedido ja esta pago" });
+    }
+
+    const preference = await createCheckoutProPreference({ pedidoId, pedidoData: pedido });
+
+    if (!preference.initPoint && !preference.sandboxInitPoint) {
+      throw new Error("Nao foi possivel gerar checkout do cartao");
+    }
+
+    await pedidoRef.update({
+      pagamentoProvider: "mercadopago",
+      pagamento: "cartao",
+      checkoutPreferenceId: preference.preferenceId,
+      atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    return res.json({
+      success: true,
+      action: "checkout_pro",
+      checkoutUrl: preference.initPoint || preference.sandboxInitPoint,
+      preferenceId: preference.preferenceId,
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.post("/api/pedidos/:id/pagar-agora", requireDb, async (req, res) => {
+  try {
+    const pedidoId = String(req.params.id || "").trim();
+    const email = String(req.body.email || "").trim().toLowerCase();
+    const metodoSolicitado = String(req.body.metodo || "").trim().toLowerCase();
+
+    if (!pedidoId) {
+      return res.status(400).json({ success: false, error: "ID do pedido invalido" });
+    }
+
+    const pedidoRef = db.collection("pedidos").doc(pedidoId);
+    const pedidoSnap = await pedidoRef.get();
+    if (!pedidoSnap.exists) {
+      return res.status(404).json({ success: false, error: "Pedido nao encontrado" });
+    }
+
+    const pedido = pedidoSnap.data() || {};
+    const pedidoEmail = String(pedido?.cliente?.email || "").trim().toLowerCase();
+    if (email && pedidoEmail && email !== pedidoEmail) {
+      return res.status(403).json({ success: false, error: "Pedido nao pertence ao e-mail informado" });
+    }
+
+    if (String(pedido.status || "").toLowerCase() === "pagto") {
+      return res.status(409).json({ success: false, error: "Pedido ja esta pago" });
+    }
+
+    const metodo = metodoSolicitado || String(pedido.pagamento || "pix").toLowerCase();
+
+    if (metodo === "pix") {
+      const pix = await createPixCharge({
+        valor: Number(pedido.total || 0),
+        descricao: `Pedido #${pedidoId.slice(0, 8)} - Zuca`,
+        cliente: pedido.cliente || {},
+        pedidoId,
+      });
+
+      await pedidoRef.update({
+        pagamento: "pix",
+        pagamentoProvider: pix.provider,
+        mercadoPagoId: pix.mercadoPagoId,
+        statusMercadoPago: pix.statusMercadoPago,
+        pixCopiaECola: pix.copiaECola,
+        pixExpiraEm: pix.expiraEm,
+        atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      return res.json({
+        success: true,
+        action: "pix",
+        provider: pix.provider,
+        qr_code: pix.qrCode,
+        brcode: pix.copiaECola,
+        transaction_id: pix.mercadoPagoId,
+        expira_em: pix.expiraEm,
+      });
+    }
+
+    const preference = await createCheckoutProPreference({ pedidoId, pedidoData: pedido });
+    await pedidoRef.update({
+      pagamento: "cartao",
+      pagamentoProvider: "mercadopago",
+      checkoutPreferenceId: preference.preferenceId,
+      atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    return res.json({
+      success: true,
+      action: "checkout_pro",
+      checkoutUrl: preference.initPoint || preference.sandboxInitPoint,
+      preferenceId: preference.preferenceId,
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
   }
 });
 
@@ -839,8 +1150,17 @@ app.post("/verificar-pagamento", requireDb, async (req, res) => {
 
     const pedidoData = pedidoSnap.data() || {};
     const mercadoPagoId = String(pedidoData.mercadoPagoId || "").trim();
+    const pagamentoProvider = String(pedidoData.pagamentoProvider || "").toLowerCase();
 
     if (!mercadoPagoId) {
+      if (pagamentoProvider === "nubank") {
+        return res.status(202).json({
+          success: false,
+          aprovado: false,
+          statusMercadoPago: "pending",
+          message: "Aguardando confirmacao manual do PIX na conta Nubank",
+        });
+      }
       return res.status(400).json({ success: false, error: "Pagamento ainda nao foi iniciado para este pedido" });
     }
 

@@ -355,7 +355,12 @@ window.exibirDetalhes = async (pedidoId) => {
 
   const itensHtml = (pedido.itens || []).map((item) => `
     <div class="item-row">
-      <div>${escapeHtml(item.nome || "Produto")}</div>
+      <div>
+        <div>${escapeHtml(item.nome || "Produto")}</div>
+        ${item.arquivoPersonalizacaoUrl
+          ? `<a href="${escapeHtml(item.arquivoPersonalizacaoUrl)}" target="_blank" rel="noopener" download style="font-size:12px; font-weight:700; color:#1f3852; text-decoration:underline;">Baixar arte (${escapeHtml(item.arquivoPersonalizacaoNome || "arquivo")})</a>`
+          : ""}
+      </div>
       <div>${item.quantidade || 1}x</div>
       <div style="text-align:right;">${formatarMoeda(item.preco)}</div>
     </div>

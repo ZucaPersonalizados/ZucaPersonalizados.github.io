@@ -19,6 +19,8 @@ const AVATARS = [
   "https://api.dicebear.com/8.x/pixel-art/svg?seed=Zuca6",
 ];
 
+const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
+
 let avatarSelecionado = localStorage.getItem("zuca_avatar_url") || AVATARS[0];
 
 function setStatus(message, type = "info") {
@@ -28,6 +30,21 @@ function setStatus(message, type = "info") {
   box.classList.remove("is-success", "is-error");
   if (type === "success") box.classList.add("is-success");
   if (type === "error") box.classList.add("is-error");
+}
+
+function persistirAvatar(url) {
+  avatarSelecionado = url;
+  localStorage.setItem("zuca_avatar_url", avatarSelecionado);
+  if (el("avatar-preview")) el("avatar-preview").src = avatarSelecionado;
+}
+
+function lerArquivoComoDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(new Error("Nao foi possivel ler a imagem"));
+    reader.readAsDataURL(file);
+  });
 }
 
 function salvarPerfil() {
@@ -93,11 +110,44 @@ function renderAvatarOptions() {
 
   grid.querySelectorAll(".avatar-option").forEach((button) => {
     button.addEventListener("click", () => {
-      avatarSelecionado = button.getAttribute("data-avatar") || AVATARS[0];
-      if (el("avatar-preview")) el("avatar-preview").src = avatarSelecionado;
+      persistirAvatar(button.getAttribute("data-avatar") || AVATARS[0]);
       renderAvatarOptions();
     });
   });
+}
+
+async function onUploadAvatar(event) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+
+  if (!String(file.type || "").startsWith("image/")) {
+    setStatus("Selecione um arquivo de imagem valido.", "error");
+    event.target.value = "";
+    return;
+  }
+
+  if (file.size > MAX_AVATAR_BYTES) {
+    setStatus("A foto deve ter no maximo 2MB.", "error");
+    event.target.value = "";
+    return;
+  }
+
+  try {
+    const dataUrl = await lerArquivoComoDataUrl(file);
+    persistirAvatar(dataUrl);
+    renderAvatarOptions();
+    setStatus("Foto de perfil atualizada. Clique em salvar para persistir os demais dados.", "success");
+  } catch (error) {
+    setStatus(`Erro ao carregar foto: ${error.message}`, "error");
+  } finally {
+    event.target.value = "";
+  }
+}
+
+function removerFotoPersonalizada() {
+  persistirAvatar(AVATARS[0]);
+  renderAvatarOptions();
+  setStatus("Foto personalizada removida.", "success");
 }
 
 async function verificarPagamento(idPedido) {
@@ -211,6 +261,8 @@ async function listarPedidos(email) {
 }
 
 el("btn-salvar")?.addEventListener("click", salvarPerfil);
+el("foto-avatar")?.addEventListener("change", onUploadAvatar);
+el("btn-remover-foto")?.addEventListener("click", removerFotoPersonalizada);
 el("btn-ir-checkout")?.addEventListener("click", () => {
   window.location.href = "/checkout";
 });

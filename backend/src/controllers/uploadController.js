@@ -31,6 +31,14 @@ export const uploadArquivo = async (req, res) => {
     stream.end(req.file.buffer);
 
   } catch (error) {
+    if (error?.code === "LIMIT_FILE_SIZE") {
+      return res.status(400).json({ erro: "Arquivo muito grande. Limite de 8MB." });
+    }
+
+    if (error?.code === "INVALID_FILE_TYPE") {
+      return res.status(400).json({ erro: error.message || "Formato invalido. Use PDF, JPG ou PNG." });
+    }
+
     res.status(500).json({ erro: error.message });
   }
 };

@@ -6,8 +6,14 @@ const API_BASE = (() => {
   return window.location.origin;
 })();
 
+const DEFAULT_AVATAR = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='32' fill='%23e8dbcb'/%3E%3Ccircle cx='32' cy='24' r='12' fill='%23b59273'/%3E%3Cpath d='M12 56c3-11 12-17 20-17s17 6 20 17' fill='%23b59273'/%3E%3C/svg%3E";
+
 function getApiUrl(path) {
   return `${API_BASE}${path}`;
+}
+
+function obterAvatarHeader() {
+  return localStorage.getItem("zuca_avatar_url") || DEFAULT_AVATAR;
 }
 
 function normalizarUrlSemExtensao() {
@@ -580,6 +586,18 @@ function validarCamposCliente(cliente) {
   return "";
 }
 
+function isItemPersonalizado(item = {}) {
+  const valor = item.personalizado;
+  if (typeof valor === "boolean") return valor;
+  if (typeof valor === "number") return valor === 1;
+  if (typeof valor === "string") {
+    const v = valor.trim().toLowerCase();
+    if (["true", "1", "sim", "yes", "personalizado"].includes(v)) return true;
+    if (["false", "0", "nao", "não", "no"].includes(v)) return false;
+  }
+  return false;
+}
+
 async function tratarRetornoPagamento() {
   const params = new URLSearchParams(window.location.search);
   const pedidoId = String(params.get("pedido") || "").trim();
@@ -614,6 +632,18 @@ async function finalizarPedido() {
   const itens = getCarrinho();
   if (itens.length === 0) {
     setCheckoutStatus("Carrinho vazio.", "error");
+    return;
+  }
+
+  const itemPersonalizadoSemArquivo = itens.find((item) =>
+    isItemPersonalizado(item) && !String(item.arquivoPersonalizacaoUrl || "").trim()
+  );
+
+  if (itemPersonalizadoSemArquivo) {
+    setCheckoutStatus(
+      `O item "${itemPersonalizadoSemArquivo.nome || "personalizado"}" precisa de um arquivo anexado antes da compra.`,
+      "error"
+    );
     return;
   }
 
@@ -709,10 +739,10 @@ function onPagamentoChange() {
   }
 }
 
-function atualizarAvatarCheckout(nome = "") {
-  const avatarLabel = el("avatar-label");
-  if (!avatarLabel) return;
-  avatarLabel.textContent = nome || "Entrar";
+function atualizarAvatarCheckout() {
+  const avatarImage = el("avatar-image");
+  if (!avatarImage) return;
+  avatarImage.src = obterAvatarHeader();
 }
 
 function setAuthStatus(message, type = "info") {
@@ -752,7 +782,7 @@ function aplicarLoginLocal(email, providerLabel) {
   if (el("email")) el("email").value = emailNormalizado;
 
   salvarDadosClienteLocal();
-  atualizarAvatarCheckout(nomeFinal.split(" ")[0]);
+  atualizarAvatarCheckout();
   setAuthStatus(`Conectado localmente com ${providerLabel}: ${emailNormalizado}`, "ok");
   listarPedidosPorEmail(emailNormalizado);
 }
@@ -808,7 +838,7 @@ function configurarBotoesLoginPlaceholder() {
     localStorage.removeItem("zuca_checkout_cliente_nome");
     if (el("nome")) el("nome").value = "";
     if (el("email")) el("email").value = "";
-    atualizarAvatarCheckout("");
+    atualizarAvatarCheckout();
     setAuthStatus("Dados locais removidos.", "ok");
     el("lista-pedidos") && (el("lista-pedidos").innerHTML = "<p>Nenhum pedido ainda.</p>");
   };
@@ -908,7 +938,7 @@ document.querySelectorAll("#nome, #cpfCnpj, #email, #telefone, #cep, #endereco, 
 
 normalizarUrlSemExtensao();
 carregarDadosClienteLocal();
-atualizarAvatarCheckout(localStorage.getItem("zuca_checkout_cliente_nome") || "");
+atualizarAvatarCheckout();
 renderCarrinho();
 onPagamentoChange();
 configurarBotoesLoginPlaceholder();

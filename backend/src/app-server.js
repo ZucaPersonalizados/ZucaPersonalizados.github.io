@@ -205,6 +205,18 @@ function buildMercadoPagoHeaders(token, withIdempotency = false) {
   return headers;
 }
 
+function isProdutoPersonalizado(produto = {}) {
+  const valor = produto?.personalizado;
+  if (typeof valor === "boolean") return valor;
+  if (typeof valor === "number") return valor === 1;
+  if (typeof valor === "string") {
+    const v = valor.trim().toLowerCase();
+    if (["true", "1", "sim", "yes", "personalizado"].includes(v)) return true;
+    if (["false", "0", "nao", "não", "no"].includes(v)) return false;
+  }
+  return false;
+}
+
 function inferAppBaseUrl(req) {
   if (publicAppUrl) return publicAppUrl;
   const origin = String(req?.headers?.origin || "").trim().replace(/\/$/, "");
@@ -694,6 +706,8 @@ app.post("/api/pedidos", requireDb, async (req, res) => {
       preco: parseMoney(item.preco),
       quantidade: Number(item.quantidade || 1),
       imagem: String(item.imagem || ""),
+      arquivoPersonalizacaoUrl: String(item.arquivoPersonalizacaoUrl || "").trim(),
+      arquivoPersonalizacaoNome: String(item.arquivoPersonalizacaoNome || "").trim(),
     }));
 
     const invalidos = [];
@@ -703,6 +717,17 @@ app.post("/api/pedidos", requireDb, async (req, res) => {
         invalidos.push({ id: item.id, nome: item.nome, motivo: "Produto nao encontrado" });
         continue;
       }
+
+      const produtoData = produtoSnap.data() || {};
+      if (isProdutoPersonalizado(produtoData) && !item.arquivoPersonalizacaoUrl) {
+        invalidos.push({
+          id: item.id,
+          nome: item.nome,
+          motivo: "Produto personalizado sem arquivo anexado",
+        });
+        continue;
+      }
+
       const estoque = Number(produtoSnap.data().estoque || 0);
       if (estoque < item.quantidade) {
         invalidos.push({
@@ -714,7 +739,7 @@ app.post("/api/pedidos", requireDb, async (req, res) => {
     }
 
     if (invalidos.length > 0) {
-      return res.status(409).json({ success: false, error: "Estoque insuficiente", itensInvalidos: invalidos });
+      return res.status(409).json({ success: false, error: "Itens invalidos para o pedido", itensInvalidos: invalidos });
     }
 
     const subtotal = itensNormalizados.reduce((acc, item) => acc + item.preco * item.quantidade, 0);

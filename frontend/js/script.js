@@ -11,6 +11,18 @@ function getApiUrl(path, base = API_BASE) {
   return `${base}${path}`;
 }
 
+const DEFAULT_AVATAR = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='32' fill='%23e8dbcb'/%3E%3Ccircle cx='32' cy='24' r='12' fill='%23b59273'/%3E%3Cpath d='M12 56c3-11 12-17 20-17s17 6 20 17' fill='%23b59273'/%3E%3C/svg%3E";
+
+function obterAvatarHeader() {
+  return localStorage.getItem("zuca_avatar_url") || DEFAULT_AVATAR;
+}
+
+function atualizarAvatarHeader() {
+  const avatarImage = document.getElementById("avatar-image");
+  if (!avatarImage) return;
+  avatarImage.src = obterAvatarHeader();
+}
+
 function normalizarUrlSemExtensao() {
   const path = window.location.pathname;
   const map = {
@@ -135,6 +147,21 @@ function normalizarLink(url = "") {
   }
 
   return "#";
+}
+
+function isProdutoPersonalizado(produto = {}) {
+  const valor = produto.personalizado;
+  if (typeof valor === "boolean") return valor;
+  if (typeof valor === "number") return valor === 1;
+  if (typeof valor === "string") {
+    const v = valor.trim().toLowerCase();
+    if (["true", "1", "sim", "yes", "personalizado"].includes(v)) return true;
+    if (["false", "0", "nao", "não", "no"].includes(v)) return false;
+  }
+
+  const composto = `${produto.tipo || ""} ${produto.categoria || ""}`.toLowerCase();
+  if (composto.includes("nao personalizado") || composto.includes("não personalizado")) return false;
+  return /(^|\s)personalizado(s)?(\s|$)/i.test(composto);
 }
 
 function obterImagensProduto(produto = {}) {
@@ -382,6 +409,12 @@ function encontrarProdutoNoCarrinho(produtoId) {
 }
 
 function adicionarAoCarrinho(produto) {
+  if (produto?.personalizado) {
+    alert("Este item e personalizado. Abra o produto e anexe o arquivo antes de adicionar ao carrinho.");
+    abrirProduto(produto.id);
+    return;
+  }
+
   const carrinho = obterCarrinho();
   const existente = encontrarProdutoNoCarrinho(produto.id);
 
@@ -435,6 +468,7 @@ function atualizarBotoesCarrinho() {
   
   produtos.forEach((produtoEl) => {
     const produtoId = produtoEl.dataset.id;
+    const produtoPersonalizado = produtoEl.dataset.personalizado === "true";
     const itemNoCarrinho = carrinho.find((item) => item.id === produtoId);
     const containerBotoes = produtoEl.querySelector(".product-buttons-container");
     
@@ -442,7 +476,19 @@ function atualizarBotoesCarrinho() {
     
     containerBotoes.innerHTML = "";
     
-    if (itemNoCarrinho) {
+    if (produtoPersonalizado) {
+      containerBotoes.innerHTML = `
+        <button class="btn-carrinho" type="button">
+          Personalizar e anexar arquivo
+        </button>
+      `;
+
+      const btnPersonalizar = containerBotoes.querySelector(".btn-carrinho");
+      btnPersonalizar?.addEventListener("click", (e) => {
+        e.stopPropagation();
+        abrirProduto(produtoId);
+      });
+    } else if (itemNoCarrinho) {
       containerBotoes.innerHTML = `
         <div class="cart-quantity-control">
           <button class="btn-qty-decrease" type="button" aria-label="Diminuir quantidade">−</button>
@@ -490,7 +536,8 @@ function atualizarBotoesCarrinho() {
           id: produtoId,
           nome: nomeElem?.textContent || "Produto",
           preco: precoElem?.textContent?.replace("R$ ", "") || "0,00",
-          imagem: imagemElem?.src || ""
+          imagem: imagemElem?.src || "",
+          personalizado: produtoPersonalizado,
         };
         
         adicionarAoCarrinho(novoProduto);
@@ -591,7 +638,6 @@ function configurarHeaderUX() {
   const dropdown = document.getElementById("avatar-dropdown");
   const btnLoginGoogle = document.getElementById("btn-login-google");
   const btnLogout = document.getElementById("btn-logout-user");
-  const avatarLabel = document.getElementById("avatar-label");
 
   const abrirCarrinho = () => {
     sidebar?.classList.add("ativo");
@@ -633,15 +679,12 @@ function configurarHeaderUX() {
 
   btnLogout?.addEventListener("click", async () => {
     localStorage.removeItem("zuca_checkout_cliente");
-    avatarLabel.textContent = "Entrar";
+    atualizarAvatarHeader();
     dropdown?.classList.remove("ativo");
     btnAvatar?.setAttribute("aria-expanded", "false");
   });
 
-  if (avatarLabel) {
-    const salvo = localStorage.getItem("zuca_checkout_cliente_nome");
-    avatarLabel.textContent = salvo || "Entrar";
-  }
+  atualizarAvatarHeader();
 
   atualizarContadorCarrinho();
   renderizarCarrinhoSidebar();
@@ -749,6 +792,7 @@ async function renderizarProdutos() {
         nome: p.nome || "Produto",
         preco: p.preco || "0,00",
         descricaoCurta: p.descricaoCurta || "",
+        personalizado: isProdutoPersonalizado(p),
         imagens: imagensValidas,
         categoria: normalizarSlug(p.categoria || ""),
         tipo: normalizarSlug(p.tipo || ""),
@@ -778,6 +822,7 @@ async function renderizarProdutos() {
       div.dataset.subcategoria = produto.tipo;
       div.dataset.tamanho = produto.tamanho;
       div.dataset.gramatura = produto.gramatura;
+      div.dataset.personalizado = produto.personalizado ? "true" : "false";
 
       const imagens = produto.imagens.length > 0
         ? produto.imagens

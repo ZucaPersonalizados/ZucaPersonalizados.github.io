@@ -8,6 +8,18 @@ function getApiUrl(path) {
   return `${API_BASE}${path}`;
 }
 
+const DEFAULT_AVATAR = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='32' fill='%23e8dbcb'/%3E%3Ccircle cx='32' cy='24' r='12' fill='%23b59273'/%3E%3Cpath d='M12 56c3-11 12-17 20-17s17 6 20 17' fill='%23b59273'/%3E%3C/svg%3E";
+
+function obterAvatarHeader() {
+  return localStorage.getItem("zuca_avatar_url") || DEFAULT_AVATAR;
+}
+
+function atualizarAvatarHeader() {
+  const avatarImage = document.getElementById("avatar-image");
+  if (!avatarImage) return;
+  avatarImage.src = obterAvatarHeader();
+}
+
 function normalizarUrlSemExtensao() {
   const path = window.location.pathname;
   const map = {
@@ -59,7 +71,28 @@ function isProdutoPersonalizado(produto = {}) {
   }
 
   const composto = `${produto.tipo || ""} ${produto.categoria || ""}`.toLowerCase();
-  return composto.includes("personalizado");
+  if (composto.includes("nao personalizado") || composto.includes("não personalizado")) {
+    return false;
+  }
+
+  return /(^|\s)personalizado(s)?(\s|$)/i.test(composto);
+}
+
+function arquivoPersonalizacaoValido(arquivo) {
+  if (!arquivo) {
+    return { ok: false, mensagem: "Selecione um arquivo para personalizacao." };
+  }
+
+  const nome = String(arquivo.name || "").toLowerCase();
+  const mime = String(arquivo.type || "").toLowerCase();
+  const extensaoValida = /\.(pdf|jpe?g|png)$/.test(nome);
+  const mimeValido = ["application/pdf", "image/jpeg", "image/png"].includes(mime);
+
+  if (!extensaoValida || !mimeValido) {
+    return { ok: false, mensagem: "Formato invalido. Envie apenas PDF, JPG ou PNG." };
+  }
+
+  return { ok: true, mensagem: "" };
 }
 
 function obterImagensProduto(produto) {
@@ -158,7 +191,6 @@ function configurarHeaderProduto() {
   const dropdown = document.getElementById("avatar-dropdown");
   const btnLoginGoogle = document.getElementById("btn-login-google");
   const btnLogoutUser = document.getElementById("btn-logout-user");
-  const avatarLabel = document.getElementById("avatar-label");
 
   const abrirCarrinho = () => {
     sidebar?.classList.add("ativo");
@@ -195,14 +227,11 @@ function configurarHeaderProduto() {
   btnLogoutUser?.addEventListener("click", () => {
     localStorage.removeItem("zuca_checkout_cliente");
     localStorage.removeItem("zuca_checkout_cliente_nome");
-    if (avatarLabel) avatarLabel.textContent = "Entrar";
+    atualizarAvatarHeader();
     dropdown?.classList.remove("ativo");
   });
 
-  if (avatarLabel) {
-    const salvo = localStorage.getItem("zuca_checkout_cliente_nome");
-    avatarLabel.textContent = salvo || "Entrar";
-  }
+  atualizarAvatarHeader();
 
   atualizarContadorCarrinho();
   renderizarCarrinhoSidebar();
@@ -287,6 +316,7 @@ function adicionarAoCarrinhoComEstoque(produto, estoqueDisponivel) {
       nome: produto.nome,
       preco: produto.preco,
       imagem: obterImagensProduto(produto)[0] || "",
+      personalizado: !!produto.personalizado,
       arquivoPersonalizacaoUrl: produto.arquivoPersonalizacaoUrl || "",
       arquivoPersonalizacaoNome: produto.arquivoPersonalizacaoNome || "",
       quantidade: 1,
@@ -381,8 +411,10 @@ async function carregarProduto() {
       if (personalizado) {
         const arquivo = inputArquivo?.files?.[0];
 
-        if (!arquivo) {
-          alert("Selecione um arquivo para personalizacao antes de adicionar ao carrinho.");
+        const validacaoArquivo = arquivoPersonalizacaoValido(arquivo);
+        if (!validacaoArquivo.ok) {
+          alert(validacaoArquivo.mensagem);
+          if (statusArquivo) statusArquivo.textContent = validacaoArquivo.mensagem;
           return;
         }
 

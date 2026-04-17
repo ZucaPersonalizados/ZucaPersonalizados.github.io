@@ -1632,6 +1632,71 @@ app.post("/verificar-pagamento", requireDb, async (req, res) => {
   }
 });
 
+// ==================== AVALIAÇÕES ====================
+
+// GET /api/avaliacoes/:produtoId
+app.get("/api/avaliacoes/:produtoId", async (req, res) => {
+  try {
+    const { produtoId } = req.params;
+    if (!produtoId) return res.status(400).json({ success: false, error: "produtoId obrigatório" });
+
+    const snap = await db.collection("avaliacoes")
+      .where("produtoId", "==", produtoId)
+      .orderBy("criadoEm", "desc")
+      .limit(50)
+      .get();
+
+    const avaliacoes = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    const media = avaliacoes.length
+      ? avaliacoes.reduce((s, a) => s + (a.nota || 0), 0) / avaliacoes.length
+      : 0;
+
+    return res.json({ success: true, avaliacoes, media: Math.round(media * 10) / 10, total: avaliacoes.length });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// POST /api/avaliacoes
+app.post("/api/avaliacoes", async (req, res) => {
+  try {
+    const { produtoId, email, nome, nota, comentario } = req.body;
+    if (!produtoId || !email || !nota) {
+      return res.status(400).json({ success: false, error: "produtoId, email e nota são obrigatórios" });
+    }
+
+    const notaNum = Number(nota);
+    if (notaNum < 1 || notaNum > 5 || !Number.isInteger(notaNum)) {
+      return res.status(400).json({ success: false, error: "Nota deve ser um inteiro de 1 a 5" });
+    }
+
+    // Check if already reviewed
+    const existing = await db.collection("avaliacoes")
+      .where("produtoId", "==", produtoId)
+      .where("email", "==", String(email).toLowerCase().trim())
+      .limit(1)
+      .get();
+
+    if (!existing.empty) {
+      return res.status(409).json({ success: false, error: "Você já avaliou este produto" });
+    }
+
+    const doc = {
+      produtoId,
+      email: String(email).toLowerCase().trim(),
+      nome: String(nome || "Anônimo").trim().slice(0, 100),
+      nota: notaNum,
+      comentario: String(comentario || "").trim().slice(0, 500),
+      criadoEm: new Date().toISOString(),
+    };
+
+    const ref = await db.collection("avaliacoes").add(doc);
+    return res.status(201).json({ success: true, id: ref.id });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`\n[ZUCA] Backend-only rodando em http://localhost:${PORT}`);
   console.log(`[ZUCA] Firebase ativo: ${!!db}`);

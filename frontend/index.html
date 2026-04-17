@@ -279,6 +279,12 @@
   </section>
 </main>
 
+<!-- Vistos Recentemente -->
+<section class="container" id="vistos-recentemente" style="margin: 32px auto; display: none;">
+  <h2 style="font-family: 'DM Serif Display', serif; margin-bottom: 16px;">Vistos recentemente</h2>
+  <div id="vistos-grid" class="grid-produtos" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px;"></div>
+</section>
+
 <footer class="footer" id="contato">
   <div class="footer-container">
     <div class="footer-col">
@@ -312,6 +318,16 @@
     <p>© 2026 Zuca Personalizados - Todos os direitos reservados</p>
   </div>
 </footer>
+
+<!-- Bottom Nav Mobile -->
+<nav class="bottom-nav" aria-label="Navegação mobile">
+  <div class="bottom-nav-inner">
+    <a href="/" class="bottom-nav-item active" aria-label="Início"><span class="nav-icon">🏠</span>Início</a>
+    <a href="/#produtos" class="bottom-nav-item" aria-label="Produtos"><span class="nav-icon">🔍</span>Buscar</a>
+    <a href="/checkout" class="bottom-nav-item" aria-label="Carrinho"><span class="nav-icon">🛒</span>Carrinho</a>
+    <a href="/minha-conta" class="bottom-nav-item" aria-label="Conta"><span class="nav-icon">👤</span>Conta</a>
+  </div>
+</nav>
 
 <div id="toast-container" aria-live="polite"></div>
 <script type="module" src="js/script.js"></script>

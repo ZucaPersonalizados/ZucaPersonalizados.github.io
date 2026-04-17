@@ -307,6 +307,20 @@
     </section>
 
     <section class="conta-card" style="grid-column: 1 / -1;">
+      <h2 style="margin-top:0;">Endereço salvo</h2>
+      <p style="margin-top:0; color:#675f56;">Este endereço será usado automaticamente no checkout.</p>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+        <div class="field"><label for="end-cep">CEP</label><input id="end-cep" placeholder="00000-000" maxlength="9"></div>
+        <div class="field"><label for="end-endereco">Endereço</label><input id="end-endereco" placeholder="Rua, Av..."></div>
+        <div class="field"><label for="end-numero">Número</label><input id="end-numero" placeholder="123"></div>
+        <div class="field"><label for="end-bairro">Bairro</label><input id="end-bairro" placeholder="Bairro"></div>
+        <div class="field"><label for="end-cidade">Cidade</label><input id="end-cidade" placeholder="Cidade"></div>
+        <div class="field"><label for="end-estado">Estado</label><input id="end-estado" placeholder="UF" maxlength="2"></div>
+      </div>
+      <button id="btn-salvar-endereco" class="checkout-btn primary" type="button" style="width:100%; margin-top:10px;">Salvar endereço</button>
+    </section>
+
+    <section class="conta-card" style="grid-column: 1 / -1;">
       <h2 style="margin-top:0;">Meus favoritos</h2>
       <div id="favoritos-container" class="favoritos-grid">
         <p style="color: #999;">Carregando favoritos...</p>
@@ -315,6 +329,17 @@
   </main>
 
   <div id="toast-container" class="toast-container" aria-live="polite"></div>
+
+  <!-- Bottom Nav Mobile -->
+  <nav class="bottom-nav" aria-label="Navegação mobile">
+    <div class="bottom-nav-inner">
+      <a href="/" class="bottom-nav-item" aria-label="Início"><span class="nav-icon">🏠</span>Início</a>
+      <a href="/#produtos" class="bottom-nav-item" aria-label="Produtos"><span class="nav-icon">🔍</span>Buscar</a>
+      <a href="/checkout" class="bottom-nav-item" aria-label="Carrinho"><span class="nav-icon">🛒</span>Carrinho</a>
+      <a href="/minha-conta" class="bottom-nav-item active" aria-label="Conta"><span class="nav-icon">👤</span>Conta</a>
+    </div>
+  </nav>
+
   <script type="module" src="js/minha-conta.js"></script>
 </body>
 </html>

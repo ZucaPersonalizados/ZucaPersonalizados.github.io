@@ -1069,3 +1069,64 @@ document.getElementById("sort-select")?.addEventListener("change", (e) => {
   currentPage = 1;
   renderProdutosFiltrados();
 });
+
+/* ========== Vistos Recentemente (index) ========== */
+(async function renderVistosIndex() {
+  const section = document.getElementById("vistos-recentemente");
+  const grid = document.getElementById("vistos-grid");
+  if (!section || !grid) return;
+
+  const vistos = JSON.parse(localStorage.getItem("zuca_vistos") || "[]");
+  if (!vistos.length) return;
+
+  try {
+    const response = await fetch(getApiUrl("/api/produtos"));
+    if (!response.ok) return;
+    const data = await response.json();
+    const produtos = Array.isArray(data) ? data : (data?.produtos || []);
+
+    const itens = vistos
+      .map((id) => produtos.find((p) => p.id === id))
+      .filter(Boolean)
+      .slice(0, 6);
+
+    if (!itens.length) return;
+
+    grid.innerHTML = itens.map((p) => {
+      const img = obterImagensProduto(p)[0] || "img/logo/logo.png";
+      const preco = Number(p.preco || p.valor || 0);
+      const precoStr = typeof preco === "number" ? preco.toFixed(2).replace(".", ",") : "0,00";
+      return `
+        <a href="/produto?id=${encodeURIComponent(p.id)}" class="produto" style="text-decoration: none; color: inherit;">
+          <img src="${escapeHtml(img)}" alt="${escapeHtml(p.nome || '')}" style="width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: var(--radius-md);" loading="lazy">
+          <h3 style="font-size: 13px; margin: 6px 0 4px; font-weight: 600;">${escapeHtml(p.nome || "Produto")}</h3>
+          <p style="font-weight: 700; color: var(--accent); margin: 0; font-size: 14px;">R$ ${precoStr}</p>
+        </a>
+      `;
+    }).join("");
+    section.style.display = "";
+  } catch { /* silent */ }
+})();
+
+/* ========== Sticky Header Auto-hide ========== */
+(function stickyHeaderAutoHide() {
+  const header = document.querySelector(".header");
+  if (!header) return;
+  let lastScroll = 0;
+  let ticking = false;
+
+  window.addEventListener("scroll", () => {
+    if (ticking) return;
+    ticking = true;
+    requestAnimationFrame(() => {
+      const current = window.scrollY;
+      if (current > 80 && current > lastScroll) {
+        header.classList.add("header-hidden");
+      } else {
+        header.classList.remove("header-hidden");
+      }
+      lastScroll = current;
+      ticking = false;
+    });
+  }, { passive: true });
+})();

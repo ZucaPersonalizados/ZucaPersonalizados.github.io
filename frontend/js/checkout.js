@@ -229,11 +229,23 @@ function salvarDadosClienteLocal() {
 function carregarDadosClienteLocal() {
   try {
     const raw = localStorage.getItem("zuca_checkout_cliente");
-    if (!raw) return;
-    const dados = JSON.parse(raw);
-    Object.entries(dados).forEach(([key, value]) => {
-      if (el(key)) el(key).value = value || "";
-    });
+    if (raw) {
+      const dados = JSON.parse(raw);
+      Object.entries(dados).forEach(([key, value]) => {
+        if (el(key)) el(key).value = value || "";
+      });
+    }
+    // Also load saved address
+    const endRaw = localStorage.getItem("zuca_endereco");
+    if (endRaw) {
+      const end = JSON.parse(endRaw);
+      if (end.cep && el("cep") && !el("cep").value) el("cep").value = end.cep;
+      if (end.endereco && el("endereco") && !el("endereco").value) el("endereco").value = end.endereco;
+      if (end.numero && el("numero") && !el("numero").value) el("numero").value = end.numero;
+      if (end.bairro && el("bairro") && !el("bairro").value) el("bairro").value = end.bairro;
+      if (end.cidade && el("cidade") && !el("cidade").value) el("cidade").value = end.cidade;
+      if (end.estado && el("estado") && !el("estado").value) el("estado").value = end.estado;
+    }
   } catch {
     // noop
   }

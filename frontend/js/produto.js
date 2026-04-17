@@ -655,6 +655,11 @@ async function carregarProduto() {
     // Load related products
     carregarRelacionados(produto.categoria, id);
 
+    // Zoom, sticky bar, vistos recentemente
+    configurarZoom();
+    configurarStickyBar(precoCalculado);
+    salvarVistoRecentemente(id);
+
   } catch (error) {
     console.error("Erro ao carregar produto:", error);
     document.body.innerHTML = "<div style='text-align:center; padding: 100px;'><h2>Erro ao carregar produto</h2><p><a href='/'>Voltar para início</a></p></div>";
@@ -705,6 +710,130 @@ function popularAbas(produto) {
       specsGrid.innerHTML = '<p style="color: var(--muted); padding: 12px;">Nenhuma especificação disponível.</p>';
     }
   }
+
+  // Reviews tab
+  carregarAvaliacoes(produto.id || new URLSearchParams(window.location.search).get("id"));
+}
+
+/* ========== Reviews / Avaliações ========== */
+async function carregarAvaliacoes(produtoId) {
+  const container = document.getElementById("avaliacoes-container");
+  if (!container || !produtoId) return;
+
+  try {
+    const response = await fetch(getApiUrl(`/api/avaliacoes/${encodeURIComponent(produtoId)}`));
+    const data = response.ok ? await response.json() : { avaliacoes: [], media: 0, total: 0 };
+    const { avaliacoes = [], media = 0, total = 0 } = data;
+
+    const perfil = JSON.parse(localStorage.getItem("zuca_perfil") || "{}");
+    const emailUser = perfil.email || "";
+
+    let html = `
+      <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 20px; flex-wrap: wrap;">
+        <div style="font-size: 36px; font-weight: 700; color: var(--accent);">${media.toFixed(1)}</div>
+        <div>
+          <div class="stars-display">${renderStars(media)}</div>
+          <p style="color: var(--muted); font-size: 13px; margin: 4px 0 0;">${total} avaliação(ões)</p>
+        </div>
+      </div>
+    `;
+
+    // Review form
+    html += `
+      <div class="review-form" style="border: 1px solid var(--line); border-radius: var(--radius-md); padding: 16px; margin-bottom: 24px;">
+        <h4 style="margin: 0 0 12px;">Deixe sua avaliação</h4>
+        <div class="star-picker" id="star-picker" style="font-size: 28px; cursor: pointer; margin-bottom: 12px;">
+          ${'<span class="star-pick" data-nota="1">☆</span><span class="star-pick" data-nota="2">☆</span><span class="star-pick" data-nota="3">☆</span><span class="star-pick" data-nota="4">☆</span><span class="star-pick" data-nota="5">☆</span>'}
+        </div>
+        <textarea id="review-comentario" rows="3" placeholder="Conte o que achou do produto..." style="width: 100%; border: 1px solid var(--line); border-radius: var(--radius-md); padding: 10px; font: inherit; resize: vertical;"></textarea>
+        <button id="btn-enviar-review" class="btn-primary" style="margin-top: 10px; padding: 10px 24px;">Enviar avaliação</button>
+      </div>
+    `;
+
+    // List reviews
+    if (avaliacoes.length) {
+      html += avaliacoes.map((a) => `
+        <div style="border-bottom: 1px solid var(--line); padding: 12px 0;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <strong style="font-size: 14px;">${escapeHtml(a.nome || "Anônimo")}</strong>
+            <span style="font-size: 14px;">${renderStars(a.nota)}</span>
+          </div>
+          ${a.comentario ? `<p style="margin: 6px 0 0; font-size: 14px; color: var(--text);">${escapeHtml(a.comentario)}</p>` : ""}
+          <p style="font-size: 11px; color: var(--muted); margin: 4px 0 0;">${new Date(a.criadoEm).toLocaleDateString("pt-BR")}</p>
+        </div>
+      `).join("");
+    }
+
+    container.innerHTML = html;
+
+    // Star picker interaction
+    let notaSelecionada = 0;
+    container.querySelectorAll(".star-pick").forEach((star) => {
+      star.addEventListener("click", () => {
+        notaSelecionada = Number(star.dataset.nota);
+        container.querySelectorAll(".star-pick").forEach((s, i) => {
+          s.textContent = i < notaSelecionada ? "★" : "☆";
+          s.style.color = i < notaSelecionada ? "#f5a623" : "#ccc";
+        });
+      });
+      star.addEventListener("mouseenter", () => {
+        const n = Number(star.dataset.nota);
+        container.querySelectorAll(".star-pick").forEach((s, i) => {
+          s.style.color = i < n ? "#f5a623" : "#ccc";
+        });
+      });
+    });
+    container.querySelector(".star-picker")?.addEventListener("mouseleave", () => {
+      container.querySelectorAll(".star-pick").forEach((s, i) => {
+        s.style.color = i < notaSelecionada ? "#f5a623" : "#ccc";
+      });
+    });
+
+    // Submit review
+    document.getElementById("btn-enviar-review")?.addEventListener("click", async () => {
+      if (!notaSelecionada) { showToast("Selecione uma nota de 1 a 5 estrelas.", "error"); return; }
+      if (!emailUser) { showToast("Preencha seu perfil em Minha Conta antes de avaliar.", "error"); return; }
+
+      const btn = document.getElementById("btn-enviar-review");
+      btn.disabled = true;
+      btn.textContent = "Enviando...";
+
+      try {
+        const resp = await fetch(getApiUrl("/api/avaliacoes"), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            produtoId,
+            email: emailUser,
+            nome: perfil.nome || "Anônimo",
+            nota: notaSelecionada,
+            comentario: document.getElementById("review-comentario")?.value?.trim() || "",
+          }),
+        });
+        const result = await resp.json();
+        if (resp.ok && result.success) {
+          showToast("Avaliação enviada com sucesso!", "success");
+          carregarAvaliacoes(produtoId);
+        } else {
+          showToast(result.error || "Erro ao enviar avaliação.", "error");
+        }
+      } catch {
+        showToast("Erro de conexão ao enviar avaliação.", "error");
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Enviar avaliação";
+      }
+    });
+  } catch {
+    container.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 24px;">Erro ao carregar avaliações.</p>';
+  }
+}
+
+function renderStars(nota) {
+  const full = Math.round(nota);
+  return Array.from({ length: 5 }, (_, i) =>
+    `<span style="color: ${i < full ? '#f5a623' : '#ddd'}; font-size: 16px;">${i < full ? '★' : '☆'}</span>`
+  ).join("");
 }
 
 /* ========== Related Products ========== */
@@ -749,6 +878,96 @@ async function carregarRelacionados(categoria, idAtual) {
   }
 }
 
+/* ========== Image Zoom (desktop) ========== */
+function configurarZoom() {
+  const container = document.getElementById("zoom-container");
+  const lens = document.getElementById("zoom-lens");
+  const result = document.getElementById("zoom-result");
+  const img = document.getElementById("imagem-principal");
+  if (!container || !lens || !result || !img) return;
+
+  const ZOOM = 2.5;
+
+  container.addEventListener("mousemove", (e) => {
+    const rect = container.getBoundingClientRect();
+    let x = e.clientX - rect.left - lens.offsetWidth / 2;
+    let y = e.clientY - rect.top - lens.offsetHeight / 2;
+    x = Math.max(0, Math.min(x, rect.width - lens.offsetWidth));
+    y = Math.max(0, Math.min(y, rect.height - lens.offsetHeight));
+    lens.style.left = x + "px";
+    lens.style.top = y + "px";
+
+    result.style.backgroundImage = `url('${img.src}')`;
+    result.style.backgroundSize = `${rect.width * ZOOM}px ${rect.height * ZOOM}px`;
+    result.style.backgroundPosition = `-${x * ZOOM}px -${y * ZOOM}px`;
+  });
+
+  container.addEventListener("mouseleave", () => {
+    lens.style.display = "none";
+    result.style.display = "none";
+  });
+
+  container.addEventListener("mouseenter", () => {
+    if (window.innerWidth <= 768) return;
+    lens.style.display = "block";
+    result.style.display = "block";
+  });
+
+  // Mobile: tap to fullscreen
+  container.addEventListener("click", () => {
+    if (window.innerWidth > 768) return;
+    const fs = document.getElementById("zoom-fullscreen");
+    const fsImg = document.getElementById("zoom-fullscreen-img");
+    if (fs && fsImg) {
+      fsImg.src = img.src;
+      fs.classList.add("active");
+    }
+  });
+
+  document.getElementById("zoom-close")?.addEventListener("click", () => {
+    document.getElementById("zoom-fullscreen")?.classList.remove("active");
+  });
+
+  document.getElementById("zoom-fullscreen")?.addEventListener("click", (e) => {
+    if (e.target === e.currentTarget) {
+      e.currentTarget.classList.remove("active");
+    }
+  });
+}
+
+/* ========== Sticky Add-to-Cart (mobile) ========== */
+function configurarStickyBar(preco) {
+  const bar = document.getElementById("sticky-add-bar");
+  const precoEl = document.getElementById("sticky-preco");
+  const btnOrig = document.getElementById("btn-adicionar-carrinho");
+  if (!bar || !btnOrig) return;
+
+  if (precoEl) precoEl.textContent = formatarMoeda(preco);
+
+  const observer = new IntersectionObserver(
+    ([entry]) => {
+      bar.classList.toggle("visible", !entry.isIntersecting);
+    },
+    { threshold: 0 }
+  );
+  observer.observe(btnOrig);
+
+  document.getElementById("sticky-btn-add")?.addEventListener("click", () => {
+    btnOrig.click();
+  });
+}
+
+/* ========== Vistos Recentemente ========== */
+function salvarVistoRecentemente(id) {
+  if (!id) return;
+  const KEY = "zuca_vistos";
+  let vistos = JSON.parse(localStorage.getItem(KEY) || "[]");
+  vistos = vistos.filter((v) => v !== id);
+  vistos.unshift(id);
+  if (vistos.length > 8) vistos = vistos.slice(0, 8);
+  localStorage.setItem(KEY, JSON.stringify(vistos));
+}
+
 // Search bar redirect to index
 document.getElementById("btn-search")?.addEventListener("click", () => {
   const q = document.getElementById("search-input")?.value.trim();
@@ -760,3 +979,43 @@ document.getElementById("search-input")?.addEventListener("keydown", (e) => {
     if (q) window.location.href = `/?q=${encodeURIComponent(q)}`;
   }
 });
+
+/* ========== Vistos Recentemente (render) ========== */
+async function renderVistosRecentemente() {
+  const section = document.getElementById("vistos-recentemente");
+  const grid = document.getElementById("vistos-grid");
+  if (!section || !grid) return;
+
+  const currentId = new URLSearchParams(window.location.search).get("id");
+  const vistos = JSON.parse(localStorage.getItem("zuca_vistos") || "[]").filter((v) => v !== currentId);
+  if (!vistos.length) return;
+
+  try {
+    const response = await fetch(getApiUrl("/api/produtos"));
+    if (!response.ok) return;
+    const data = await response.json();
+    const produtos = Array.isArray(data) ? data : (data?.produtos || []);
+
+    const itens = vistos
+      .map((id) => produtos.find((p) => p.id === id))
+      .filter(Boolean)
+      .slice(0, 6);
+
+    if (!itens.length) return;
+
+    grid.innerHTML = itens.map((p) => {
+      const preco = precoParaNumero(p.preco ?? p.valor ?? 0);
+      const img = obterImagensProduto(p)[0] || "img/logo/logo.png";
+      return `
+        <a href="/produto?id=${encodeURIComponent(p.id)}" class="produto" style="text-decoration: none; color: inherit;">
+          <img src="${escapeHtml(img)}" alt="${escapeHtml(p.nome || '')}" style="width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: var(--radius-md);" loading="lazy">
+          <h3 style="font-size: 13px; margin: 6px 0 4px; font-weight: 600;">${escapeHtml(p.nome || "Produto")}</h3>
+          <p style="font-weight: 700; color: var(--accent); margin: 0; font-size: 14px;">${formatarMoeda(preco)}</p>
+        </a>
+      `;
+    }).join("");
+    section.style.display = "";
+  } catch { /* silent */ }
+}
+
+renderVistosRecentemente();

@@ -313,6 +313,54 @@ el("email")?.addEventListener("blur", (event) => {
 renderAvatarOptions();
 carregarPerfil();
 
+/* ========== Saved Address ========== */
+function carregarEnderecoSalvo() {
+  const end = JSON.parse(localStorage.getItem("zuca_endereco") || "{}");
+  if (el("end-cep")) el("end-cep").value = end.cep || "";
+  if (el("end-endereco")) el("end-endereco").value = end.endereco || "";
+  if (el("end-numero")) el("end-numero").value = end.numero || "";
+  if (el("end-bairro")) el("end-bairro").value = end.bairro || "";
+  if (el("end-cidade")) el("end-cidade").value = end.cidade || "";
+  if (el("end-estado")) el("end-estado").value = end.estado || "";
+}
+
+function salvarEndereco() {
+  const end = {
+    cep: String(el("end-cep")?.value || "").trim(),
+    endereco: String(el("end-endereco")?.value || "").trim(),
+    numero: String(el("end-numero")?.value || "").trim(),
+    bairro: String(el("end-bairro")?.value || "").trim(),
+    cidade: String(el("end-cidade")?.value || "").trim(),
+    estado: String(el("end-estado")?.value || "").trim().toUpperCase(),
+  };
+  localStorage.setItem("zuca_endereco", JSON.stringify(end));
+
+  // Also update checkout client data
+  const cliente = JSON.parse(localStorage.getItem("zuca_checkout_cliente") || "{}");
+  Object.assign(cliente, end);
+  localStorage.setItem("zuca_checkout_cliente", JSON.stringify(cliente));
+
+  showToast("Endereço salvo com sucesso!", "success");
+}
+
+// CEP auto-fill via ViaCEP
+el("end-cep")?.addEventListener("blur", async () => {
+  const cep = String(el("end-cep")?.value || "").replace(/\D/g, "");
+  if (cep.length !== 8) return;
+  try {
+    const resp = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+    const data = await resp.json();
+    if (data.erro) return;
+    if (data.logradouro && el("end-endereco")) el("end-endereco").value = data.logradouro;
+    if (data.bairro && el("end-bairro")) el("end-bairro").value = data.bairro;
+    if (data.localidade && el("end-cidade")) el("end-cidade").value = data.localidade;
+    if (data.uf && el("end-estado")) el("end-estado").value = data.uf;
+  } catch { /* silent */ }
+});
+
+el("btn-salvar-endereco")?.addEventListener("click", salvarEndereco);
+carregarEnderecoSalvo();
+
 /* ========== Timeline ========== */
 const TIMELINE_STEPS = [
   { key: "pendente", label: "Pedido" },

@@ -1,5 +1,22 @@
 const ORIGIN_BASE = window.location.origin.replace(/\/$/, "");
 
+function normalizarUrlSemExtensao() {
+  const path = window.location.pathname;
+  const map = {
+    "/index.html": "/",
+    "/produto.html": "/produto",
+    "/checkout.html": "/checkout",
+    "/admin.html": "/admin",
+  };
+
+  const normalized = map[path];
+  if (normalized) {
+    window.history.replaceState({}, "", `${normalized}${window.location.search}${window.location.hash}`);
+  }
+}
+
+normalizarUrlSemExtensao();
+
 // Admin depende de cookie HttpOnly de sessao: manter sempre same-origin evita 401 por cross-domain.
 const API_BASE = ORIGIN_BASE;
 const API_BASES = [ORIGIN_BASE];

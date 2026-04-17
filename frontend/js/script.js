@@ -4,8 +4,52 @@ const API_BASE = (() => {
   return window.location.origin;
 })();
 
-function getApiUrl(path) {
-  return `${API_BASE}${path}`;
+const ORIGIN_BASE = window.location.origin.replace(/\/$/, "");
+const API_BASES = [...new Set([API_BASE, ORIGIN_BASE].filter(Boolean))];
+
+function getApiUrl(path, base = API_BASE) {
+  return `${base}${path}`;
+}
+
+function normalizarUrlSemExtensao() {
+  const path = window.location.pathname;
+  const map = {
+    "/index.html": "/",
+    "/produto.html": "/produto",
+    "/checkout.html": "/checkout",
+    "/admin.html": "/admin",
+  };
+
+  const normalized = map[path];
+  if (normalized) {
+    window.history.replaceState({}, "", `${normalized}${window.location.search}${window.location.hash}`);
+  }
+}
+
+async function fetchApi(path, options) {
+  let lastResponse = null;
+  let lastError = null;
+
+  for (const base of API_BASES) {
+    try {
+      const response = await fetch(getApiUrl(path, base), options);
+      if (response.ok) {
+        if (base === ORIGIN_BASE && API_BASE !== ORIGIN_BASE) {
+          localStorage.removeItem("zuca_api_base_url");
+        }
+        return response;
+      }
+      lastResponse = response;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  if (lastResponse) {
+    return lastResponse;
+  }
+
+  throw lastError || new Error("Falha ao conectar com a API");
 }
 
 let filtros = {
@@ -91,6 +135,25 @@ function normalizarLink(url = "") {
   }
 
   return "#";
+}
+
+function obterImagensProduto(produto = {}) {
+  if (Array.isArray(produto.imagens)) {
+    const lista = produto.imagens.map((img) => String(img || "").trim()).filter(Boolean);
+    if (lista.length) return lista;
+  }
+
+  if (typeof produto.imagens === "string") {
+    const lista = produto.imagens.split(",").map((img) => img.trim()).filter(Boolean);
+    if (lista.length) return lista;
+  }
+
+  const candidatas = [produto.imagem, produto.imagemUrl, produto.foto]
+    .map((img) => String(img || "").trim())
+    .filter(Boolean);
+
+  if (candidatas.length) return candidatas;
+  return ["img/logo/logo.png"];
 }
 
 function renderizarCategoriasDesktop() {
@@ -296,7 +359,7 @@ function fecharFiltro() {
 
 function abrirProduto(id) {
   const idSeguro = encodeURIComponent(String(id || ""));
-  window.location.href = `produto.html?id=${idSeguro}`;
+  window.location.href = `/produto?id=${idSeguro}`;
 }
 
 function obterCarrinho() {
@@ -563,7 +626,7 @@ function configurarHeaderUX() {
   });
 
   btnLoginGoogle?.addEventListener("click", async () => {
-    window.location.href = "checkout.html";
+    window.location.href = "/checkout";
     dropdown?.classList.remove("ativo");
     btnAvatar?.setAttribute("aria-expanded", "false");
   });
@@ -663,16 +726,23 @@ async function renderizarProdutos() {
   container.innerHTML = "";
 
   try {
-    const response = await fetch(getApiUrl("/api/produtos"));
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const response = await fetchApi("/api/produtos");
+    if (!response.ok) {
+      let detalhe = `HTTP ${response.status}`;
+      try {
+        const erroPayload = await response.json();
+        detalhe = erroPayload?.error || erroPayload?.message || detalhe;
+      } catch {
+        // Ignora erro de parse e mantem status HTTP
+      }
+      throw new Error(detalhe);
+    }
     const payload = await response.json();
     const lista = Array.isArray(payload.produtos) ? payload.produtos : [];
 
     const produtos = lista.map((p) => {
 
-      const imagensValidas = Array.isArray(p.imagens)
-        ? p.imagens.map((img) => String(img || "").trim()).filter(Boolean)
-        : [];
+      const imagensValidas = obterImagensProduto(p);
 
       return {
         id: p.id,
@@ -711,7 +781,7 @@ async function renderizarProdutos() {
 
       const imagens = produto.imagens.length > 0
         ? produto.imagens
-        : ["img/produtos/planner-doce.png"];
+        : ["img/logo/logo.png"];
 
       const nomeSeguro = escapeHtml(produto.nome);
       const descricaoSegura = escapeHtml(produto.descricaoCurta);
@@ -720,7 +790,7 @@ async function renderizarProdutos() {
       div.innerHTML = `
         <div class="produto-slider">
           <div class="slides">
-            ${imagens.map((img) => `<img src="${escapeHtml(img)}" alt="${nomeSeguro}" onerror="this.onerror=null;this.src='img/produtos/planner-doce.png';">`).join("")}
+            ${imagens.map((img) => `<img src="${escapeHtml(img)}" alt="${nomeSeguro}" onerror="this.onerror=null;this.src='img/logo/logo.png';">`).join("")}
           </div>
           <div class="dots">
             ${imagens.map((_, i) => `<span class="dot ${i === 0 ? "active" : ""}" data-index="${i}"></span>`).join("")}
@@ -748,7 +818,8 @@ async function renderizarProdutos() {
   } catch (error) {
     console.error(error);
     renderizarCategoriasDesktop();
-    container.innerHTML = "<p>Não foi possível carregar os produtos no momento.</p>";
+    const detalhe = error?.message ? ` (${escapeHtml(error.message)})` : "";
+    container.innerHTML = `<p>Não foi possível carregar os produtos no momento${detalhe}.</p>`;
   }
 }
 
@@ -758,6 +829,7 @@ window.fecharFiltro = fecharFiltro;
 window.selecionarCategoriaMobile = selecionarCategoriaMobile;
 window.setFiltro = setFiltro;
 
+normalizarUrlSemExtensao();
 renderizarProdutos();
 configurarHeaderUX();
 atualizarBotoesCarrinho();

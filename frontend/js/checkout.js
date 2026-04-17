@@ -10,6 +10,21 @@ function getApiUrl(path) {
   return `${API_BASE}${path}`;
 }
 
+function normalizarUrlSemExtensao() {
+  const path = window.location.pathname;
+  const map = {
+    "/index.html": "/",
+    "/produto.html": "/produto",
+    "/checkout.html": "/checkout",
+    "/admin.html": "/admin",
+  };
+
+  const normalized = map[path];
+  if (normalized) {
+    window.history.replaceState({}, "", `${normalized}${window.location.search}${window.location.hash}`);
+  }
+}
+
 let descontoAtual = 0;
 let cupomAplicado = null;
 let mpConfigCache = null;
@@ -631,6 +646,7 @@ el("email")?.addEventListener("blur", (event) => {
 document.querySelectorAll("#nome, #cpfCnpj, #email, #telefone, #cep, #endereco, #numero, #bairro, #cidade, #estado")
   .forEach((input) => input.addEventListener("change", salvarDadosClienteLocal));
 
+normalizarUrlSemExtensao();
 carregarDadosClienteLocal();
 atualizarAvatarCheckout(localStorage.getItem("zuca_checkout_cliente_nome") || "");
 renderCarrinho();

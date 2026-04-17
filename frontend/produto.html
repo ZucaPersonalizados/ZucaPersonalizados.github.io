@@ -217,6 +217,40 @@
       align-items: center;
     }
 
+    .produto-personalizacao {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding: 14px;
+      border: 1px dashed var(--line);
+      border-radius: var(--radius-md);
+      background: rgba(201, 141, 89, 0.06);
+    }
+
+    .produto-personalizacao h3 {
+      margin: 0;
+      font-size: 0.95rem;
+      color: var(--ink-deep);
+    }
+
+    .produto-personalizacao p {
+      margin: 0;
+      font-size: 0.82rem;
+      color: var(--muted);
+      line-height: 1.4;
+    }
+
+    .produto-personalizacao input[type="file"] {
+      font-size: 0.85rem;
+      color: var(--text);
+    }
+
+    .arquivo-status {
+      min-height: 1.2em;
+      font-size: 0.82rem;
+      color: var(--ink-deep);
+    }
+
     .btn-primary {
       background: var(--accent);
       color: white;
@@ -338,10 +372,10 @@
     </div>
 
     <nav class="menu">
-      <a href="index.html">Início</a>
-      <a href="index.html#produtos">Produtos</a>
-      <a href="index.html#sobre">Sobre</a>
-      <a href="index.html#contato">Contato</a>
+      <a href="/">Início</a>
+      <a href="/#produtos">Produtos</a>
+      <a href="/#sobre">Sobre</a>
+      <a href="/#contato">Contato</a>
     </nav>
 
     <div class="header-actions">
@@ -361,7 +395,7 @@
         <div id="avatar-dropdown" class="avatar-dropdown">
           <button id="btn-login-google" type="button">Entrar com Google</button>
           <button id="btn-logout-user" type="button">Sair</button>
-          <a href="checkout.html">Minha conta</a>
+          <a href="/checkout">Minha conta</a>
         </div>
       </div>
     </div>
@@ -376,16 +410,16 @@
   <div id="cart-sidebar-items" class="cart-sidebar-items"></div>
   <div class="cart-sidebar-footer">
     <p>Total: <strong id="cart-sidebar-total">R$ 0,00</strong></p>
-    <a href="checkout.html" class="btn">Ir para checkout</a>
+    <a href="/checkout" class="btn">Ir para checkout</a>
   </div>
 </aside>
 <div id="cart-overlay" class="cart-overlay"></div>
 
 <!-- BREADCRUMB -->
 <div class="breadcrumb">
-  <a href="index.html">Início</a>
+  <a href="/">Início</a>
   <span>/</span>
-  <a href="index.html#produtos">Produtos</a>
+  <a href="/#produtos">Produtos</a>
   <span>/</span>
   <span id="breadcrumb-produto">Produto</span>
 </div>
@@ -441,8 +475,15 @@
         </div>
         <div class="produto-feature">
           <div class="produto-feature-icon">🛡️</div>
-          <div class="produto-feature-text">Garantia 12 Meses</div>
+          <div class="produto-feature-text">Acabamento Profissional</div>
         </div>
+      </div>
+
+      <div id="bloco-personalizacao" class="produto-personalizacao" hidden>
+        <h3>Envie sua arte para personalização</h3>
+        <p>Anexe o arquivo com o nome, logo ou referência visual antes de adicionar ao carrinho.</p>
+        <input id="arquivo-personalizacao" type="file" accept=".jpg,.jpeg,.png,.pdf,.svg,.webp">
+        <div id="arquivo-personalizacao-status" class="arquivo-status"></div>
       </div>
 
       <div class="produto-actions">
@@ -469,10 +510,10 @@
     </div>
     <div class="footer-column">
       <h4>Navegação</h4>
-      <a href="index.html">Início</a>
-      <a href="index.html#produtos">Produtos</a>
-      <a href="index.html#sobre">Sobre</a>
-      <a href="index.html#contato">Contato</a>
+      <a href="/">Início</a>
+      <a href="/#produtos">Produtos</a>
+      <a href="/#sobre">Sobre</a>
+      <a href="/#contato">Contato</a>
     </div>
     <div class="footer-column">
       <h4>Suporte</h4>

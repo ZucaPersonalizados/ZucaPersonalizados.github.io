@@ -8,6 +8,103 @@ function getApiUrl(path) {
   return `${API_BASE}${path}`;
 }
 
+function normalizarUrlSemExtensao() {
+  const path = window.location.pathname;
+  const map = {
+    "/index.html": "/",
+    "/produto.html": "/produto",
+    "/checkout.html": "/checkout",
+    "/admin.html": "/admin",
+  };
+
+  const normalized = map[path];
+  if (normalized) {
+    window.history.replaceState({}, "", `${normalized}${window.location.search}${window.location.hash}`);
+  }
+}
+
+function precoParaNumero(valor) {
+  if (typeof valor === "number") {
+    return Number.isFinite(valor) ? valor : 0;
+  }
+
+  const textoLimpo = String(valor ?? "")
+    .replace(/[^\d.,-]/g, "")
+    .trim();
+
+  if (!textoLimpo) return 0;
+
+  let texto = textoLimpo;
+  if (texto.includes(",")) {
+    texto = texto.replace(/\./g, "").replace(",", ".");
+  } else if ((texto.match(/\./g) || []).length > 1) {
+    const partes = texto.split(".");
+    const decimal = partes.pop();
+    texto = `${partes.join("")}.${decimal}`;
+  }
+
+  const numero = Number(texto);
+  return Number.isFinite(numero) ? numero : 0;
+}
+
+function isProdutoPersonalizado(produto = {}) {
+  const valor = produto.personalizado;
+
+  if (typeof valor === "boolean") return valor;
+  if (typeof valor === "number") return valor === 1;
+  if (typeof valor === "string") {
+    const v = valor.trim().toLowerCase();
+    if (["true", "1", "sim", "yes", "personalizado"].includes(v)) return true;
+    if (["false", "0", "nao", "não", "no"].includes(v)) return false;
+  }
+
+  const composto = `${produto.tipo || ""} ${produto.categoria || ""}`.toLowerCase();
+  return composto.includes("personalizado");
+}
+
+function obterImagensProduto(produto) {
+  if (Array.isArray(produto?.imagens)) {
+    const lista = produto.imagens.map((img) => String(img || "").trim()).filter(Boolean);
+    if (lista.length) return lista;
+  }
+
+  if (typeof produto?.imagens === "string") {
+    const lista = produto.imagens.split(",").map((img) => img.trim()).filter(Boolean);
+    if (lista.length) return lista;
+  }
+
+  const candidatas = [produto?.imagem, produto?.imagemUrl, produto?.foto]
+    .map((img) => String(img || "").trim())
+    .filter(Boolean);
+
+  if (candidatas.length) return candidatas;
+  return ["img/logo/logo.png"];
+}
+
+function mostrarBlocoPersonalizacao(personalizado) {
+  const bloco = document.getElementById("bloco-personalizacao");
+  if (!bloco) return;
+  bloco.hidden = !personalizado;
+}
+
+async function enviarArquivoPersonalizacao(arquivo) {
+  const formData = new FormData();
+  formData.append("arquivo", arquivo);
+
+  const response = await fetch(getApiUrl("/upload"), {
+    method: "POST",
+    body: formData,
+  });
+
+  const payload = await response.json();
+
+  if (!response.ok || !payload?.url) {
+    throw new Error(payload?.erro || payload?.error || "Falha ao enviar arquivo");
+  }
+
+  return payload.url;
+}
+
 function getCarrinho() {
   try {
     return JSON.parse(localStorage.getItem("zuca_carrinho") || "[]");
@@ -36,7 +133,7 @@ function renderizarCarrinhoSidebar() {
 
   let total = 0;
   container.innerHTML = itens.map((item) => {
-    const subtotal = Number(String(item.preco || "0").replace("R$", "").replace(/\./g, "").replace(",", ".")) * Number(item.quantidade || 1);
+    const subtotal = precoParaNumero(item.preco) * Number(item.quantidade || 1);
     total += subtotal;
     return `
       <div class="cart-item">
@@ -92,7 +189,7 @@ function configurarHeaderProduto() {
   });
 
   btnLoginGoogle?.addEventListener("click", () => {
-    window.location.href = "checkout.html";
+    window.location.href = "/checkout";
   });
 
   btnLogoutUser?.addEventListener("click", () => {
@@ -112,10 +209,12 @@ function configurarHeaderProduto() {
 }
 
 function formatarMoeda(valor) {
+  const numero = Number(valor);
+  const seguro = Number.isFinite(numero) ? numero : 0;
   return new Intl.NumberFormat("pt-BR", {
     style: "currency",
     currency: "BRL",
-  }).format(Number(valor || 0));
+  }).format(seguro);
 }
 
 function atualizarEstoqueUI(estoque) {
@@ -169,7 +268,10 @@ function atualizarEstoqueUI(estoque) {
 
 function adicionarAoCarrinhoComEstoque(produto, estoqueDisponivel) {
   const carrinho = JSON.parse(localStorage.getItem("zuca_carrinho") || "[]");
-  const existente = carrinho.find((item) => item.id === produto.id);
+  const produtoPersonalizado = isProdutoPersonalizado(produto);
+  const existente = produtoPersonalizado
+    ? null
+    : carrinho.find((item) => item.id === produto.id && !item.arquivoPersonalizacaoUrl);
   const quantidadeNoCarrinho = existente ? Number(existente.quantidade || 0) : 0;
 
   if (quantidadeNoCarrinho + 1 > estoqueDisponivel) {
@@ -184,7 +286,9 @@ function adicionarAoCarrinhoComEstoque(produto, estoqueDisponivel) {
       id: produto.id,
       nome: produto.nome,
       preco: produto.preco,
-      imagem: Array.isArray(produto.imagens) ? produto.imagens[0] || "" : "",
+      imagem: obterImagensProduto(produto)[0] || "",
+      arquivoPersonalizacaoUrl: produto.arquivoPersonalizacaoUrl || "",
+      arquivoPersonalizacaoNome: produto.arquivoPersonalizacaoNome || "",
       quantidade: 1,
     });
   }
@@ -210,35 +314,42 @@ async function carregarProduto() {
   const id = params.get("id");
 
   if (!id) {
-    document.body.innerHTML = "<div style='text-align:center; padding: 100px;'><h2>Produto não encontrado</h2><p><a href='index.html'>Voltar para início</a></p></div>";
+    document.body.innerHTML = "<div style='text-align:center; padding: 100px;'><h2>Produto não encontrado</h2><p><a href='/'>Voltar para início</a></p></div>";
     return;
   }
 
   try {
     const response = await fetch(getApiUrl(`/api/produtos/${encodeURIComponent(id)}`));
     if (!response.ok) {
-      document.body.innerHTML = "<div style='text-align:center; padding: 100px;'><h2>Produto não encontrado</h2><p><a href='index.html'>Voltar para início</a></p></div>";
+      document.body.innerHTML = "<div style='text-align:center; padding: 100px;'><h2>Produto não encontrado</h2><p><a href='/'>Voltar para início</a></p></div>";
       return;
     }
 
     const payload = await response.json();
     const produto = payload?.produto;
     if (!produto) {
-      document.body.innerHTML = "<div style='text-align:center; padding: 100px;'><h2>Produto não encontrado</h2><p><a href='index.html'>Voltar para início</a></p></div>";
+      document.body.innerHTML = "<div style='text-align:center; padding: 100px;'><h2>Produto não encontrado</h2><p><a href='/'>Voltar para início</a></p></div>";
       return;
     }
 
     document.getElementById("nome").textContent = produto.nome || "Sem nome";
     document.getElementById("breadcrumb-produto").textContent = produto.nome || "Produto";
-    document.getElementById("preco").textContent = formatarMoeda(produto.preco || 0);
+    const precoBase = produto.preco ?? produto.valor ?? 0;
+    const precoCalculado = precoParaNumero(precoBase);
+    const personalizado = isProdutoPersonalizado(produto);
+    const produtoParaCarrinho = { ...produto, preco: precoCalculado, personalizado };
+    document.getElementById("preco").textContent = formatarMoeda(precoCalculado);
     document.getElementById("descricao").textContent = produto.descricaoCurta || "Descrição não disponível";
+    mostrarBlocoPersonalizacao(personalizado);
 
     const estoque = Number(produto.estoque || 0);
     atualizarEstoqueUI(estoque);
 
-    const imagens = Array.isArray(produto.imagens) ? produto.imagens : [];
+    const imagens = obterImagensProduto(produto);
     const imgPrincipal = document.getElementById("imagem-principal");
     const miniaturas = document.getElementById("miniaturas");
+    const inputArquivo = document.getElementById("arquivo-personalizacao");
+    const statusArquivo = document.getElementById("arquivo-personalizacao-status");
 
     if (miniaturas) miniaturas.innerHTML = "";
 
@@ -259,18 +370,58 @@ async function carregarProduto() {
       miniaturas.appendChild(thumb);
     });
 
-    document.getElementById("btn-adicionar-carrinho")?.addEventListener("click", () => {
+    document.getElementById("btn-adicionar-carrinho")?.addEventListener("click", async () => {
       if (estoque <= 0) {
         alert("❌ Este produto está fora de estoque");
         return;
       }
-      adicionarAoCarrinhoComEstoque(produto, estoque);
+
+      const botao = document.getElementById("btn-adicionar-carrinho");
+
+      if (personalizado) {
+        const arquivo = inputArquivo?.files?.[0];
+
+        if (!arquivo) {
+          alert("Selecione um arquivo para personalizacao antes de adicionar ao carrinho.");
+          return;
+        }
+
+        try {
+          if (statusArquivo) statusArquivo.textContent = "Enviando arquivo...";
+          if (botao) {
+            botao.disabled = true;
+            botao.textContent = "Enviando...";
+          }
+
+          const urlArquivo = await enviarArquivoPersonalizacao(arquivo);
+          adicionarAoCarrinhoComEstoque({
+            ...produtoParaCarrinho,
+            arquivoPersonalizacaoUrl: urlArquivo,
+            arquivoPersonalizacaoNome: arquivo.name,
+          }, estoque);
+
+          if (statusArquivo) statusArquivo.textContent = `Arquivo enviado: ${arquivo.name}`;
+        } catch (error) {
+          alert(`Erro ao enviar arquivo: ${error.message}`);
+          if (statusArquivo) statusArquivo.textContent = "Nao foi possivel enviar o arquivo.";
+        } finally {
+          if (botao) {
+            botao.disabled = false;
+            botao.textContent = "🛒 Adicionar ao carrinho";
+          }
+        }
+
+        return;
+      }
+
+      adicionarAoCarrinhoComEstoque(produtoParaCarrinho, estoque);
     });
   } catch (error) {
     console.error("Erro ao carregar produto:", error);
-    document.body.innerHTML = "<div style='text-align:center; padding: 100px;'><h2>Erro ao carregar produto</h2><p><a href='index.html'>Voltar para início</a></p></div>";
+    document.body.innerHTML = "<div style='text-align:center; padding: 100px;'><h2>Erro ao carregar produto</h2><p><a href='/'>Voltar para início</a></p></div>";
   }
 }
 
+normalizarUrlSemExtensao();
 carregarProduto();
 configurarHeaderProduto();

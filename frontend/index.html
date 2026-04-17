@@ -34,6 +34,13 @@
       <a href="#contato">Contato</a>
     </nav>
 
+    <div class="search-bar">
+      <input type="text" id="search-input" placeholder="Buscar produtos..." autocomplete="off">
+      <button type="button" id="btn-search" aria-label="Buscar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      </button>
+    </div>
+
     <div class="header-actions">
       <button id="btn-cart" class="btn-cart-header" type="button" aria-label="Abrir carrinho">
         <svg class="cart-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
@@ -213,7 +220,18 @@
             <div id="filtros-dinamicos-mobile"></div>
           </div>
 
+          <div class="sort-control">
+            <label for="sort-select">Ordenar:</label>
+            <select id="sort-select">
+              <option value="relevancia">Relevância</option>
+              <option value="menor-preco">Menor preço</option>
+              <option value="maior-preco">Maior preço</option>
+              <option value="a-z">A-Z</option>
+            </select>
+          </div>
+
           <div class="produtos-grid" id="lista-produtos"></div>
+          <div id="pagination-container" class="pagination"></div>
         </div>
       </div>
     </div>
@@ -295,6 +313,7 @@
   </div>
 </footer>
 
+<div id="toast-container" aria-live="polite"></div>
 <script type="module" src="js/script.js"></script>
 </body>
 </html>

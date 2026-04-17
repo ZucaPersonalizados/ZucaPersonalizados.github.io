@@ -400,6 +400,10 @@
           <label for="cep">CEP</label>
           <input id="cep" placeholder="79000-000" inputmode="numeric" autocomplete="postal-code" />
         </div>
+
+        <!-- Shipping options -->
+        <div id="frete-options" class="frete-options"></div>
+
         <div class="field-group">
           <label for="endereco">Endereco</label>
           <input id="endereco" placeholder="Rua, avenida, travessa" autocomplete="street-address" />
@@ -467,8 +471,9 @@
           <strong>Resumo:</strong><br/>
           Subtotal: <span id="subtotal">R$ 0,00</span><br/>
           Desconto: <span id="desconto">R$ 0,00</span><br/>
-          Frete: <span id="frete">R$ 0,00</span><br/>
+          Frete: <span id="frete">R$ 0,00</span> <span id="frete-prazo-resumo"></span><br/>
           <strong style="font-size: 16px;">Total: <span id="total-final">R$ 0,00</span></strong>
+          <span id="parcelas-resumo" class="parcelas-badge" style="display: block; margin-top: 4px;"></span>
         </p>
       </div>
 
@@ -516,6 +521,8 @@
       © 2026 Zuca Personalizados. Todos os direitos reservados.
     </div>
   </footer>
+
+  <div id="toast-container" aria-live="polite"></div>
 
   <!-- Mercado Pago SDK -->
   <script src="https://sdk.mercadopago.com/js/v2"></script>

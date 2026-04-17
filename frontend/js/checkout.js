@@ -12,6 +12,42 @@ function getApiUrl(path) {
   return `${API_BASE}${path}`;
 }
 
+/* ========== Toast Notification System ========== */
+function escapeHtml(value = "") {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function showToast(message, type = "info", duration = 4000) {
+  const container = document.getElementById("toast-container");
+  if (!container) return;
+
+  const icons = { success: "✓", error: "✕", info: "ℹ", warning: "⚠" };
+  const toast = document.createElement("div");
+  toast.className = `toast is-${type}`;
+  toast.innerHTML = `
+    <span class="toast-icon">${icons[type] || icons.info}</span>
+    <span class="toast-msg">${escapeHtml(message)}</span>
+    <button class="toast-close" aria-label="Fechar">✕</button>
+    <div class="toast-progress" style="animation-duration: ${duration}ms"></div>
+  `;
+
+  const close = () => {
+    toast.classList.add("removing");
+    setTimeout(() => toast.remove(), 250);
+  };
+
+  toast.querySelector(".toast-close").addEventListener("click", close);
+  container.appendChild(toast);
+  const timer = setTimeout(close, duration);
+  toast.addEventListener("mouseenter", () => clearTimeout(timer));
+  toast.addEventListener("mouseleave", () => setTimeout(close, 1500));
+}
+
 function obterAvatarHeader() {
   return localStorage.getItem("zuca_avatar_url") || DEFAULT_AVATAR;
 }
@@ -41,6 +77,7 @@ let freteAtual = {
   servico: "",
   prazoDias: null,
 };
+let freteOpcoes = [];
 
 function digitsOnly(value = "") {
   return String(value).replace(/\D/g, "");
@@ -88,8 +125,24 @@ function setCheckoutStatus(message, type = "info") {
   else box.classList.add("is-info");
 }
 
-function setActionFeedback(message, type = "info") {
+function showInlineActionStatus(anchorEl, message, type = "info") {
+  if (!(anchorEl instanceof Element)) return;
+
+  let feedback = anchorEl.nextElementSibling;
+  if (!(feedback instanceof HTMLElement) || !feedback.classList.contains("action-feedback")) {
+    feedback = document.createElement("div");
+    feedback.className = "action-feedback";
+    anchorEl.insertAdjacentElement("afterend", feedback);
+  }
+
+  feedback.textContent = message;
+  feedback.classList.remove("is-info", "is-success", "is-error");
+  feedback.classList.add(type === "success" ? "is-success" : type === "error" ? "is-error" : "is-info");
+}
+
+function setActionFeedback(message, type = "info", anchorEl = null) {
   setCheckoutStatus(message, type);
+  if (anchorEl) showInlineActionStatus(anchorEl, message, type);
 }
 
 async function obterConfigMercadoPago(forceRefresh = false) {
@@ -131,9 +184,24 @@ function atualizarResumo(subtotal) {
   const total = Math.max(0, subtotal - descontoAtual + Number(freteAtual.valor || 0));
   if (el("subtotal")) el("subtotal").textContent = formatarMoeda(subtotal);
   if (el("desconto")) el("desconto").textContent = formatarMoeda(descontoAtual);
-  if (el("frete")) el("frete").textContent = formatarMoeda(freteAtual.valor || 0);
+  if (el("frete")) el("frete").textContent = freteAtual.valor === 0 && freteAtual.servico ? "GRÁTIS" : formatarMoeda(freteAtual.valor || 0);
+  if (el("frete-prazo-resumo")) {
+    el("frete-prazo-resumo").textContent = freteAtual.prazoDias ? `(${freteAtual.prazoDias} dias úteis)` : "";
+  }
   if (el("total-final")) el("total-final").textContent = formatarMoeda(total);
   if (el("total-carrinho")) el("total-carrinho").textContent = formatarMoeda(total);
+
+  // Installments info
+  const parcelasEl = el("parcelas-resumo");
+  if (parcelasEl) {
+    if (total >= 100) {
+      const parcelas = Math.min(12, Math.floor(total / 50));
+      const valorParcela = (total / parcelas).toFixed(2).replace(".", ",");
+      parcelasEl.textContent = `ou até ${parcelas}x de R$ ${valorParcela} sem juros no cartão`;
+    } else {
+      parcelasEl.textContent = "";
+    }
+  }
 }
 
 function salvarDadosClienteLocal() {
@@ -200,7 +268,7 @@ function renderCarrinho() {
     div.className = "cart-item";
     div.innerHTML = `
       <span>
-        <strong>${item.nome}</strong><br/>
+        <strong>${escapeHtml(item.nome)}</strong><br/>
         <small>x${item.quantidade || 1}</small>
       </span>
       <strong>${formatarMoeda(subtotalItem)}</strong>
@@ -237,10 +305,17 @@ async function preencherEnderecoPorCep(cep) {
 
 async function recalcularFrete() {
   const cep = el("cep")?.value || "";
+  const freteContainer = el("frete-options");
+
   if (!isCepValido(cep)) {
     freteAtual = { valor: 0, servico: "", prazoDias: null };
+    if (freteContainer) freteContainer.innerHTML = "";
     atualizarResumo(obterSubtotal());
     return;
+  }
+
+  if (freteContainer) {
+    freteContainer.innerHTML = `<div class="frete-loading"><div class="spinner"></div>Calculando frete...</div>`;
   }
 
   try {
@@ -261,22 +336,69 @@ async function recalcularFrete() {
       throw new Error(payload.error || "Nao foi possivel calcular o frete");
     }
 
-    const melhor = [...payload.options].sort((a, b) => Number(a.price || 0) - Number(b.price || 0))[0];
+    freteOpcoes = payload.options;
+
+    // Pre-select cheapest
+    const maisBarata = [...freteOpcoes].sort((a, b) => Number(a.price || 0) - Number(b.price || 0))[0];
     freteAtual = {
-      valor: Number(melhor.price || 0),
-      servico: String(melhor.service || "Entrega"),
-      prazoDias: Number(melhor.delivery_time || 0) || null,
+      valor: Number(maisBarata.price || 0),
+      servico: String(maisBarata.label || maisBarata.service || "Entrega"),
+      prazoDias: Number(maisBarata.delivery_time || 0) || null,
     };
 
+    renderFreteOptions(freteOpcoes, maisBarata.id || 0);
     atualizarResumo(obterSubtotal());
-    setActionFeedback(
-      `Frete atualizado: ${freteAtual.servico} (${formatarMoeda(freteAtual.valor)}${freteAtual.prazoDias ? `, ${freteAtual.prazoDias} dias` : ""}).`,
-      "info"
-    );
+    showToast("Frete calculado com sucesso!", "success");
   } catch {
     freteAtual = { valor: 0, servico: "", prazoDias: null };
+    freteOpcoes = [];
+    if (freteContainer) freteContainer.innerHTML = `<p style="color: var(--accent-rose); font-size: 0.85rem;">Não foi possível calcular o frete. Verifique o CEP.</p>`;
     atualizarResumo(obterSubtotal());
   }
+}
+
+function renderFreteOptions(opcoes, selectedId) {
+  const container = el("frete-options");
+  if (!container) return;
+
+  container.innerHTML = opcoes.map((opcao, i) => {
+    const isSelected = opcao.id === selectedId || (i === 0 && !selectedId);
+    const precoDisplay = opcao.freteGratis
+      ? `<span class="frete-option-price gratis">GRÁTIS</span><span class="frete-original-price">R$ ${Number(opcao.originalPrice || 0).toFixed(2).replace(".", ",")}</span>`
+      : `<span class="frete-option-price">R$ ${Number(opcao.price || 0).toFixed(2).replace(".", ",")}</span>`;
+
+    return `
+      <label class="frete-option ${isSelected ? "selected" : ""}" data-frete-idx="${i}">
+        <input type="radio" name="frete-radio" value="${i}" ${isSelected ? "checked" : ""}>
+        <div class="frete-option-info">
+          <div class="frete-option-name">
+            ${escapeHtml(opcao.label || opcao.service)}
+            ${opcao.freteGratis ? ' <span class="frete-badge-gratis">Frete Grátis</span>' : ""}
+          </div>
+          <div class="frete-option-prazo">Receba em até ${Number(opcao.delivery_time) || "?"} dias úteis</div>
+        </div>
+        ${precoDisplay}
+      </label>
+    `;
+  }).join("");
+
+  container.querySelectorAll("input[name='frete-radio']").forEach((radio) => {
+    radio.addEventListener("change", () => {
+      const idx = Number(radio.value);
+      const opcao = freteOpcoes[idx];
+      if (!opcao) return;
+
+      freteAtual = {
+        valor: Number(opcao.price || 0),
+        servico: String(opcao.label || opcao.service || "Entrega"),
+        prazoDias: Number(opcao.delivery_time || 0) || null,
+      };
+
+      container.querySelectorAll(".frete-option").forEach((el) => el.classList.remove("selected"));
+      radio.closest(".frete-option")?.classList.add("selected");
+      atualizarResumo(obterSubtotal());
+    });
+  });
 }
 
 function atualizarContadorCarrinho() {
@@ -304,7 +426,7 @@ function renderizarCarrinhoSidebar() {
     return `
       <div class="cart-item">
         <div>
-          <p class="cart-item-name">${item.nome || "Produto"}</p>
+          <p class="cart-item-name">${escapeHtml(item.nome || "Produto")}</p>
           <p class="cart-item-price">x${item.quantidade || 1}</p>
         </div>
         <strong>${formatarMoeda(subtotal)}</strong>
@@ -326,9 +448,10 @@ function fecharCarrinhoSidebar() {
 }
 
 async function aplicarCupom() {
+  const anchorEl = el("btn-aplicar-cupom");
   const cupom = el("cupom")?.value.trim().toUpperCase();
   if (!cupom) {
-    setCheckoutStatus("Informe um cupom.", "info");
+    setActionFeedback("Informe um cupom.", "info", anchorEl);
     return;
   }
 
@@ -344,16 +467,16 @@ async function aplicarCupom() {
       descontoAtual = 0;
       cupomAplicado = null;
       renderCarrinho();
-      setCheckoutStatus(payload.error || "Cupom invalido.", "error");
+      setActionFeedback(payload.error || "Cupom invalido.", "error", anchorEl);
       return;
     }
 
     descontoAtual = Number(payload.desconto || 0);
     cupomAplicado = cupom;
     renderCarrinho();
-    setCheckoutStatus(`Cupom aplicado: -${formatarMoeda(descontoAtual)}`, "success");
+    setActionFeedback(`Cupom aplicado: -${formatarMoeda(descontoAtual)}`, "success", anchorEl);
   } catch (error) {
-    setCheckoutStatus(`Erro ao validar cupom: ${error.message}`, "error");
+    setActionFeedback(`Erro ao validar cupom: ${error.message}`, "error", anchorEl);
   }
 }
 
@@ -408,7 +531,7 @@ async function listarPedidosPorEmail(email) {
       btn.addEventListener("click", () => {
         const pedidoId = btn.getAttribute("data-pedido-id") || "";
         const pagamento = btn.getAttribute("data-pagamento") || "pix";
-        pagarPedidoPendente(pedidoId, pagamento, email);
+        pagarPedidoPendente(pedidoId, pagamento, email, btn);
       });
     });
 
@@ -421,7 +544,8 @@ async function listarPedidosPorEmail(email) {
           verificacao.aprovado
             ? `Pagamento confirmado para o pedido #${pedidoId.slice(0, 8)}.`
             : (verificacao.payload?.message || "Pagamento ainda pendente."),
-          verificacao.aprovado ? "success" : "info"
+          verificacao.aprovado ? "success" : "info",
+          btn
         );
         if (verificacao.aprovado) {
           await listarPedidosPorEmail(email);
@@ -472,7 +596,7 @@ async function gerarPixDinamico(total, idPedido, cliente) {
 
   const qrContainer = el("pix-qrcode");
   const brCodeInput = el("pix-brcode");
-  if (qrContainer) qrContainer.innerHTML = `<img src="${data.qr_code}" alt="QR PIX" style="max-width:220px;">`;
+  if (qrContainer) qrContainer.innerHTML = `<img src="${escapeHtml(data.qr_code)}" alt="QR PIX" style="max-width:220px;">`;
   if (brCodeInput) brCodeInput.value = data.brcode || "";
 
   return data;
@@ -482,7 +606,7 @@ function mostrarPixNaTela(data = {}) {
   const qrContainer = el("pix-qrcode");
   const brCodeInput = el("pix-brcode");
   if (qrContainer && data.qr_code) {
-    qrContainer.innerHTML = `<img src="${data.qr_code}" alt="QR PIX" style="max-width:220px;">`;
+    qrContainer.innerHTML = `<img src="${escapeHtml(data.qr_code)}" alt="QR PIX" style="max-width:220px;">`;
   }
   if (brCodeInput) {
     brCodeInput.value = data.brcode || "";
@@ -542,6 +666,7 @@ async function pagarPedidoPendente(idPedido, metodoOriginal, email) {
 
   try {
     setCheckoutStatus(`Preparando pagamento do pedido #${idPedido.slice(0, 8)}...`, "info");
+    showToast(`Preparando pagamento do pedido #${idPedido.slice(0, 8)}...`, "info");
     const metodo = metodoOriginal === "cartao" ? "cartao" : "pix";
     const response = await fetch(getApiUrl(`/api/pedidos/${encodeURIComponent(idPedido)}/pagar-agora`), {
       method: "POST",
@@ -556,20 +681,20 @@ async function pagarPedidoPendente(idPedido, metodoOriginal, email) {
 
     if (payload.action === "pix") {
       mostrarPixNaTela(payload);
-      setCheckoutStatus(`PIX atualizado para o pedido #${idPedido.slice(0, 8)}.`, "success");
+      showToast(`PIX atualizado para o pedido #${idPedido.slice(0, 8)}.`, "success");
       iniciarMonitoramentoPagamento(idPedido, email);
       return;
     }
 
     if (payload.action === "checkout_pro" && payload.checkoutUrl) {
-      setCheckoutStatus("Redirecionando para pagamento seguro do Mercado Pago...", "info");
+      showToast("Redirecionando para pagamento seguro do Mercado Pago...", "info");
       window.location.href = payload.checkoutUrl;
       return;
     }
 
     throw new Error("Resposta de pagamento invalida");
   } catch (error) {
-    setCheckoutStatus(`Erro: ${error.message}`, "error");
+    showToast(`Erro: ${error.message}`, "error");
   }
 }
 
@@ -631,7 +756,7 @@ async function tratarRetornoPagamento() {
 async function finalizarPedido() {
   const itens = getCarrinho();
   if (itens.length === 0) {
-    setCheckoutStatus("Carrinho vazio.", "error");
+    showToast("Carrinho vazio.", "error");
     return;
   }
 
@@ -640,9 +765,9 @@ async function finalizarPedido() {
   );
 
   if (itemPersonalizadoSemArquivo) {
-    setCheckoutStatus(
+    showToast(
       `O item "${itemPersonalizadoSemArquivo.nome || "personalizado"}" precisa de um arquivo anexado antes da compra.`,
-      "error"
+      "error", 6000
     );
     return;
   }
@@ -650,7 +775,7 @@ async function finalizarPedido() {
   const cliente = salvarDadosClienteLocal();
   const erro = validarCamposCliente(cliente);
   if (erro) {
-    setCheckoutStatus(erro, "error");
+    showToast(erro, "error");
     return;
   }
 
@@ -702,16 +827,16 @@ async function finalizarPedido() {
     if (metodo === "pix") {
       const pix = await gerarPixDinamico(total, pedidoId, cliente);
       mostrarPixNaTela(pix);
-      setCheckoutStatus(
-        `PIX gerado para o pedido #${pedidoId.slice(0, 8)}. Aguardando confirmacao do pagamento.`,
-        "success"
+      showToast(
+        `PIX gerado para o pedido #${pedidoId.slice(0, 8)}. Aguardando confirmação.`,
+        "success", 8000
       );
       iniciarMonitoramentoPagamento(pedidoId, cliente.email);
     } else if (metodo === "cartao") {
-      setCheckoutStatus("Redirecionando para pagamento seguro do Mercado Pago...", "info");
+      showToast("Redirecionando para pagamento seguro do Mercado Pago...", "info");
       await iniciarCheckoutCartao(pedidoId, cliente.email);
     } else if (metodo === "boleto") {
-      setCheckoutStatus(`Pedido #${pedidoId.slice(0, 8)} criado. Boleto sera enviado por e-mail.`, "success");
+      showToast(`Pedido #${pedidoId.slice(0, 8)} criado. Boleto será enviado por e-mail.`, "success", 8000);
     }
 
     if (metodo !== "cartao") {
@@ -723,6 +848,7 @@ async function finalizarPedido() {
     await listarPedidosPorEmail(cliente.email);
   } catch (error) {
     setCheckoutStatus(`Erro: ${error.message}`, "error");
+    showToast(`Erro: ${error.message}`, "error", 6000);
   } finally {
     if (btn) {
       btn.disabled = false;
@@ -886,7 +1012,7 @@ function configurarCopiarPix() {
     const value = el("pix-brcode")?.value || "";
     if (!value) return;
     await navigator.clipboard.writeText(value);
-    setCheckoutStatus("Chave PIX copiada.", "success");
+    showToast("Chave PIX copiada!", "success");
   });
 }
 
@@ -921,7 +1047,7 @@ function configurarMascarasFormulario() {
 
 function configurarAcoesPagamento() {
   el("btn-pagar-cartao")?.addEventListener("click", () => {
-    setCheckoutStatus("Para pagar com cartao, finalize o pedido com a forma Cartao selecionada.", "info");
+    showToast("Para pagar com cartão, finalize o pedido com a forma Cartão selecionada.", "info");
   });
 }
 

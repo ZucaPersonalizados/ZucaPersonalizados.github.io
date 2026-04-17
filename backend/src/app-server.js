@@ -296,6 +296,8 @@ async function calcularFreteMelhorEnvio({ cepDestino, itens }) {
     quantity: Math.max(1, Number(item.quantidade || 1)),
   }));
 
+  const PRAZO_EXTRA = 3;
+
   try {
     const response = await axios.post(
       "https://melhorenvio.com.br/api/v2/me/shipment/calculate",
@@ -303,7 +305,6 @@ async function calcularFreteMelhorEnvio({ cepDestino, itens }) {
         from: { postal_code: cepOrigem },
         to: { postal_code: cepDestinoNormalizado },
         products: produtos,
-        services: "1,2",
         options: {
           receipt: false,
           own_hand: false,
@@ -321,26 +322,109 @@ async function calcularFreteMelhorEnvio({ cepDestino, itens }) {
     );
 
     const lista = Array.isArray(response.data) ? response.data : [];
-    const opcoes = lista
+    const validas = lista
       .filter((item) => !item.error && Number(item.price || 0) > 0)
       .map((item) => ({
         service: String(item.name || "Entrega"),
         company: String(item.company?.name || "Melhor Envio"),
         price: Number(item.price || 0),
-        delivery_time: Number(item.delivery_time || 0),
+        delivery_time: Number(item.delivery_time || 0) + PRAZO_EXTRA,
+        originalPrice: Number(item.price || 0),
       }));
 
-    if (!opcoes.length) {
+    if (!validas.length) {
       return calcularFreteFallback({ cepDestino, itens });
     }
 
+    const opcoesSelecionadas = selecionarOpcoesFrete(validas);
+
     return {
       provider: "melhorenvio",
-      options: opcoes,
+      options: opcoesSelecionadas,
     };
   } catch {
     return calcularFreteFallback({ cepDestino, itens });
   }
+}
+
+function selecionarOpcoesFrete(opcoes) {
+  const isCorreios = (o) => /correios/i.test(o.company);
+
+  const correios = opcoes.filter(isCorreios);
+  const todas = [...opcoes];
+
+  const menorPreco = (arr) => arr.length ? arr.reduce((a, b) => a.price < b.price ? a : b) : null;
+  const menorPrazo = (arr) => arr.length ? arr.reduce((a, b) => a.delivery_time < b.delivery_time ? a : b) : null;
+
+  const correiosBarato = menorPreco(correios);
+  const correiosRapido = menorPrazo(correios);
+  const geralBarato = menorPreco(todas);
+  const geralRapido = menorPrazo(todas);
+
+  const resultMap = new Map();
+
+  if (correiosBarato) {
+    resultMap.set(`${correiosBarato.service}-${correiosBarato.company}-barato`, {
+      ...correiosBarato,
+      id: "correios-barato",
+      label: `${correiosBarato.service} - ${correiosBarato.company} (Mais econômico)`,
+    });
+  }
+
+  if (correiosRapido && (!correiosBarato || correiosRapido.service !== correiosBarato.service || correiosRapido.delivery_time !== correiosBarato.delivery_time)) {
+    resultMap.set(`${correiosRapido.service}-${correiosRapido.company}-rapido`, {
+      ...correiosRapido,
+      id: "correios-rapido",
+      label: `${correiosRapido.service} - ${correiosRapido.company} (Mais rápido)`,
+    });
+  }
+
+  if (geralBarato && !isCorreios(geralBarato)) {
+    const key = `${geralBarato.service}-${geralBarato.company}-geral-barato`;
+    if (!resultMap.has(key)) {
+      resultMap.set(key, {
+        ...geralBarato,
+        id: "geral-barato",
+        label: `${geralBarato.service} - ${geralBarato.company} (Mais econômico geral)`,
+      });
+    }
+  }
+
+  if (geralRapido && !isCorreios(geralRapido)) {
+    const key = `${geralRapido.service}-${geralRapido.company}-geral-rapido`;
+    if (!resultMap.has(key)) {
+      resultMap.set(key, {
+        ...geralRapido,
+        id: "geral-rapido",
+        label: `${geralRapido.service} - ${geralRapido.company} (Mais rápido geral)`,
+      });
+    }
+  }
+
+  const resultado = [...resultMap.values()].map((o) => {
+    const freteGratis = o.price <= 10;
+    return {
+      id: o.id,
+      label: o.label,
+      service: o.service,
+      company: o.company,
+      price: freteGratis ? 0 : o.price,
+      originalPrice: o.originalPrice,
+      delivery_time: o.delivery_time,
+      freteGratis,
+    };
+  });
+
+  return resultado.length ? resultado : opcoes.slice(0, 2).map((o, i) => ({
+    id: `opcao-${i}`,
+    label: `${o.service} - ${o.company}`,
+    service: o.service,
+    company: o.company,
+    price: o.price <= 10 ? 0 : o.price,
+    originalPrice: o.originalPrice,
+    delivery_time: o.delivery_time,
+    freteGratis: o.price <= 10,
+  }));
 }
 
 function removeAccents(value = "") {
@@ -556,6 +640,16 @@ async function createCheckoutProPreference({ pedidoId, pedidoData, appBaseUrl })
       picture_url: String(item.imagem || ""),
     })),
   };
+
+  // Calculate installments: min R$50/installment, max 12, only above R$100
+  const totalPedido = itens.reduce((acc, item) => acc + Number(item.preco || 0) * Number(item.quantidade || 1), 0);
+  if (totalPedido >= 100) {
+    const maxParcelas = Math.min(12, Math.floor(totalPedido / 50));
+    payload.payment_methods = {
+      installments: maxParcelas,
+      default_installments: 1,
+    };
+  }
 
   const response = await axios.post(
     "https://api.mercadopago.com/checkout/preferences",
@@ -1289,7 +1383,12 @@ app.post("/processar-pagamento", async (req, res) => {
           first_name: cliente?.nome?.split(" ")[0] || "Cliente",
           last_name: cliente?.nome?.split(" ").slice(1).join(" ") || "",
         },
-        installments: 1,
+        installments: (() => {
+          const reqInstallments = Number(req.body?.installments || 1);
+          if (!Number.isInteger(reqInstallments) || reqInstallments < 1) return 1;
+          const maxAllowed = valor >= 100 ? Math.min(12, Math.floor(valor / 50)) : 1;
+          return Math.min(reqInstallments, maxAllowed);
+        })(),
       },
       {
         headers: buildMercadoPagoHeaders(mpAccessToken, true),

@@ -10,6 +10,69 @@ function getApiUrl(path) {
 
 const DEFAULT_AVATAR = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='32' fill='%23e8dbcb'/%3E%3Ccircle cx='32' cy='24' r='12' fill='%23b59273'/%3E%3Cpath d='M12 56c3-11 12-17 20-17s17 6 20 17' fill='%23b59273'/%3E%3C/svg%3E";
 
+/* ========== Toast Notification System ========== */
+function escapeHtml(value = "") {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function showToast(message, type = "info", duration = 4000) {
+  const container = document.getElementById("toast-container");
+  if (!container) return;
+
+  const icons = { success: "✓", error: "✕", info: "ℹ", warning: "⚠" };
+  const toast = document.createElement("div");
+  toast.className = `toast is-${type}`;
+  toast.innerHTML = `
+    <span class="toast-icon">${icons[type] || icons.info}</span>
+    <span class="toast-msg">${escapeHtml(message)}</span>
+    <button class="toast-close" aria-label="Fechar">✕</button>
+    <div class="toast-progress" style="animation-duration: ${duration}ms"></div>
+  `;
+
+  const close = () => {
+    toast.classList.add("removing");
+    setTimeout(() => toast.remove(), 250);
+  };
+
+  toast.querySelector(".toast-close").addEventListener("click", close);
+  container.appendChild(toast);
+  const timer = setTimeout(close, duration);
+  toast.addEventListener("mouseenter", () => clearTimeout(timer));
+  toast.addEventListener("mouseleave", () => setTimeout(close, 1500));
+}
+
+/* ========== Wishlist ========== */
+function getWishlist() {
+  try { return JSON.parse(localStorage.getItem("zuca_wishlist") || "[]"); } catch { return []; }
+}
+
+function toggleWishlist(id) {
+  let list = getWishlist();
+  const idx = list.indexOf(id);
+  if (idx >= 0) {
+    list.splice(idx, 1);
+    showToast("Removido dos favoritos.", "info");
+  } else {
+    list.push(id);
+    showToast("Adicionado aos favoritos!", "success");
+  }
+  localStorage.setItem("zuca_wishlist", JSON.stringify(list));
+  atualizarBotaoWishlist(id);
+}
+
+function atualizarBotaoWishlist(id) {
+  const btn = document.getElementById("btn-wishlist");
+  if (!btn) return;
+  const ativo = getWishlist().includes(id);
+  btn.classList.toggle("active", ativo);
+  btn.textContent = ativo ? "♥ Favoritado" : "♡ Favoritar";
+}
+
 function obterAvatarHeader() {
   return localStorage.getItem("zuca_avatar_url") || DEFAULT_AVATAR;
 }
@@ -70,12 +133,8 @@ function isProdutoPersonalizado(produto = {}) {
     if (["false", "0", "nao", "não", "no"].includes(v)) return false;
   }
 
-  const composto = `${produto.tipo || ""} ${produto.categoria || ""}`.toLowerCase();
-  if (composto.includes("nao personalizado") || composto.includes("não personalizado")) {
-    return false;
-  }
-
-  return /(^|\s)personalizado(s)?(\s|$)/i.test(composto);
+  // Regra oficial: quando o campo nao vier, considera nao personalizado.
+  return false;
 }
 
 function arquivoPersonalizacaoValido(arquivo) {
@@ -171,7 +230,7 @@ function renderizarCarrinhoSidebar() {
     return `
       <div class="cart-item">
         <div>
-          <p class="cart-item-name">${item.nome || "Produto"}</p>
+          <p class="cart-item-name">${escapeHtml(item.nome || "Produto")}</p>
           <p class="cart-item-price">x${item.quantidade || 1}</p>
         </div>
         <strong>${formatarMoeda(subtotal)}</strong>
@@ -295,7 +354,7 @@ function atualizarEstoqueUI(estoque) {
   }
 }
 
-function adicionarAoCarrinhoComEstoque(produto, estoqueDisponivel) {
+function adicionarAoCarrinhoComEstoque(produto, estoqueDisponivel, quantidade = 1) {
   const carrinho = JSON.parse(localStorage.getItem("zuca_carrinho") || "[]");
   const produtoPersonalizado = isProdutoPersonalizado(produto);
   const existente = produtoPersonalizado
@@ -303,13 +362,13 @@ function adicionarAoCarrinhoComEstoque(produto, estoqueDisponivel) {
     : carrinho.find((item) => item.id === produto.id && !item.arquivoPersonalizacaoUrl);
   const quantidadeNoCarrinho = existente ? Number(existente.quantidade || 0) : 0;
 
-  if (quantidadeNoCarrinho + 1 > estoqueDisponivel) {
-    alert(`❌ Máximo de ${estoqueDisponivel} unidade(s) disponível(is). Você já tem ${quantidadeNoCarrinho} no carrinho.`);
+  if (quantidadeNoCarrinho + quantidade > estoqueDisponivel) {
+    showToast(`Máximo de ${estoqueDisponivel} unidade(s) disponível(is). Você já tem ${quantidadeNoCarrinho} no carrinho.`, "error");
     return;
   }
 
   if (existente) {
-    existente.quantidade += 1;
+    existente.quantidade += quantidade;
   } else {
     carrinho.push({
       id: produto.id,
@@ -319,13 +378,14 @@ function adicionarAoCarrinhoComEstoque(produto, estoqueDisponivel) {
       personalizado: !!produto.personalizado,
       arquivoPersonalizacaoUrl: produto.arquivoPersonalizacaoUrl || "",
       arquivoPersonalizacaoNome: produto.arquivoPersonalizacaoNome || "",
-      quantidade: 1,
+      quantidade: quantidade,
     });
   }
 
   localStorage.setItem("zuca_carrinho", JSON.stringify(carrinho));
   atualizarContadorCarrinho();
   renderizarCarrinhoSidebar();
+  showToast(`${produto.nome || "Produto"} adicionado ao carrinho!`, "success");
 
   const btn = document.getElementById("btn-adicionar-carrinho");
   if (!btn) return;
@@ -337,6 +397,67 @@ function adicionarAoCarrinhoComEstoque(produto, estoqueDisponivel) {
     btn.textContent = original;
     btn.style.background = "";
   }, 2000);
+}
+
+/* ========== Calcular Parcelas ========== */
+function calcularParcelas(preco) {
+  if (preco < 100) return null;
+  const parcelas = Math.min(12, Math.floor(preco / 50));
+  const valor = preco / parcelas;
+  return { parcelas, valor, valorFormatado: formatarMoeda(valor) };
+}
+
+/* ========== Calcular Frete no Produto ========== */
+async function calcularFreteProduto(cep, produtoId) {
+  const freteResultado = document.getElementById("frete-produto-resultado");
+  if (!freteResultado) return;
+
+  cep = cep.replace(/\D/g, "");
+  if (cep.length !== 8) {
+    showToast("CEP inválido. Informe 8 dígitos.", "error");
+    return;
+  }
+
+  freteResultado.innerHTML = '<p style="color: var(--muted);">Calculando frete...</p>';
+
+  try {
+    const qty = Number(document.getElementById("qty-input")?.value || 1);
+    const url = new URL(getApiUrl("/api/frete/calcular"));
+    url.searchParams.set("cep", cep);
+    url.searchParams.set("itens", JSON.stringify([{ id: produtoId, quantidade: qty }]));
+
+    const response = await fetch(url.toString());
+
+    const data = await response.json();
+    if (!response.ok || !data.options?.length) {
+      freteResultado.innerHTML = '<p style="color: var(--accent-rose);">Nenhuma opção de frete encontrada.</p>';
+      return;
+    }
+
+    freteResultado.innerHTML = data.options.map((op) => `
+      <div class="frete-option-mini">
+        <span><strong>${escapeHtml(op.label || op.company)}</strong> - ${Number(op.delivery_time) || "?"} dias úteis</span>
+        <span class="frete-price">${op.freteGratis ? '<span style="color: var(--accent);">GRÁTIS</span>' : formatarMoeda(op.price)}</span>
+      </div>
+    `).join("");
+  } catch {
+    freteResultado.innerHTML = '<p style="color: var(--error);">Erro ao calcular frete.</p>';
+  }
+}
+
+/* ========== Compartilhar Produto ========== */
+function compartilharWhatsApp(nome) {
+  const url = encodeURIComponent(window.location.href);
+  const text = encodeURIComponent(`Olha esse produto: ${nome} - `);
+  window.open(`https://wa.me/?text=${text}${url}`, "_blank");
+}
+
+function copiarLink() {
+  navigator.clipboard.writeText(window.location.href).then(() => {
+    showToast("Link copiado!", "success");
+  }).catch(() => {
+    showToast("Não foi possível copiar o link.", "error");
+  });
 }
 
 async function carregarProduto() {
@@ -400,12 +521,90 @@ async function carregarProduto() {
       miniaturas.appendChild(thumb);
     });
 
+    /* ========== Installments Badge ========== */
+    const parcelasInfo = calcularParcelas(precoCalculado);
+    const precoEl = document.getElementById("preco");
+    if (parcelasInfo && precoEl) {
+      const badge = document.createElement("span");
+      badge.className = "parcelas-badge";
+      badge.textContent = `ou ${parcelasInfo.parcelas}x de ${parcelasInfo.valorFormatado} sem juros`;
+      precoEl.insertAdjacentElement("afterend", badge);
+    }
+
+    /* ========== Quantity Selector ========== */
+    const btnCarrinho = document.getElementById("btn-adicionar-carrinho");
+    if (btnCarrinho) {
+      const qtyHtml = `
+        <div class="qty-selector" style="display: flex; align-items: center; gap: 8px; margin: 12px 0;">
+          <button type="button" id="qty-minus" class="qty-btn">−</button>
+          <input type="number" id="qty-input" value="1" min="1" max="${estoque}" readonly
+            style="width: 50px; text-align: center; border: 1px solid var(--border); border-radius: 6px; padding: 6px; font-size: 16px;">
+          <button type="button" id="qty-plus" class="qty-btn">+</button>
+        </div>
+      `;
+      btnCarrinho.insertAdjacentHTML("beforebegin", qtyHtml);
+
+      document.getElementById("qty-minus")?.addEventListener("click", () => {
+        const input = document.getElementById("qty-input");
+        if (input && Number(input.value) > 1) input.value = Number(input.value) - 1;
+      });
+      document.getElementById("qty-plus")?.addEventListener("click", () => {
+        const input = document.getElementById("qty-input");
+        if (input && Number(input.value) < estoque) input.value = Number(input.value) + 1;
+      });
+    }
+
+    /* ========== Wishlist + Share ========== */
+    const actionsHtml = `
+      <div class="produto-actions" style="display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap;">
+        <button id="btn-wishlist" class="btn-secondary-action">♡ Favoritar</button>
+        <button id="btn-share-whatsapp" class="btn-secondary-action">📱 WhatsApp</button>
+        <button id="btn-share-link" class="btn-secondary-action">🔗 Copiar Link</button>
+      </div>
+    `;
+    btnCarrinho?.insertAdjacentHTML("afterend", actionsHtml);
+    atualizarBotaoWishlist(id);
+
+    document.getElementById("btn-wishlist")?.addEventListener("click", () => toggleWishlist(id));
+    document.getElementById("btn-share-whatsapp")?.addEventListener("click", () => compartilharWhatsApp(produto.nome || ""));
+    document.getElementById("btn-share-link")?.addEventListener("click", copiarLink);
+
+    /* ========== Frete Calculator ========== */
+    const freteHtml = `
+      <div class="frete-produto" style="margin-top: 20px; padding: 16px; background: var(--bg-secondary, #f9f7f4); border-radius: 10px;">
+        <p style="font-weight: 600; margin: 0 0 8px;">📦 Calcular frete</p>
+        <div style="display: flex; gap: 8px;">
+          <input type="text" id="cep-produto" placeholder="00000-000" maxlength="9"
+            style="flex: 1; padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px;">
+          <button type="button" id="btn-calcular-frete-produto" class="btn btn-sm"
+            style="padding: 8px 16px; border-radius: 6px;">Calcular</button>
+        </div>
+        <div id="frete-produto-resultado" style="margin-top: 10px;"></div>
+      </div>
+    `;
+    const estoqueContainer = document.getElementById("estoque-container");
+    if (estoqueContainer) {
+      estoqueContainer.insertAdjacentHTML("afterend", freteHtml);
+    }
+
+    document.getElementById("cep-produto")?.addEventListener("input", (e) => {
+      let v = e.target.value.replace(/\D/g, "");
+      if (v.length > 5) v = v.slice(0, 5) + "-" + v.slice(5, 8);
+      e.target.value = v;
+    });
+
+    document.getElementById("btn-calcular-frete-produto")?.addEventListener("click", () => {
+      const cep = document.getElementById("cep-produto")?.value || "";
+      calcularFreteProduto(cep, id);
+    });
+
     document.getElementById("btn-adicionar-carrinho")?.addEventListener("click", async () => {
       if (estoque <= 0) {
-        alert("❌ Este produto está fora de estoque");
+        showToast("Este produto está fora de estoque.", "error");
         return;
       }
 
+      const quantidade = Number(document.getElementById("qty-input")?.value || 1);
       const botao = document.getElementById("btn-adicionar-carrinho");
 
       if (personalizado) {
@@ -413,7 +612,7 @@ async function carregarProduto() {
 
         const validacaoArquivo = arquivoPersonalizacaoValido(arquivo);
         if (!validacaoArquivo.ok) {
-          alert(validacaoArquivo.mensagem);
+          showToast(validacaoArquivo.mensagem, "error");
           if (statusArquivo) statusArquivo.textContent = validacaoArquivo.mensagem;
           return;
         }
@@ -430,12 +629,12 @@ async function carregarProduto() {
             ...produtoParaCarrinho,
             arquivoPersonalizacaoUrl: urlArquivo,
             arquivoPersonalizacaoNome: arquivo.name,
-          }, estoque);
+          }, estoque, quantidade);
 
           if (statusArquivo) statusArquivo.textContent = `Arquivo enviado: ${arquivo.name}`;
         } catch (error) {
-          alert(`Erro ao enviar arquivo: ${error.message}`);
-          if (statusArquivo) statusArquivo.textContent = "Nao foi possivel enviar o arquivo.";
+          showToast(`Erro ao enviar arquivo: ${error.message}`, "error");
+          if (statusArquivo) statusArquivo.textContent = "Não foi possível enviar o arquivo.";
         } finally {
           if (botao) {
             botao.disabled = false;
@@ -446,7 +645,7 @@ async function carregarProduto() {
         return;
       }
 
-      adicionarAoCarrinhoComEstoque(produtoParaCarrinho, estoque);
+      adicionarAoCarrinhoComEstoque(produtoParaCarrinho, estoque, quantidade);
     });
   } catch (error) {
     console.error("Erro ao carregar produto:", error);

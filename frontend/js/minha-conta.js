@@ -480,3 +480,26 @@ async function renderFavoritos() {
 }
 
 renderFavoritos();
+
+/* ========== Sticky Header Auto-hide ========== */
+(function stickyHeaderAutoHide() {
+  const header = document.querySelector(".header");
+  if (!header) return;
+  let lastScroll = 0;
+  let ticking = false;
+
+  window.addEventListener("scroll", () => {
+    if (ticking) return;
+    ticking = true;
+    requestAnimationFrame(() => {
+      const current = window.scrollY;
+      if (current > 80 && current > lastScroll) {
+        header.classList.add("header-hidden");
+      } else {
+        header.classList.remove("header-hidden");
+      }
+      lastScroll = current;
+      ticking = false;
+    });
+  }, { passive: true });
+})();

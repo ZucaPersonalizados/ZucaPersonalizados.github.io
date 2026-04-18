@@ -866,10 +866,10 @@ async function carregarRelacionados(categoria, idAtual) {
       const preco = precoParaNumero(p.preco ?? p.valor ?? 0);
       const img = obterImagensProduto(p)[0] || "img/logo/logo.png";
       return `
-        <a href="/produto?id=${encodeURIComponent(p.id)}" class="produto" style="text-decoration: none; color: inherit;">
+        <a href="/produto?id=${encodeURIComponent(p.id)}" class="produto" style="text-decoration: none; color: inherit; text-align: center;">
           <img src="${escapeHtml(img)}" alt="${escapeHtml(p.nome || '')}" style="width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: var(--radius-md);" loading="lazy">
-          <h3 style="font-size: 14px; margin: 8px 0 4px; font-weight: 600;">${escapeHtml(p.nome || "Produto")}</h3>
-          <p style="font-weight: 700; color: var(--accent); margin: 0;">${formatarMoeda(preco)}</p>
+          <h3 style="font-size: 14px; margin: 8px 0 4px; font-weight: 600; text-align: center;">${escapeHtml(p.nome || "Produto")}</h3>
+          <p style="font-weight: 700; color: var(--accent); margin: 0; text-align: center;">${formatarMoeda(preco)}</p>
         </a>
       `;
     }).join("");

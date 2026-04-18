@@ -310,7 +310,7 @@ function exibirPedidos() {
         <div class="table-actions">
           <button class="btn btn-small btn-secondary" type="button" onclick="exibirDetalhes('${pedido.id}')">Ver</button>
           <button class="btn btn-small btn-secondary" type="button" onclick="editarStatus('${pedido.id}')">Editar</button>
-          ${(pedido.itens || []).some((item) => item.arquivoPersonalizacaoUrl)
+          ${(pedido.itens || []).some((item) => item.arquivoPersonalizacaoUrl || item.personalizado)
             ? `<button class="btn btn-small btn-primary" type="button" onclick="baixarAnexosPedido('${pedido.id}')" title="Baixar arquivos de personalização">📎 Baixar arte</button>`
             : ""}
         </div>
@@ -328,6 +328,20 @@ async function carregarPedidos() {
   }
 
   allOrders = payload.pedidos || [];
+
+  // Debug: log pedidos com itens personalizados para diagnosticar anexos
+  allOrders.forEach((p) => {
+    const itensP = (p.itens || []).filter((i) => i.personalizado || i.arquivoPersonalizacaoUrl);
+    if (itensP.length) {
+      console.log(`[Admin] Pedido #${p.id.slice(0, 8)} — itens personalizados:`, itensP.map((i) => ({
+        nome: i.nome,
+        personalizado: i.personalizado,
+        arquivoUrl: i.arquivoPersonalizacaoUrl || '(vazio)',
+        arquivoNome: i.arquivoPersonalizacaoNome || '(vazio)',
+      })));
+    }
+  });
+
   renderDashboard(payload.dashboard, allOrders);
   exibirPedidos();
 }
@@ -361,13 +375,26 @@ function isImageUrl(url) {
 }
 
 function buildAnexosHtml(itens) {
-  const anexos = (itens || []).filter((item) => item.arquivoPersonalizacaoUrl);
-  if (!anexos.length) return "";
+  const personalizados = (itens || []).filter((item) => item.arquivoPersonalizacaoUrl || item.personalizado);
+  if (!personalizados.length) return "";
 
-  const cards = anexos.map((item) => {
+  const cards = personalizados.map((item) => {
     const url = resolveArquivoUrl(item.arquivoPersonalizacaoUrl);
     const nome = item.arquivoPersonalizacaoNome || "arquivo";
-    const ehImagem = isImageUrl(url);
+    const ehImagem = url && isImageUrl(url);
+
+    if (!url) {
+      return `
+        <div class="anexo-card" style="border-color:#e0a800;">
+          <div class="anexo-preview anexo-preview-pdf" style="background:#fff3cd;">
+            <span style="font-size:32px;">⚠️</span>
+          </div>
+          <div class="anexo-info">
+            <span class="anexo-produto">${escapeHtml(item.nome || "Produto")}</span>
+            <span class="anexo-nome" style="color:#856404;">Item personalizado — arquivo não encontrado</span>
+          </div>
+        </div>`;
+    }
 
     return `
       <div class="anexo-card">
@@ -442,7 +469,14 @@ window.baixarAnexosPedido = (pedidoId) => {
     .filter((a) => a.url);
 
   if (!anexos.length) {
-    alert("Este pedido nao possui arquivo anexado");
+    // Se nao tem URL mas tem item personalizado, mostra detalhes
+    const temPersonalizado = (pedido.itens || []).some((i) => i.personalizado);
+    if (temPersonalizado) {
+      alert("Este pedido tem item personalizado, mas o arquivo não foi anexado pelo cliente. Verifique os detalhes do pedido.");
+      exibirDetalhes(pedidoId);
+    } else {
+      alert("Este pedido nao possui arquivo anexado.");
+    }
     return;
   }
 

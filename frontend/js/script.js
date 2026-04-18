@@ -1070,6 +1070,22 @@ document.getElementById("sort-select")?.addEventListener("change", (e) => {
   renderProdutosFiltrados();
 });
 
+function parsePrecoSeguro(valor) {
+  if (typeof valor === "number") return Number.isFinite(valor) ? valor : 0;
+  const textoLimpo = String(valor ?? "").replace(/[^\d.,-]/g, "").trim();
+  if (!textoLimpo) return 0;
+  let texto = textoLimpo;
+  if (texto.includes(",")) {
+    texto = texto.replace(/\./g, "").replace(",", ".");
+  } else if ((texto.match(/\./g) || []).length > 1) {
+    const partes = texto.split(".");
+    const decimal = partes.pop();
+    texto = `${partes.join("")}.${decimal}`;
+  }
+  const numero = Number(texto);
+  return Number.isFinite(numero) ? numero : 0;
+}
+
 /* ========== Vistos Recentemente (index) ========== */
 (async function renderVistosIndex() {
   const section = document.getElementById("vistos-recentemente");
@@ -1094,12 +1110,12 @@ document.getElementById("sort-select")?.addEventListener("change", (e) => {
 
     grid.innerHTML = itens.map((p) => {
       const img = obterImagensProduto(p)[0] || "img/logo/logo.png";
-      const preco = Number(p.preco || p.valor || 0);
-      const precoStr = typeof preco === "number" ? preco.toFixed(2).replace(".", ",") : "0,00";
+      const preco = parsePrecoSeguro(p.preco ?? p.valor ?? 0);
+      const precoStr = preco.toFixed(2).replace(".", ",");
       return `
-        <a href="/produto?id=${encodeURIComponent(p.id)}" class="produto" style="text-decoration: none; color: inherit;">
+        <a href="/produto?id=${encodeURIComponent(p.id)}" class="produto" style="text-decoration: none; color: inherit; text-align: center;">
           <img src="${escapeHtml(img)}" alt="${escapeHtml(p.nome || '')}" style="width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: var(--radius-md);" loading="lazy">
-          <h3 style="font-size: 13px; margin: 6px 0 4px; font-weight: 600;">${escapeHtml(p.nome || "Produto")}</h3>
+          <h3 style="font-size: 13px; margin: 6px 0 4px; font-weight: 600; text-align: center;">${escapeHtml(p.nome || "Produto")}</h3>
           <p style="font-weight: 700; color: var(--accent); margin: 0; font-size: 14px;">R$ ${precoStr}</p>
         </a>
       `;

@@ -402,7 +402,7 @@ function selecionarOpcoesFrete(opcoes) {
   }
 
   const resultado = [...resultMap.values()].map((o) => {
-    const freteGratis = o.price <= 10;
+    const freteGratis = o.price <= 20;
     return {
       id: o.id,
       label: o.label,
@@ -420,10 +420,10 @@ function selecionarOpcoesFrete(opcoes) {
     label: `${o.service} - ${o.company}`,
     service: o.service,
     company: o.company,
-    price: o.price <= 10 ? 0 : o.price,
+    price: o.price <= 20 ? 0 : o.price,
     originalPrice: o.originalPrice,
     delivery_time: o.delivery_time,
-    freteGratis: o.price <= 10,
+    freteGratis: o.price <= 20,
   }));
 }
 
@@ -1340,6 +1340,48 @@ app.post("/api/pedidos/:id/pagar-agora", requireDb, async (req, res) => {
       checkoutUrl: preference.initPoint || preference.sandboxInitPoint,
       preferenceId: preference.preferenceId,
     });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.post("/api/pedidos/:id/cancelar", requireDb, async (req, res) => {
+  try {
+    const pedidoId = String(req.params.id || "").trim();
+    const email = String(req.body.email || "").trim().toLowerCase();
+
+    if (!pedidoId) {
+      return res.status(400).json({ success: false, error: "ID do pedido invalido" });
+    }
+
+    const pedidoRef = db.collection("pedidos").doc(pedidoId);
+    const pedidoSnap = await pedidoRef.get();
+    if (!pedidoSnap.exists) {
+      return res.status(404).json({ success: false, error: "Pedido nao encontrado" });
+    }
+
+    const pedido = pedidoSnap.data() || {};
+    const pedidoEmail = String(pedido?.cliente?.email || "").trim().toLowerCase();
+    if (email && pedidoEmail && email !== pedidoEmail) {
+      return res.status(403).json({ success: false, error: "Pedido nao pertence ao e-mail informado" });
+    }
+
+    const statusAtual = String(pedido.status || "").toLowerCase();
+    if (statusAtual === "cancelado") {
+      return res.status(409).json({ success: false, error: "Pedido ja esta cancelado" });
+    }
+
+    if (statusAtual !== "pendente") {
+      return res.status(409).json({ success: false, error: "Apenas pedidos pendentes podem ser cancelados" });
+    }
+
+    await pedidoRef.update({
+      status: "cancelado",
+      statusPedido: "cancelado",
+      atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    return res.json({ success: true, message: "Pedido cancelado com sucesso" });
   } catch (error) {
     return res.status(500).json({ success: false, error: error.message });
   }

@@ -120,6 +120,13 @@ function formatarData(timestamp) {
   return date.toLocaleString("pt-BR");
 }
 
+function resolveArquivoUrl(url = "") {
+  const raw = String(url || "").trim();
+  if (!raw) return "";
+  if (/^https?:\/\//i.test(raw)) return raw;
+  return `${API_BASE}${raw.startsWith("/") ? "" : "/"}${raw}`;
+}
+
 function formatarMoeda(valor) {
   return `R$ ${Number(valor || 0).toFixed(2).replace(".", ",")}`;
 }
@@ -303,6 +310,9 @@ function exibirPedidos() {
         <div class="table-actions">
           <button class="btn btn-small btn-secondary" type="button" onclick="exibirDetalhes('${pedido.id}')">Ver</button>
           <button class="btn btn-small btn-secondary" type="button" onclick="editarStatus('${pedido.id}')">Editar</button>
+          ${(pedido.itens || []).some((item) => item.arquivoPersonalizacaoUrl)
+            ? `<button class="btn btn-small btn-primary" type="button" onclick="baixarAnexosPedido('${pedido.id}')">Baixar arte</button>`
+            : ""}
         </div>
       </td>
     </tr>
@@ -358,7 +368,7 @@ window.exibirDetalhes = async (pedidoId) => {
       <div>
         <div>${escapeHtml(item.nome || "Produto")}</div>
         ${item.arquivoPersonalizacaoUrl
-          ? `<a href="${escapeHtml(item.arquivoPersonalizacaoUrl)}" target="_blank" rel="noopener" download style="font-size:12px; font-weight:700; color:#1f3852; text-decoration:underline;">Baixar arte (${escapeHtml(item.arquivoPersonalizacaoNome || "arquivo")})</a>`
+          ? `<a href="${escapeHtml(resolveArquivoUrl(item.arquivoPersonalizacaoUrl))}" target="_blank" rel="noopener" download style="font-size:12px; font-weight:700; color:#1f3852; text-decoration:underline;">Baixar arte (${escapeHtml(item.arquivoPersonalizacaoNome || "arquivo")})</a>`
           : ""}
       </div>
       <div>${item.quantidade || 1}x</div>
@@ -378,6 +388,27 @@ window.exibirDetalhes = async (pedidoId) => {
 
   document.getElementById("modal-title").textContent = `Pedido #${pedido.id.slice(0, 8)}`;
   detailsModal.classList.add("active");
+};
+
+window.baixarAnexosPedido = (pedidoId) => {
+  const pedido = allOrders.find((item) => item.id === pedidoId);
+  if (!pedido) {
+    alert("Pedido nao encontrado");
+    return;
+  }
+
+  const anexos = (pedido.itens || [])
+    .map((item) => resolveArquivoUrl(item.arquivoPersonalizacaoUrl))
+    .filter(Boolean);
+
+  if (!anexos.length) {
+    alert("Este pedido nao possui arquivo anexado");
+    return;
+  }
+
+  anexos.forEach((url) => {
+    window.open(url, "_blank", "noopener");
+  });
 };
 
 window.editarStatus = async (pedidoId) => {

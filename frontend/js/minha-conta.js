@@ -200,6 +200,20 @@ async function pagarAgora(idPedido, email, metodo) {
   }
 }
 
+async function cancelarPedido(idPedido, email) {
+  const response = await fetch(getApiUrl(`/api/pedidos/${encodeURIComponent(idPedido)}/cancelar`), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+
+  const payload = await response.json();
+  if (!response.ok || !payload.success) {
+    throw new Error(payload.error || "Falha ao cancelar pedido");
+  }
+  return payload;
+}
+
 async function listarPedidos(email) {
   const list = el("pedido-list");
   if (!list) return;
@@ -227,19 +241,21 @@ async function listarPedidos(email) {
     list.innerHTML = pedidos.map((pedido) => {
       const status = String(pedido.status || "pendente").toLowerCase();
       const paid = status === "pagto";
+      const canceled = status === "cancelado";
       const timeline = renderTimeline(status);
       return `
         <article class="pedido-item ${paid ? "is-paid" : "is-pending"}">
           <div class="pedido-top">
             <strong>#${escapeHtml(pedido.id.slice(0, 8))}</strong>
-            <span class="pedido-status">${paid ? "Pago" : "Pendente"}</span>
+            <span class="pedido-status">${paid ? "Pago" : canceled ? "Cancelado" : "Pendente"}</span>
           </div>
           <div>Total: R$ ${Number(pedido.total || 0).toFixed(2).replace(".", ",")}</div>
           <div>Pagamento: ${escapeHtml(String(pedido.pagamento || "pix").toUpperCase())}</div>
           ${timeline}
           <div style="display:flex; gap:8px; flex-wrap:wrap;">
-            ${paid ? "" : `<button type="button" class="checkout-btn secondary btn-verificar" data-id="${escapeHtml(pedido.id)}">Verificar pagamento</button>
+            ${paid || canceled ? "" : `<button type="button" class="checkout-btn secondary btn-verificar" data-id="${escapeHtml(pedido.id)}">Verificar pagamento</button>
             <button type="button" class="checkout-btn secondary btn-pagar" data-id="${escapeHtml(pedido.id)}" data-pag="${escapeHtml(String(pedido.pagamento || "pix").toLowerCase())}">Pagar agora</button>`}
+            ${!paid && !canceled ? `<button type="button" class="checkout-btn secondary btn-cancelar" data-id="${escapeHtml(pedido.id)}">Cancelar pedido</button>` : ""}
             ${paid ? `<button type="button" class="checkout-btn secondary btn-recomprar" data-itens='${escapeHtml(JSON.stringify(pedido.itens || []))}'>🔁 Comprar novamente</button>` : ""}
           </div>
         </article>
@@ -291,6 +307,25 @@ async function listarPedidos(email) {
           setTimeout(() => { window.location.href = "/checkout"; }, 1200);
         } catch {
           showToast("Erro ao adicionar itens ao carrinho.", "error");
+        }
+      });
+    });
+
+    list.querySelectorAll(".btn-cancelar").forEach((button) => {
+      button.addEventListener("click", async () => {
+        const id = button.getAttribute("data-id") || "";
+        if (!id) return;
+
+        const ok = window.confirm(`Deseja cancelar o pedido #${id.slice(0, 8)}?`);
+        if (!ok) return;
+
+        try {
+          setStatus(`Cancelando pedido #${id.slice(0, 8)}...`);
+          await cancelarPedido(id, email);
+          showToast("Pedido cancelado com sucesso.", "success");
+          listarPedidos(email);
+        } catch (error) {
+          showToast(`Erro ao cancelar: ${error.message}`, "error");
         }
       });
     });

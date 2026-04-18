@@ -311,7 +311,7 @@ function exibirPedidos() {
           <button class="btn btn-small btn-secondary" type="button" onclick="exibirDetalhes('${pedido.id}')">Ver</button>
           <button class="btn btn-small btn-secondary" type="button" onclick="editarStatus('${pedido.id}')">Editar</button>
           ${(pedido.itens || []).some((item) => item.arquivoPersonalizacaoUrl)
-            ? `<button class="btn btn-small btn-primary" type="button" onclick="baixarAnexosPedido('${pedido.id}')">Baixar arte</button>`
+            ? `<button class="btn btn-small btn-primary" type="button" onclick="baixarAnexosPedido('${pedido.id}')" title="Baixar arquivos de personalização">📎 Baixar arte</button>`
             : ""}
         </div>
       </td>
@@ -356,6 +356,44 @@ async function carregarCupons() {
   renderCupons();
 }
 
+function isImageUrl(url) {
+  return /\.(jpe?g|png|gif|webp)(\?|$)/i.test(url);
+}
+
+function buildAnexosHtml(itens) {
+  const anexos = (itens || []).filter((item) => item.arquivoPersonalizacaoUrl);
+  if (!anexos.length) return "";
+
+  const cards = anexos.map((item) => {
+    const url = resolveArquivoUrl(item.arquivoPersonalizacaoUrl);
+    const nome = item.arquivoPersonalizacaoNome || "arquivo";
+    const ehImagem = isImageUrl(url);
+
+    return `
+      <div class="anexo-card">
+        ${ehImagem
+          ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener" class="anexo-preview">
+               <img src="${escapeHtml(url)}" alt="Preview - ${escapeHtml(nome)}" />
+             </a>`
+          : `<div class="anexo-preview anexo-preview-pdf">
+               <span style="font-size:32px;">📄</span>
+               <span style="font-size:11px;color:var(--muted);">PDF</span>
+             </div>`}
+        <div class="anexo-info">
+          <span class="anexo-produto">${escapeHtml(item.nome || "Produto")}</span>
+          <span class="anexo-nome">${escapeHtml(nome)}</span>
+          <a href="${escapeHtml(url)}" target="_blank" rel="noopener" download="${escapeHtml(nome)}" class="btn btn-small btn-primary anexo-btn-download">⬇ Baixar arquivo</a>
+        </div>
+      </div>`;
+  }).join("");
+
+  return `
+    <div class="detail-item">
+      <div class="detail-label">📎 Anexos de Personalização</div>
+      <div class="anexos-grid">${cards}</div>
+    </div>`;
+}
+
 window.exibirDetalhes = async (pedidoId) => {
   const pedido = allOrders.find((item) => item.id === pedidoId);
   if (!pedido) {
@@ -365,16 +403,13 @@ window.exibirDetalhes = async (pedidoId) => {
 
   const itensHtml = (pedido.itens || []).map((item) => `
     <div class="item-row">
-      <div>
-        <div>${escapeHtml(item.nome || "Produto")}</div>
-        ${item.arquivoPersonalizacaoUrl
-          ? `<a href="${escapeHtml(resolveArquivoUrl(item.arquivoPersonalizacaoUrl))}" target="_blank" rel="noopener" download style="font-size:12px; font-weight:700; color:#1f3852; text-decoration:underline;">Baixar arte (${escapeHtml(item.arquivoPersonalizacaoNome || "arquivo")})</a>`
-          : ""}
-      </div>
+      <div>${escapeHtml(item.nome || "Produto")}</div>
       <div>${item.quantidade || 1}x</div>
       <div style="text-align:right;">${formatarMoeda(item.preco)}</div>
     </div>
   `).join("");
+
+  const anexosHtml = buildAnexosHtml(pedido.itens);
 
   modalBody.innerHTML = `
     <div class="detail-item"><div class="detail-label">ID Pedido</div><div>#${pedido.id.slice(0, 8)}</div></div>
@@ -382,6 +417,7 @@ window.exibirDetalhes = async (pedidoId) => {
     <div class="detail-item"><div class="detail-label">Metodo de pagto</div><div>${getPaymentMethodLabel(pedido.pagamento)}</div></div>
     <div class="detail-item"><div class="detail-label">Status Pag.</div><div><span class="status-pill ${pedido.status === "pagto" ? "pagto" : "pendente"}">${pedido.status === "pagto" ? "Verificado" : "Pendente"}</span></div></div>
     <div class="detail-item"><div class="detail-label">Itens</div><div><div class="items-list">${itensHtml || "<p>Sem itens</p>"}</div></div></div>
+    ${anexosHtml}
     <div class="detail-item"><div class="detail-label">Total</div><div style="font-size:18px; font-weight:700;">${formatarMoeda(pedido.total)}</div></div>
     <div class="detail-item"><div class="detail-label">Criado em</div><div>${formatarData(pedido.criadoEmISO)}</div></div>
   `;
@@ -398,16 +434,27 @@ window.baixarAnexosPedido = (pedidoId) => {
   }
 
   const anexos = (pedido.itens || [])
-    .map((item) => resolveArquivoUrl(item.arquivoPersonalizacaoUrl))
-    .filter(Boolean);
+    .filter((item) => item.arquivoPersonalizacaoUrl)
+    .map((item) => ({
+      url: resolveArquivoUrl(item.arquivoPersonalizacaoUrl),
+      nome: item.arquivoPersonalizacaoNome || "arquivo",
+    }))
+    .filter((a) => a.url);
 
   if (!anexos.length) {
     alert("Este pedido nao possui arquivo anexado");
     return;
   }
 
-  anexos.forEach((url) => {
-    window.open(url, "_blank", "noopener");
+  anexos.forEach((anexo) => {
+    const a = document.createElement("a");
+    a.href = anexo.url;
+    a.download = anexo.nome;
+    a.target = "_blank";
+    a.rel = "noopener";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
   });
 };
 

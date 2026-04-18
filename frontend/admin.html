@@ -349,6 +349,73 @@
 
     .item-row:last-child { border-bottom: none; }
 
+    /* Anexos de personalização */
+    .anexos-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+    }
+    .anexo-card {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      background: #f5f8fa;
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 12px;
+      min-width: 240px;
+      max-width: 360px;
+      flex: 1;
+    }
+    .anexo-preview {
+      flex-shrink: 0;
+      width: 80px;
+      height: 80px;
+      border-radius: 8px;
+      overflow: hidden;
+      background: #e9ecef;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--border-color);
+    }
+    .anexo-preview img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .anexo-preview-pdf {
+      flex-direction: column;
+      gap: 2px;
+    }
+    .anexo-info {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      min-width: 0;
+    }
+    .anexo-produto {
+      font-weight: 600;
+      font-size: 13px;
+      color: var(--text-color);
+    }
+    .anexo-nome {
+      font-size: 11px;
+      color: var(--muted);
+      word-break: break-all;
+    }
+    .anexo-btn-download {
+      margin-top: 4px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      width: fit-content;
+      text-decoration: none !important;
+      font-size: 12px !important;
+      padding: 5px 12px !important;
+    }
+
     .login-page {
       display: flex;
       align-items: center;

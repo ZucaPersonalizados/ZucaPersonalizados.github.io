@@ -82,17 +82,12 @@ function atualizarMenuUsuario() {
   // ── Botão avatar ──
   if (usuario) {
     btnAvatar.classList.remove("nao-logado");
-    if (avatarImg) {
-      avatarImg.src = usuario.avatar;
-      avatarImg.style.display = "";
-    }
+    const label = btnAvatar.querySelector(".avatar-btn-label");
+    if (label) label.remove();
+    if (avatarImg) { avatarImg.src = usuario.avatar; avatarImg.style.display = ""; }
   } else {
     btnAvatar.classList.add("nao-logado");
-    if (avatarImg) {
-      // Ícone de pessoa para não-logado
-      avatarImg.style.display = "none";
-    }
-    // Adiciona ícone + texto "Entrar" dentro do botão (somente se não existir)
+    if (avatarImg) avatarImg.style.display = "none";
     if (!btnAvatar.querySelector(".avatar-btn-label")) {
       const span = document.createElement("span");
       span.className = "avatar-btn-label";
@@ -122,11 +117,24 @@ function atualizarMenuUsuario() {
           Meus pedidos
         </a>
         <div class="avatar-dd-divider"></div>
-        <button class="avatar-dd-item sair" data-action="logout" type="button" role="menuitem">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-          Sair
-        </button>
       </div>`;
+
+    // Botão Sair criado como nó DOM real — garante binding do evento sem depender de delegation
+    const btnSair = document.createElement("button");
+    btnSair.className = "avatar-dd-item sair";
+    btnSair.type = "button";
+    btnSair.setAttribute("role", "menuitem");
+    btnSair.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg> Sair`;
+    btnSair.onclick = (e) => {
+      e.stopPropagation();
+      dropdown.classList.remove("ativo");
+      btnAvatar.setAttribute("aria-expanded", "false");
+      limparSessaoUsuario();
+      atualizarMenuUsuario();
+      atualizarContadorCarrinho();
+      showToast("Até logo! Você saiu da sua conta.", "success");
+    };
+    dropdown.querySelector(".avatar-dd-lista").appendChild(btnSair);
 
   } else {
     dropdown.innerHTML = `
@@ -801,22 +809,10 @@ function configurarHeaderUX() {
     btnAvatar.setAttribute("aria-expanded", ativo ? "true" : "false");
   });
 
-  // Fecha dropdown ao clicar fora; trata logout via event delegation
+  // Fecha dropdown ao clicar fora (logout é tratado pelo onclick do botão)
   document.addEventListener("click", (event) => {
     if (!dropdown || !btnAvatar) return;
     const alvo = event.target;
-
-    // Logout por delegation — botão criado dinamicamente via atualizarMenuUsuario()
-    if (alvo.closest?.("[data-action='logout']") && dropdown.contains(alvo.closest("[data-action='logout']"))) {
-      dropdown.classList.remove("ativo");
-      btnAvatar.setAttribute("aria-expanded", "false");
-      limparSessaoUsuario();
-      atualizarMenuUsuario();
-      atualizarContadorCarrinho();
-      showToast("Até logo! Você saiu da sua conta.", "success");
-      return;
-    }
-
     if (alvo instanceof Node && !dropdown.contains(alvo) && !btnAvatar.contains(alvo)) {
       dropdown.classList.remove("ativo");
       btnAvatar.setAttribute("aria-expanded", "false");

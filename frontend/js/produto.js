@@ -109,9 +109,9 @@ function atualizarMenuUsuario() {
 
   if (usuario) {
     btnAvatar.classList.remove("nao-logado");
-    if (avatarImg) { avatarImg.src = usuario.avatar; avatarImg.style.display = ""; }
     const labelEl = btnAvatar.querySelector(".avatar-btn-label");
     if (labelEl) labelEl.remove();
+    if (avatarImg) { avatarImg.src = usuario.avatar; avatarImg.style.display = ""; }
   } else {
     btnAvatar.classList.add("nao-logado");
     if (avatarImg) avatarImg.style.display = "none";
@@ -143,11 +143,23 @@ function atualizarMenuUsuario() {
           Meus pedidos
         </a>
         <div class="avatar-dd-divider"></div>
-        <button class="avatar-dd-item sair" data-action="logout" type="button">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-          Sair
-        </button>
       </div>`;
+
+    const btnSair = document.createElement("button");
+    btnSair.className = "avatar-dd-item sair";
+    btnSair.type = "button";
+    btnSair.setAttribute("role", "menuitem");
+    btnSair.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg> Sair`;
+    btnSair.onclick = (e) => {
+      e.stopPropagation();
+      dropdown.classList.remove("ativo");
+      btnAvatar.setAttribute("aria-expanded", "false");
+      limparSessaoUsuario();
+      atualizarMenuUsuario();
+      showToast("Até logo! Você saiu da sua conta.", "success");
+    };
+    dropdown.querySelector(".avatar-dd-lista").appendChild(btnSair);
+
   } else {
     dropdown.innerHTML = `
       <div class="avatar-dd-promo">
@@ -363,29 +375,17 @@ function configurarHeaderProduto() {
     btnAvatar.setAttribute("aria-expanded", ativo ? "true" : "false");
   });
 
-  // Fecha dropdown ao clicar fora; trata logout via event delegation
+  // Fecha dropdown ao clicar fora (logout é tratado pelo onclick do botão)
   document.addEventListener("click", (event) => {
     if (!dropdown || !btnAvatar) return;
     const target = event.target;
-
-    // Logout por delegation — botão criado dinamicamente via atualizarMenuUsuario()
-    const logoutBtn = target.closest?.("[data-action='logout']");
-    if (logoutBtn && dropdown.contains(logoutBtn)) {
-      dropdown.classList.remove("ativo");
-      btnAvatar.setAttribute("aria-expanded", "false");
-      limparSessaoUsuario();
-      atualizarMenuUsuario();
-      showToast("Até logo! Você saiu da sua conta.", "success");
-      return;
-    }
-
     if (target instanceof Node && !dropdown.contains(target) && !btnAvatar.contains(target)) {
       dropdown.classList.remove("ativo");
       btnAvatar.setAttribute("aria-expanded", "false");
     }
   });
 
-  // Menu de usuário (login/logout) é gerenciado localmente
+  // Menu de usuário (login/logout) gerenciado localmente
   atualizarMenuUsuario();
 
   atualizarContadorCarrinho();

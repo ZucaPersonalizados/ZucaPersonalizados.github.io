@@ -345,6 +345,69 @@ el("email")?.addEventListener("blur", (event) => {
   if (value) listarPedidos(value);
 });
 
+/* ── Login social (simulação local) ── */
+function setLoginSocialStatus(msg, ok = true) {
+  const s = el("login-social-status");
+  if (!s) return;
+  s.textContent = msg;
+  s.style.color = ok ? "#1f8f4f" : "#b02a37";
+}
+
+function aplicarLoginSocial(email, provedor) {
+  email = email.trim().toLowerCase();
+  if (!email || !email.includes("@")) {
+    setLoginSocialStatus("E-mail inválido. Tente novamente.", false);
+    return;
+  }
+  const perfil = JSON.parse(localStorage.getItem("zuca_perfil") || "{}");
+  perfil.email = email;
+  localStorage.setItem("zuca_perfil", JSON.stringify(perfil));
+
+  const checkoutCliente = JSON.parse(localStorage.getItem("zuca_checkout_cliente") || "{}");
+  checkoutCliente.email = email;
+  localStorage.setItem("zuca_checkout_cliente", JSON.stringify(checkoutCliente));
+
+  if (el("email")) el("email").value = email;
+  setLoginSocialStatus(`Conectado como ${email} via ${provedor}.`);
+  showToast(`Bem-vindo! Conectado com ${provedor}.`, "success");
+
+  // Oculta a seção de login social e mostra o perfil
+  const sec = el("login-social-section");
+  if (sec) sec.style.display = "none";
+
+  listarPedidos(email);
+  if (perfil.email) carregarPerfil();
+}
+
+el("btn-login-google")?.addEventListener("click", () => {
+  const atual = String(el("email")?.value || "").trim();
+  const email = window.prompt("Digite seu e-mail do Gmail (Google):", atual);
+  if (email) aplicarLoginSocial(email, "Google");
+});
+
+el("btn-login-apple")?.addEventListener("click", () => {
+  const atual = String(el("email")?.value || "").trim();
+  const email = window.prompt("Digite seu e-mail do iCloud (Apple):", atual);
+  if (email) aplicarLoginSocial(email, "Apple");
+});
+
+el("btn-login-outlook")?.addEventListener("click", () => {
+  const atual = String(el("email")?.value || "").trim();
+  const email = window.prompt("Digite seu e-mail do Outlook (Microsoft):", atual);
+  if (email) aplicarLoginSocial(email, "Outlook");
+});
+
+// Se o usuário já tem e-mail salvo, oculta a seção de login social
+(function verificarLoginSocialVisivel() {
+  const perfil = JSON.parse(localStorage.getItem("zuca_perfil") || "{}");
+  const checkout = JSON.parse(localStorage.getItem("zuca_checkout_cliente") || "{}");
+  const email = perfil.email || checkout.email || "";
+  if (email) {
+    const sec = el("login-social-section");
+    if (sec) sec.style.display = "none";
+  }
+})();
+
 renderAvatarOptions();
 carregarPerfil();
 

@@ -143,23 +143,16 @@ function atualizarMenuUsuario() {
           Meus pedidos
         </a>
         <div class="avatar-dd-divider"></div>
-        <button class="avatar-dd-item sair" id="btn-logout-user" type="button">
+        <button class="avatar-dd-item sair" data-action="logout" type="button">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
           Sair
         </button>
       </div>`;
-    dropdown.querySelector("#btn-logout-user")?.addEventListener("click", () => {
-      dropdown.classList.remove("ativo");
-      btnAvatar.setAttribute("aria-expanded", "false");
-      limparSessaoUsuario();
-      atualizarMenuUsuario();
-      showToast("Até logo! Você saiu da sua conta.", "success");
-    });
   } else {
     dropdown.innerHTML = `
       <div class="avatar-dd-promo">
         <p>Faça login para ver seus pedidos e salvar seus dados.</p>
-        <a class="avatar-dd-btn-entrar" href="/minha-conta">Entrar / Criar conta</a>
+        <a class="avatar-dd-btn-entrar" href="/minha-conta">Entrar</a>
       </div>
       <div class="avatar-dd-lista">
         <a class="avatar-dd-item" href="/minha-conta#pedidos">
@@ -370,17 +363,30 @@ function configurarHeaderProduto() {
     btnAvatar.setAttribute("aria-expanded", ativo ? "true" : "false");
   });
 
+  // Fecha dropdown ao clicar fora; trata logout via event delegation
   document.addEventListener("click", (event) => {
     if (!dropdown || !btnAvatar) return;
     const target = event.target;
+
+    // Logout por delegation — botão criado dinamicamente via atualizarMenuUsuario()
+    const logoutBtn = target.closest?.("[data-action='logout']");
+    if (logoutBtn && dropdown.contains(logoutBtn)) {
+      dropdown.classList.remove("ativo");
+      btnAvatar.setAttribute("aria-expanded", "false");
+      limparSessaoUsuario();
+      atualizarMenuUsuario();
+      showToast("Até logo! Você saiu da sua conta.", "success");
+      return;
+    }
+
     if (target instanceof Node && !dropdown.contains(target) && !btnAvatar.contains(target)) {
       dropdown.classList.remove("ativo");
       btnAvatar.setAttribute("aria-expanded", "false");
     }
   });
 
-  // Menu de usuário (login/logout) é gerenciado pelo script.js
-  if (typeof atualizarMenuUsuario === "function") atualizarMenuUsuario();
+  // Menu de usuário (login/logout) é gerenciado localmente
+  atualizarMenuUsuario();
 
   atualizarContadorCarrinho();
   renderizarCarrinhoSidebar();

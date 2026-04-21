@@ -68,6 +68,12 @@ function getUsuarioLogado() {
   } catch { return null; }
 }
 
+function limparSessaoUsuario() {
+  ["zuca_checkout_cliente", "zuca_perfil", "zuca_avatar_url", "zuca_checkout_cliente_nome"].forEach(
+    (k) => localStorage.removeItem(k)
+  );
+}
+
 function atualizarMenuUsuario() {
   const btnAvatar = document.getElementById("btn-avatar");
   const dropdown = document.getElementById("avatar-dropdown");
@@ -112,29 +118,16 @@ function atualizarMenuUsuario() {
           Meus pedidos
         </a>
         <div class="avatar-dd-divider"></div>
-        <button class="avatar-dd-item sair" id="btn-logout-user" type="button">
+        <button class="avatar-dd-item sair" data-action="logout" type="button">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
           Sair
         </button>
       </div>`;
-    dropdown.querySelector("#btn-logout-user")?.addEventListener("click", () => {
-      dropdown.classList.remove("ativo");
-      btnAvatar.setAttribute("aria-expanded", "false");
-      ["zuca_checkout_cliente", "zuca_perfil", "zuca_avatar_url", "zuca_checkout_cliente_nome"].forEach(
-        (k) => localStorage.removeItem(k)
-      );
-      atualizarMenuUsuario();
-      showToast("Até logo! Você saiu da sua conta.", "success");
-      // Recarrega formulário do checkout para limpar campos
-      if (el("nome")) el("nome").value = "";
-      if (el("email")) el("email").value = "";
-      atualizarAvatarCheckout();
-    });
   } else {
     dropdown.innerHTML = `
       <div class="avatar-dd-promo">
         <p>Faça login para ver seus pedidos e salvar seus dados.</p>
-        <a class="avatar-dd-btn-entrar" href="/minha-conta">Entrar / Criar conta</a>
+        <a class="avatar-dd-btn-entrar" href="/minha-conta">Entrar</a>
       </div>
       <div class="avatar-dd-lista">
         <a class="avatar-dd-item" href="/minha-conta#pedidos">
@@ -1182,17 +1175,34 @@ function configurarHeaderCheckout() {
     btnAvatar.setAttribute("aria-expanded", ativo ? "true" : "false");
   });
 
+  // Fecha dropdown ao clicar fora; trata logout via event delegation
   document.addEventListener("click", (event) => {
     if (!dropdown || !btnAvatar) return;
     const target = event.target;
+
+    // Logout por delegation — botão criado dinamicamente via atualizarMenuUsuario()
+    const logoutBtn = target.closest?.("[data-action='logout']");
+    if (logoutBtn && dropdown.contains(logoutBtn)) {
+      dropdown.classList.remove("ativo");
+      btnAvatar.setAttribute("aria-expanded", "false");
+      limparSessaoUsuario();
+      atualizarMenuUsuario();
+      atualizarAvatarCheckout();
+      showToast("Até logo! Você saiu da sua conta.", "success");
+      // Limpa campos do formulário de checkout
+      if (el("nome")) el("nome").value = "";
+      if (el("email")) el("email").value = "";
+      return;
+    }
+
     if (target instanceof Node && !dropdown.contains(target) && !btnAvatar.contains(target)) {
       dropdown.classList.remove("ativo");
       btnAvatar.setAttribute("aria-expanded", "false");
     }
   });
 
-  // Menu de usuário (login/logout) gerenciado pelo script.js
-  if (typeof atualizarMenuUsuario === "function") atualizarMenuUsuario();
+  // Menu de usuário (login/logout) gerenciado localmente
+  atualizarMenuUsuario();
 }
 
 function configurarCopiarPix() {

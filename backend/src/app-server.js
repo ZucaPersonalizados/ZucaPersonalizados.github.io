@@ -977,6 +977,45 @@ app.get("/api/admin/me", adminAuth, (req, res) => {
   return res.json({ success: true, user: { email: req.adminSession.email } });
 });
 
+app.get("/api/admin/anexos/download", adminAuth, async (req, res) => {
+  try {
+    const rawUrl = String(req.query.url || "").trim();
+    const rawNome = String(req.query.nome || "").trim();
+
+    if (!rawUrl) {
+      return res.status(400).json({ success: false, error: "URL do anexo nao informada" });
+    }
+
+    const urlObj = new URL(rawUrl);
+    if (!["http:", "https:"].includes(urlObj.protocol)) {
+      return res.status(400).json({ success: false, error: "Protocolo de URL invalido" });
+    }
+
+    const host = String(urlObj.hostname || "").toLowerCase();
+    const hostPermitido = host === "storage.googleapis.com" || host === "firebasestorage.googleapis.com";
+    if (!hostPermitido) {
+      return res.status(400).json({ success: false, error: "Host nao permitido para download" });
+    }
+
+    const upstream = await fetch(urlObj.toString());
+    if (!upstream.ok) {
+      return res.status(upstream.status || 502).json({ success: false, error: "Falha ao obter anexo" });
+    }
+
+    const buffer = Buffer.from(await upstream.arrayBuffer());
+    const nomeArquivo = String(rawNome || path.basename(urlObj.pathname) || "anexo")
+      .replace(/[\r\n]/g, "")
+      .replace(/[\\/:*?"<>|]+/g, "_")
+      .trim() || "anexo";
+
+    res.setHeader("Content-Type", upstream.headers.get("content-type") || "application/octet-stream");
+    res.setHeader("Content-Disposition", `attachment; filename="${nomeArquivo}"`);
+    return res.send(buffer);
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message || "Erro ao baixar anexo" });
+  }
+});
+
 app.get("/api/admin/pedidos", adminAuth, requireDb, async (req, res) => {
   try {
     const snap = await db.collection("pedidos").get();

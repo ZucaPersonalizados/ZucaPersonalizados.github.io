@@ -127,6 +127,20 @@ function resolveArquivoUrl(url = "") {
   return `${API_BASE}${raw.startsWith("/") ? "" : "/"}${raw}`;
 }
 
+function isPossivelUrlArquivo(value = "") {
+  const texto = String(value || "").trim();
+  if (!texto) return false;
+  return /^https?:\/\//i.test(texto) || texto.startsWith("/upload") || texto.includes("storage.googleapis.com");
+}
+
+function getAdminDownloadUrl(url = "", nome = "") {
+  const query = new URLSearchParams({
+    url: String(url || ""),
+    nome: String(nome || "arquivo"),
+  });
+  return getApiUrl(`/api/admin/anexos/download?${query.toString()}`);
+}
+
 function detectarNomeArquivoPorUrl(url = "") {
   const semQuery = String(url).split("?")[0];
   const partes = semQuery.split("/").filter(Boolean);
@@ -138,10 +152,12 @@ function getPedidoAnexos(pedido = {}) {
   const vistos = new Set();
 
   const adicionar = (url, nome = "") => {
+    if (!isPossivelUrlArquivo(url)) return;
     const resolvida = resolveArquivoUrl(url);
     if (!resolvida) return;
-    if (vistos.has(resolvida)) return;
-    vistos.add(resolvida);
+    const chave = String(resolvida).split("?")[0].split("#")[0];
+    if (vistos.has(chave)) return;
+    vistos.add(chave);
     anexos.push({
       url: resolvida,
       nome: String(nome || "").trim() || detectarNomeArquivoPorUrl(resolvida),
@@ -170,7 +186,7 @@ function getPedidoAnexos(pedido = {}) {
         const chaveLower = String(chave || "").toLowerCase();
         const ehCampoArquivo = /(arquivo|anexo|upload|personaliz)/.test(chaveLower);
 
-        if (typeof interno === "string" && ehCampoArquivo) {
+        if (typeof interno === "string" && ehCampoArquivo && isPossivelUrlArquivo(interno)) {
           adicionar(interno, chaveLower.includes("nome") ? interno : "");
           return;
         }
@@ -467,7 +483,7 @@ function buildAnexosHtml(pedido) {
         <div class="anexo-info">
           <span class="anexo-produto">Arquivo do pedido</span>
           <span class="anexo-nome">${escapeHtml(nome)}</span>
-          <a href="${escapeHtml(url)}" target="_blank" rel="noopener" download="${escapeHtml(nome)}" class="btn btn-small btn-primary anexo-btn-download">⬇ Baixar arquivo</a>
+          <a href="${escapeHtml(getAdminDownloadUrl(url, nome))}" class="btn btn-small btn-primary anexo-btn-download">⬇ Baixar arquivo</a>
         </div>
       </div>`;
   }).join("");
@@ -528,10 +544,7 @@ window.baixarAnexosPedido = (pedidoId) => {
 
   anexos.forEach((anexo) => {
     const a = document.createElement("a");
-    a.href = anexo.url;
-    a.download = anexo.nome;
-    a.target = "_blank";
-    a.rel = "noopener";
+    a.href = getAdminDownloadUrl(anexo.url, anexo.nome);
     document.body.appendChild(a);
     a.click();
     a.remove();

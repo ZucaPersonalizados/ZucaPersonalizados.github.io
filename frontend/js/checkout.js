@@ -383,7 +383,7 @@ async function recalcularFrete() {
     const maisBarata = [...freteOpcoes].sort((a, b) => Number(a.price || 0) - Number(b.price || 0))[0];
     freteAtual = {
       valor: Number(maisBarata.price || 0),
-      servico: String(maisBarata.label || maisBarata.service || "Entrega"),
+      servico: String(`${maisBarata.service || "Entrega"} - ${maisBarata.company || "Transportadora"}`),
       prazoDias: Number(maisBarata.delivery_time || 0) || null,
     };
 
@@ -413,10 +413,10 @@ function renderFreteOptions(opcoes, selectedId) {
         <input type="radio" name="frete-radio" value="${i}" ${isSelected ? "checked" : ""}>
         <div class="frete-option-info">
           <div class="frete-option-name">
-            ${escapeHtml(opcao.label || opcao.service)}
+            ${escapeHtml(opcao.company || "Transportadora")}
             ${opcao.freteGratis ? ' <span class="frete-badge-gratis">Frete Grátis</span>' : ""}
           </div>
-          <div class="frete-option-prazo">Serviço: ${escapeHtml(opcao.service || "Entrega")} • Transportadora: ${escapeHtml(opcao.company || "-")}</div>
+          <div class="frete-option-prazo">Serviço: ${escapeHtml(opcao.service || "Entrega")}</div>
           <div class="frete-option-prazo">Receba em até ${Number(opcao.delivery_time) || "?"} dias úteis</div>
         </div>
         ${precoDisplay}
@@ -432,7 +432,7 @@ function renderFreteOptions(opcoes, selectedId) {
 
       freteAtual = {
         valor: Number(opcao.price || 0),
-        servico: String(opcao.label || opcao.service || "Entrega"),
+        servico: String(`${opcao.service || "Entrega"} - ${opcao.company || "Transportadora"}`),
         prazoDias: Number(opcao.delivery_time || 0) || null,
       };
 

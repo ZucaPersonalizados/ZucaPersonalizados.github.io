@@ -9,6 +9,8 @@ import crypto from "crypto";
 import path from "path";
 import { fileURLToPath } from "url";
 import { db, firebaseDebug } from "./firebase.js";
+import { buildNfePayload, emitirNfe, consultarNfe, getDanfePdfBuffer } from "./services/nfeService.js";
+import { sendNotaFiscalEmail } from "./services/emailService.js";
 
 import produtosRoutes from "./routes/produtos.js";
 import uploadRoutes from "./routes/upload.js";
@@ -693,9 +695,21 @@ async function createCheckoutProPreference({ pedidoId, pedidoData, appBaseUrl })
 
 function normalizePedido(docSnap) {
   const data = docSnap.data() || {};
+
+  // Normaliza timestamps do objeto notaFiscal (Firestore Timestamp → ISO string)
+  let notaFiscal = data.notaFiscal || null;
+  if (notaFiscal) {
+    notaFiscal = {
+      ...notaFiscal,
+      emitidaEm: notaFiscal.emitidaEm?.toDate ? notaFiscal.emitidaEm.toDate().toISOString() : notaFiscal.emitidaEm || null,
+      emailEnviadoEm: notaFiscal.emailEnviadoEm?.toDate ? notaFiscal.emailEnviadoEm.toDate().toISOString() : notaFiscal.emailEnviadoEm || null,
+    };
+  }
+
   return {
     id: docSnap.id,
     ...data,
+    notaFiscal,
     criadoEmISO: data.criadoEm?.toDate ? data.criadoEm.toDate().toISOString() : data.criadoEm || null,
     atualizadoEmISO: data.atualizadoEm?.toDate ? data.atualizadoEm.toDate().toISOString() : data.atualizadoEm || null,
   };
@@ -1893,6 +1907,192 @@ app.post("/api/avaliacoes", async (req, res) => {
     return res.status(500).json({ success: false, error: error.message });
   }
 });
+
+// ─── Nota Fiscal Eletrônica ────────────────────────────────────────────────
+
+/**
+ * POST /api/admin/pedidos/:id/nota-fiscal
+ * Emite a NF-e junto à SEFAZ-MS via Focus NFe e envia a DANFE por e-mail ao cliente.
+ */
+app.post("/api/admin/pedidos/:id/nota-fiscal", adminAuth, requireDb, async (req, res) => {
+  const pedidoId = String(req.params.id || "").trim();
+  if (!pedidoId) return res.status(400).json({ success: false, error: "ID do pedido inválido" });
+
+  try {
+    const pedidoRef = db.collection("pedidos").doc(pedidoId);
+    const pedidoSnap = await pedidoRef.get();
+    if (!pedidoSnap.exists) return res.status(404).json({ success: false, error: "Pedido não encontrado" });
+
+    const pedido = { id: pedidoId, ...pedidoSnap.data() };
+
+    // Validações de negócio
+    if (pedido.status !== "pagto") {
+      return res.status(422).json({ success: false, error: "NF-e só pode ser emitida para pedidos com pagamento confirmado (status: pagto)" });
+    }
+
+    const cpfCnpj = String(pedido.cliente?.cpfCnpj || pedido.cliente?.cpf || "").replace(/\D/g, "");
+    if (!cpfCnpj) {
+      return res.status(422).json({ success: false, error: "CPF/CNPJ do cliente não preenchido no pedido" });
+    }
+
+    if (pedido.notaFiscal?.status === "aprovado") {
+      return res.status(409).json({
+        success: false,
+        error: "NF-e já emitida para este pedido",
+        notaFiscal: pedido.notaFiscal,
+      });
+    }
+
+    // Busca NCM dos produtos no Firestore
+    const itensIds = [...new Set((pedido.itens || []).map((i) => i.id).filter(Boolean))];
+    const produtosMap = {};
+    if (itensIds.length > 0) {
+      const chunks = [];
+      for (let i = 0; i < itensIds.length; i += 10) chunks.push(itensIds.slice(i, i + 10));
+      for (const chunk of chunks) {
+        const snaps = await db.collection("produtos").where("__name__", "in", chunk).get();
+        snaps.forEach((doc) => { produtosMap[doc.id] = doc.data(); });
+      }
+    }
+
+    const ref = `zuca-${pedidoId}`;
+
+    // Marca como processando
+    await pedidoRef.update({
+      notaFiscal: {
+        ref,
+        status: "processando",
+        emitidaEm: admin.firestore.FieldValue.serverTimestamp(),
+      },
+    });
+
+    let nfeData;
+    try {
+      const payload = buildNfePayload(pedido, produtosMap);
+      await emitirNfe(ref, payload);
+      nfeData = await consultarNfe(ref, { statusTimeoutMs: 40000 });
+    } catch (nfeErr) {
+      await pedidoRef.update({
+        "notaFiscal.status": "erro",
+        "notaFiscal.erros": [nfeErr.message],
+      });
+      return res.status(502).json({ success: false, error: `Erro ao emitir NF-e: ${nfeErr.message}` });
+    }
+
+    const statusNfe = String(nfeData?.status || "").toLowerCase();
+    const chaveAcesso = String(nfeData?.chave_nfe || "");
+    const numero = String(nfeData?.numero || "");
+    const serie = String(nfeData?.serie || "1");
+    const danfeUrl = String(nfeData?.caminho_danfe || "");
+    const xmlUrl = String(nfeData?.caminho_xml_nota_fiscal || "");
+    const erros = Array.isArray(nfeData?.erros) ? nfeData.erros.map((e) => e?.mensagem || String(e)) : [];
+
+    const notaFiscalObj = {
+      ref,
+      status: statusNfe,
+      chaveAcesso,
+      numero,
+      serie,
+      danfeUrl,
+      xmlUrl,
+      emitidaEm: admin.firestore.FieldValue.serverTimestamp(),
+      erros,
+    };
+
+    if (statusNfe !== "aprovado") {
+      await pedidoRef.update({ notaFiscal: notaFiscalObj });
+      const msgErro = erros[0] || `SEFAZ retornou status: ${statusNfe}`;
+      return res.status(422).json({ success: false, error: `NF-e rejeitada: ${msgErro}`, status: statusNfe, erros });
+    }
+
+    // Envia DANFE por e-mail
+    let emailEnviado = false;
+    let emailErro = null;
+    try {
+      const danfePdfBuffer = await getDanfePdfBuffer(ref);
+      await sendNotaFiscalEmail({ pedido, danfePdfBuffer, chaveAcesso, numero, serie });
+      emailEnviado = true;
+      notaFiscalObj.emailEnviadoEm = admin.firestore.FieldValue.serverTimestamp();
+    } catch (emailErr) {
+      emailErro = emailErr.message;
+      console.error("[NF-e] Falha ao enviar e-mail:", emailErr.message);
+    }
+
+    await pedidoRef.update({ notaFiscal: notaFiscalObj });
+
+    return res.json({
+      success: true,
+      status: statusNfe,
+      chaveAcesso,
+      numero,
+      serie,
+      danfeUrl,
+      emailEnviado,
+      emailErro,
+    });
+  } catch (error) {
+    console.error("[NF-e] Erro inesperado:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/admin/pedidos/:id/nota-fiscal
+ * Retorna o objeto notaFiscal do pedido (status, chave, urls).
+ */
+app.get("/api/admin/pedidos/:id/nota-fiscal", adminAuth, requireDb, async (req, res) => {
+  const pedidoId = String(req.params.id || "").trim();
+  if (!pedidoId) return res.status(400).json({ success: false, error: "ID do pedido inválido" });
+
+  try {
+    const pedidoSnap = await db.collection("pedidos").doc(pedidoId).get();
+    if (!pedidoSnap.exists) return res.status(404).json({ success: false, error: "Pedido não encontrado" });
+
+    const { notaFiscal } = pedidoSnap.data();
+    return res.json({ success: true, notaFiscal: notaFiscal || null });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/admin/pedidos/:id/nota-fiscal/reenviar-email
+ * Reenvia a DANFE por e-mail ao cliente (somente se a NF-e estiver aprovada).
+ */
+app.post("/api/admin/pedidos/:id/nota-fiscal/reenviar-email", adminAuth, requireDb, async (req, res) => {
+  const pedidoId = String(req.params.id || "").trim();
+  if (!pedidoId) return res.status(400).json({ success: false, error: "ID do pedido inválido" });
+
+  try {
+    const pedidoRef = db.collection("pedidos").doc(pedidoId);
+    const pedidoSnap = await pedidoRef.get();
+    if (!pedidoSnap.exists) return res.status(404).json({ success: false, error: "Pedido não encontrado" });
+
+    const pedido = { id: pedidoId, ...pedidoSnap.data() };
+    const nf = pedido.notaFiscal;
+
+    if (!nf || nf.status !== "aprovado") {
+      return res.status(422).json({ success: false, error: "Não há NF-e aprovada para este pedido" });
+    }
+
+    const danfePdfBuffer = await getDanfePdfBuffer(nf.ref);
+    await sendNotaFiscalEmail({
+      pedido,
+      danfePdfBuffer,
+      chaveAcesso: nf.chaveAcesso,
+      numero: nf.numero,
+      serie: nf.serie,
+    });
+
+    await pedidoRef.update({ "notaFiscal.emailEnviadoEm": admin.firestore.FieldValue.serverTimestamp() });
+
+    return res.json({ success: true, message: "E-mail reenviado com sucesso" });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ───────────────────────────────────────────────────────────────────────────
 
 app.listen(PORT, () => {
   console.log(`\n[ZUCA] Backend-only rodando em http://localhost:${PORT}`);

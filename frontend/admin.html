@@ -550,6 +550,7 @@
                   <th>Total</th>
                   <th>Status</th>
                   <th>Pagamento</th>
+                  <th>NF-e</th>
                   <th>Data</th>
                   <th>Ações</th>
                 </tr>
@@ -642,6 +643,13 @@
                   <label for="personalizado" style="margin:0;">Produto personalizado?</label>
                 </div>
 
+                <div class="field">
+                  <label for="ncm">NCM (Nota Fiscal)</label>
+                  <input id="ncm" type="text" placeholder="48201010" maxlength="8" pattern="\d{8}"
+                    title="8 dígitos numéricos. Papelaria/planners: 48201010"
+                    style="font-family:monospace;" />
+                </div>
+
                 <div class="field field-full actions">
                   <button type="submit" class="btn btn-primary" id="btn-submit">Salvar produto</button>
                   <button type="button" class="btn btn-secondary" id="btn-novo">Novo</button>
@@ -700,6 +708,19 @@
           <button class="close-btn" onclick="fecharModal()">x</button>
         </div>
         <div id="modal-body"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal NF-e -->
+  <div id="nfe-modal" class="details-modal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="nfe-modal-title">
+    <div class="modal-content" style="max-width:480px;">
+      <div class="modal-header">
+        <h2 id="nfe-modal-title">Nota Fiscal Eletrônica</h2>
+        <button class="close-btn" onclick="fecharModalNfe()">x</button>
+      </div>
+      <div id="nfe-modal-body" style="padding:24px;">
+        <!-- preenchido pelo JS -->
       </div>
     </div>
   </div>

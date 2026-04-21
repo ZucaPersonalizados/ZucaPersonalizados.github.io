@@ -285,6 +285,7 @@ function obterProdutoDoFormulario() {
     descricaoCurta: String(document.getElementById("descricaoCurta")?.value || "").trim(),
     descricaoLonga: String(document.getElementById("descricaoLonga")?.value || "").trim(),
     personalizado: !!document.getElementById("personalizado")?.checked,
+    ncm: String(document.getElementById("ncm")?.value || "").replace(/\D/g, "").slice(0, 8) || "48201010",
   };
 }
 
@@ -315,6 +316,8 @@ function preencherFormularioProduto(produto) {
   document.getElementById("descricaoCurta").value = produto.descricaoCurta || "";
   document.getElementById("descricaoLonga").value = produto.descricaoLonga || "";
   document.getElementById("personalizado").checked = !!produto.personalizado;
+  const ncmEl = document.getElementById("ncm");
+  if (ncmEl) ncmEl.value = produto.ncm || "";
 
   selectedProductId = produto.id;
   if (inputProdutoId) inputProdutoId.disabled = true;
@@ -394,17 +397,39 @@ function exibirPedidos() {
     : allOrders;
 
   if (!pedidosFiltrados.length) {
-    pedidosList.innerHTML = "<tr><td colspan='7' style='text-align:center; padding:20px;'>Nenhum pedido encontrado</td></tr>";
+    pedidosList.innerHTML = "<tr><td colspan='8' style='text-align:center; padding:20px;'>Nenhum pedido encontrado</td></tr>";
     return;
   }
 
-  pedidosList.innerHTML = pedidosFiltrados.map((pedido) => `
+  pedidosList.innerHTML = pedidosFiltrados.map((pedido) => {
+    const nf = pedido.notaFiscal;
+    const nfStatus = nf?.status || "";
+    let nfeBadge = "<span style='color:#9ca3af;font-size:11px;'>—</span>";
+    if (nfStatus === "aprovado") {
+      nfeBadge = `<span class="status-pill pagto" title="Chave: ${escapeHtml(nf.chaveAcesso || "")}">✔ Emitida</span>`;
+    } else if (nfStatus === "processando") {
+      nfeBadge = `<span class="status-pill pendente">⏳ Processando</span>`;
+    } else if (nfStatus === "rejeitado" || nfStatus === "erro") {
+      nfeBadge = `<span class="status-pill cancelado" title="${escapeHtml((nf.erros || []).join(" | "))}">✘ Rejeitada</span>`;
+    }
+
+    let nfeAcoes = "";
+    if (pedido.status === "pagto" && nfStatus !== "aprovado" && nfStatus !== "processando") {
+      nfeAcoes = `<button class="btn btn-small btn-primary" type="button" onclick="gerarNotaFiscal('${pedido.id}')" title="Emitir NF-e e enviar DANFE por e-mail">🧾 Gerar NF-e</button>`;
+    }
+    if (nfStatus === "aprovado") {
+      nfeAcoes += nf.danfeUrl ? `<button class="btn btn-small btn-secondary" type="button" onclick="window.open('${escapeHtml(nf.danfeUrl)}','_blank')" title="Abrir DANFE">📄 DANFE</button>` : "";
+      nfeAcoes += `<button class="btn btn-small btn-secondary" type="button" onclick="reenviarEmailNfe('${pedido.id}')" title="Reenviar DANFE por e-mail">📧 E-mail</button>`;
+    }
+
+    return `
     <tr>
       <td><strong>#${pedido.id.slice(0, 8)}</strong></td>
       <td>${escapeHtml(pedido.cliente?.nome || pedido.cliente?.email || "-")}</td>
       <td><strong>${formatarMoeda(pedido.total)}</strong></td>
       <td><span class="status-pill ${getStatusClass(pedido.statusPedido || pedido.status)}">${getStatusLabel(pedido.statusPedido || pedido.status)}</span></td>
       <td><span class="status-pill ${pedido.status === "pagto" ? "pagto" : "pendente"}">${pedido.status === "pagto" ? "Verificado" : "Pendente"}</span></td>
+      <td>${nfeBadge}${nfeAcoes ? `<div style="margin-top:4px;">${nfeAcoes}</div>` : ""}</td>
       <td>${formatarData(pedido.criadoEmISO)}</td>
       <td>
         <div class="table-actions">
@@ -414,7 +439,8 @@ function exibirPedidos() {
         </div>
       </td>
     </tr>
-  `).join("");
+    `;
+  }).join("");
 }
 
 async function carregarPedidos() {
@@ -882,3 +908,124 @@ async function bootstrap() {
 }
 
 bootstrap();
+
+// ─── NF-e ────────────────────────────────────────────────────────────────────
+
+function abrirModalNfe(html) {
+  const modal = document.getElementById("nfe-modal");
+  const body = document.getElementById("nfe-modal-body");
+  if (!modal || !body) return;
+  body.innerHTML = html;
+  modal.style.display = "flex";
+  modal.classList.add("active");
+}
+
+window.fecharModalNfe = function () {
+  const modal = document.getElementById("nfe-modal");
+  if (!modal) return;
+  modal.style.display = "none";
+  modal.classList.remove("active");
+};
+
+window.gerarNotaFiscal = async function (pedidoId) {
+  abrirModalNfe(`
+    <div style="text-align:center;padding:32px 0;">
+      <div style="font-size:32px;margin-bottom:16px;">⏳</div>
+      <p style="font-size:15px;color:#374151;font-weight:600;">Emitindo Nota Fiscal...</p>
+      <p style="font-size:13px;color:#6b7280;">Aguarde enquanto a SEFAZ processa a emissão.<br>Isso pode levar até 40 segundos.</p>
+    </div>
+  `);
+
+  try {
+    const resp = await fetchApi(`/api/admin/pedidos/${pedidoId}/nota-fiscal`, {
+      method: "POST",
+      credentials: "include",
+    });
+    const data = await resp.json().catch(() => ({}));
+
+    if (!resp.ok || !data.success) {
+      const msg = escapeHtml(data.error || "Erro desconhecido");
+      abrirModalNfe(`
+        <div style="text-align:center;padding:32px 0;">
+          <div style="font-size:36px;margin-bottom:16px;">❌</div>
+          <p style="font-size:15px;color:#dc2626;font-weight:600;">Falha na emissão</p>
+          <p style="font-size:13px;color:#374151;margin:12px 0;">${msg}</p>
+          ${(data.erros || []).map((e) => `<p style="font-size:12px;color:#6b7280;">${escapeHtml(e)}</p>`).join("")}
+          <button class="btn btn-secondary" style="margin-top:16px;" onclick="fecharModalNfe()">Fechar</button>
+        </div>
+      `);
+      return;
+    }
+
+    const chave = escapeHtml(data.chaveAcesso || "");
+    const numero = escapeHtml(data.numero || "");
+    const emailMsg = data.emailEnviado
+      ? `<p style="font-size:13px;color:#16a34a;margin-top:8px;">✅ DANFE enviada por e-mail ao cliente.</p>`
+      : `<p style="font-size:13px;color:#f59e0b;margin-top:8px;">⚠️ E-mail não enviado: ${escapeHtml(data.emailErro || "verifique as configurações SMTP")}.</p>`;
+
+    abrirModalNfe(`
+      <div style="text-align:center;padding:24px 0 8px;">
+        <div style="font-size:36px;margin-bottom:12px;">✅</div>
+        <p style="font-size:16px;color:#16a34a;font-weight:700;">NF-e emitida com sucesso!</p>
+      </div>
+      <table style="width:100%;font-size:13px;margin:16px 0;border-collapse:collapse;">
+        <tr><td style="padding:6px 0;color:#6b7280;width:40%;">Número / Série</td><td style="color:#111827;font-weight:600;">${numero} / ${escapeHtml(data.serie || "1")}</td></tr>
+        <tr><td style="padding:6px 0;color:#6b7280;">Chave de Acesso</td><td style="color:#374151;font-family:monospace;word-break:break-all;font-size:11px;">${chave}</td></tr>
+        <tr><td style="padding:6px 0;color:#6b7280;">Status</td><td><span class="status-pill pagto">Aprovada</span></td></tr>
+      </table>
+      ${emailMsg}
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:20px;flex-wrap:wrap;">
+        ${data.danfeUrl ? `<a href="${escapeHtml(data.danfeUrl)}" target="_blank" class="btn btn-secondary">📄 Abrir DANFE</a>` : ""}
+        <button class="btn btn-secondary" onclick="reenviarEmailNfe('${pedidoId}')">📧 Reenviar E-mail</button>
+        <button class="btn btn-primary" onclick="fecharModalNfe();carregarPedidos();">Fechar</button>
+      </div>
+    `);
+  } catch (err) {
+    abrirModalNfe(`
+      <div style="text-align:center;padding:32px 0;">
+        <div style="font-size:36px;margin-bottom:16px;">❌</div>
+        <p style="font-size:15px;color:#dc2626;font-weight:600;">Erro de conexão</p>
+        <p style="font-size:13px;color:#374151;">${escapeHtml(err.message)}</p>
+        <button class="btn btn-secondary" style="margin-top:16px;" onclick="fecharModalNfe()">Fechar</button>
+      </div>
+    `);
+  }
+};
+
+window.reenviarEmailNfe = async function (pedidoId) {
+  const body = document.getElementById("nfe-modal-body");
+  const prevHtml = body?.innerHTML || "";
+
+  if (body) {
+    body.innerHTML += `<p id="msg-reenvio" style="font-size:13px;color:#6b7280;margin-top:8px;">⏳ Reenviando e-mail...</p>`;
+  }
+
+  try {
+    const resp = await fetchApi(`/api/admin/pedidos/${pedidoId}/nota-fiscal/reenviar-email`, {
+      method: "POST",
+      credentials: "include",
+    });
+    const data = await resp.json().catch(() => ({}));
+
+    const msgEl = document.getElementById("msg-reenvio");
+    if (msgEl) {
+      if (data.success) {
+        msgEl.style.color = "#16a34a";
+        msgEl.textContent = "✅ E-mail reenviado com sucesso!";
+      } else {
+        msgEl.style.color = "#dc2626";
+        msgEl.textContent = `❌ ${data.error || "Falha ao reenviar"}`;
+      }
+    }
+  } catch (err) {
+    const msgEl = document.getElementById("msg-reenvio");
+    if (msgEl) { msgEl.style.color = "#dc2626"; msgEl.textContent = `❌ ${err.message}`; }
+  }
+};
+
+// Fecha modal NF-e ao clicar fora
+document.getElementById("nfe-modal")?.addEventListener("click", (e) => {
+  if (e.target === document.getElementById("nfe-modal")) fecharModalNfe();
+});
+
+// ─────────────────────────────────────────────────────────────────────────────

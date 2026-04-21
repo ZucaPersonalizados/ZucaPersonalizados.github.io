@@ -173,6 +173,17 @@ function obterImagensProduto(produto) {
   return ["img/logo/logo.png"];
 }
 
+const IMG_FALLBACK_SRC = "img/logo/logo.png";
+
+function aplicarFallbackImagem(imgEl) {
+  if (!imgEl) return;
+  imgEl.onerror = () => {
+    if (imgEl.src.includes(IMG_FALLBACK_SRC)) return;
+    imgEl.onerror = null;
+    imgEl.src = IMG_FALLBACK_SRC;
+  };
+}
+
 function mostrarBlocoPersonalizacao(personalizado) {
   const bloco = document.getElementById("bloco-personalizacao");
   if (!bloco) return;
@@ -468,15 +479,20 @@ async function carregarProduto() {
 
     if (imagens.length > 0 && imgPrincipal) {
       imgPrincipal.src = imagens[0];
+      aplicarFallbackImagem(imgPrincipal);
     }
 
     imagens.forEach((img, index) => {
       if (!miniaturas) return;
       const thumb = document.createElement("img");
       thumb.src = img;
+      aplicarFallbackImagem(thumb);
       if (index === 0) thumb.classList.add("ativa");
       thumb.addEventListener("click", () => {
-        if (imgPrincipal) imgPrincipal.src = img;
+        if (imgPrincipal) {
+          imgPrincipal.src = img;
+          aplicarFallbackImagem(imgPrincipal);
+        }
         document.querySelectorAll("#miniaturas img").forEach((item) => item.classList.remove("ativa"));
         thumb.classList.add("ativa");
       });
@@ -800,7 +816,7 @@ async function carregarRelacionados(categoria, idAtual) {
       const img = obterImagensProduto(p)[0] || "img/logo/logo.png";
       return `
         <a href="/produto?id=${encodeURIComponent(p.id)}" class="produto" style="text-decoration: none; color: inherit; text-align: center;">
-          <img src="${escapeHtml(img)}" alt="${escapeHtml(p.nome || '')}" style="width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: var(--radius-md);" loading="lazy">
+          <img src="${escapeHtml(img)}" alt="${escapeHtml(p.nome || '')}" style="width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: var(--radius-md);" loading="lazy" onerror="this.onerror=null;this.src='img/logo/logo.png';">
           <h3 style="font-size: 14px; margin: 8px 0 4px; font-weight: 600; text-align: center;">${escapeHtml(p.nome || "Produto")}</h3>
           <p style="font-weight: 700; color: var(--accent); margin: 0; text-align: center;">${formatarMoeda(preco)}</p>
         </a>
@@ -941,7 +957,7 @@ async function renderVistosRecentemente() {
       const img = obterImagensProduto(p)[0] || "img/logo/logo.png";
       return `
         <a href="/produto?id=${encodeURIComponent(p.id)}" class="produto" style="text-decoration: none; color: inherit; text-align: center;">
-          <img src="${escapeHtml(img)}" alt="${escapeHtml(p.nome || '')}" style="width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: var(--radius-md);" loading="lazy">
+          <img src="${escapeHtml(img)}" alt="${escapeHtml(p.nome || '')}" style="width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: var(--radius-md);" loading="lazy" onerror="this.onerror=null;this.src='img/logo/logo.png';">
           <h3 style="font-size: 13px; margin: 6px 0 4px; font-weight: 600; text-align: center;">${escapeHtml(p.nome || "Produto")}</h3>
           <p style="font-weight: 700; color: var(--accent); margin: 0; font-size: 14px;">${formatarMoeda(preco)}</p>
         </a>

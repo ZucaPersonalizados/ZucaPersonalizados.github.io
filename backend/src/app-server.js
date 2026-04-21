@@ -1817,18 +1817,33 @@ app.post("/verificar-pagamento", requireDb, async (req, res) => {
 // ==================== AVALIAÇÕES ====================
 
 // GET /api/avaliacoes/:produtoId
-app.get("/api/avaliacoes/:produtoId", async (req, res) => {
+app.get("/api/avaliacoes/:produtoId", requireDb, async (req, res) => {
   try {
     const { produtoId } = req.params;
     if (!produtoId) return res.status(400).json({ success: false, error: "produtoId obrigatório" });
 
-    const snap = await db.collection("avaliacoes")
-      .where("produtoId", "==", produtoId)
-      .orderBy("criadoEm", "desc")
-      .limit(50)
-      .get();
+    let snap;
+    try {
+      snap = await db.collection("avaliacoes")
+        .where("produtoId", "==", produtoId)
+        .orderBy("criadoEm", "desc")
+        .limit(50)
+        .get();
+    } catch (error) {
+      // Fallback para quando o indice composto ainda nao foi criado no Firestore.
+      const failedPrecondition = error?.code === 9 || /FAILED_PRECONDITION|requires an index/i.test(String(error?.message || ""));
+      if (!failedPrecondition) throw error;
 
-    const avaliacoes = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      snap = await db.collection("avaliacoes")
+        .where("produtoId", "==", produtoId)
+        .limit(50)
+        .get();
+    }
+
+    const avaliacoes = snap.docs
+      .map((d) => ({ id: d.id, ...d.data() }))
+      .sort((a, b) => String(b.criadoEm || "").localeCompare(String(a.criadoEm || "")));
+
     const media = avaliacoes.length
       ? avaliacoes.reduce((s, a) => s + (a.nota || 0), 0) / avaliacoes.length
       : 0;

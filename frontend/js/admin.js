@@ -127,6 +127,73 @@ function resolveArquivoUrl(url = "") {
   return `${API_BASE}${raw.startsWith("/") ? "" : "/"}${raw}`;
 }
 
+function detectarNomeArquivoPorUrl(url = "") {
+  const semQuery = String(url).split("?")[0];
+  const partes = semQuery.split("/").filter(Boolean);
+  return partes[partes.length - 1] || "arquivo";
+}
+
+function getPedidoAnexos(pedido = {}) {
+  const anexos = [];
+  const vistos = new Set();
+
+  const adicionar = (url, nome = "") => {
+    const resolvida = resolveArquivoUrl(url);
+    if (!resolvida) return;
+    if (vistos.has(resolvida)) return;
+    vistos.add(resolvida);
+    anexos.push({
+      url: resolvida,
+      nome: String(nome || "").trim() || detectarNomeArquivoPorUrl(resolvida),
+    });
+  };
+
+  const extrairRecursivo = (valor, nomeChave = "") => {
+    if (!valor) return;
+
+    if (typeof valor === "string") {
+      const texto = valor.trim();
+      if (!texto) return;
+      if (/^https?:\/\//i.test(texto) || texto.startsWith("/upload") || texto.includes("storage.googleapis.com")) {
+        adicionar(texto);
+      }
+      return;
+    }
+
+    if (Array.isArray(valor)) {
+      valor.forEach((item) => extrairRecursivo(item, nomeChave));
+      return;
+    }
+
+    if (typeof valor === "object") {
+      Object.entries(valor).forEach(([chave, interno]) => {
+        const chaveLower = String(chave || "").toLowerCase();
+        const ehCampoArquivo = /(arquivo|anexo|upload|personaliz)/.test(chaveLower);
+
+        if (typeof interno === "string" && ehCampoArquivo) {
+          adicionar(interno, chaveLower.includes("nome") ? interno : "");
+          return;
+        }
+
+        extrairRecursivo(interno, chaveLower);
+      });
+    }
+  };
+
+  const itens = Array.isArray(pedido.itens) ? pedido.itens : [];
+  itens.forEach((item) => {
+    adicionar(item?.arquivoPersonalizacaoUrl, item?.arquivoPersonalizacaoNome);
+    adicionar(item?.arquivoUrl, item?.arquivoNome);
+    adicionar(item?.anexoUrl, item?.anexoNome);
+    adicionar(item?.urlArquivo, item?.nomeArquivo);
+    adicionar(item?.personalizacaoUrl, item?.personalizacaoNome);
+    extrairRecursivo(item, "item");
+  });
+
+  extrairRecursivo(pedido, "pedido");
+  return anexos;
+}
+
 function formatarMoeda(valor) {
   return `R$ ${Number(valor || 0).toFixed(2).replace(".", ",")}`;
 }
@@ -310,9 +377,7 @@ function exibirPedidos() {
         <div class="table-actions">
           <button class="btn btn-small btn-secondary" type="button" onclick="exibirDetalhes('${pedido.id}')">Ver</button>
           <button class="btn btn-small btn-secondary" type="button" onclick="editarStatus('${pedido.id}')">Editar</button>
-          ${(pedido.itens || []).some((item) => item.arquivoPersonalizacaoUrl || item.personalizado)
-            ? `<button class="btn btn-small btn-primary" type="button" onclick="baixarAnexosPedido('${pedido.id}')" title="Baixar arquivos de personalização">📎 Baixar arte</button>`
-            : ""}
+          <button class="btn btn-small btn-primary" type="button" onclick="baixarAnexosPedido('${pedido.id}')" title="Abrir anexos do pedido">📎 Anexos</button>
         </div>
       </td>
     </tr>
@@ -374,27 +439,20 @@ function isImageUrl(url) {
   return /\.(jpe?g|png|gif|webp)(\?|$)/i.test(url);
 }
 
-function buildAnexosHtml(itens) {
-  const personalizados = (itens || []).filter((item) => item.arquivoPersonalizacaoUrl || item.personalizado);
-  if (!personalizados.length) return "";
+function buildAnexosHtml(pedido) {
+  const anexos = getPedidoAnexos(pedido);
+  if (!anexos.length) {
+    return `
+      <div class="detail-item">
+        <div class="detail-label">📎 Anexos de Personalização</div>
+        <div style="font-size:13px; color: var(--muted);">Nenhum anexo identificado neste pedido.</div>
+      </div>`;
+  }
 
-  const cards = personalizados.map((item) => {
-    const url = resolveArquivoUrl(item.arquivoPersonalizacaoUrl);
-    const nome = item.arquivoPersonalizacaoNome || "arquivo";
+  const cards = anexos.map((anexo) => {
+    const url = anexo.url;
+    const nome = anexo.nome || "arquivo";
     const ehImagem = url && isImageUrl(url);
-
-    if (!url) {
-      return `
-        <div class="anexo-card" style="border-color:#e0a800;">
-          <div class="anexo-preview anexo-preview-pdf" style="background:#fff3cd;">
-            <span style="font-size:32px;">⚠️</span>
-          </div>
-          <div class="anexo-info">
-            <span class="anexo-produto">${escapeHtml(item.nome || "Produto")}</span>
-            <span class="anexo-nome" style="color:#856404;">Item personalizado — arquivo não encontrado</span>
-          </div>
-        </div>`;
-    }
 
     return `
       <div class="anexo-card">
@@ -407,7 +465,7 @@ function buildAnexosHtml(itens) {
                <span style="font-size:11px;color:var(--muted);">PDF</span>
              </div>`}
         <div class="anexo-info">
-          <span class="anexo-produto">${escapeHtml(item.nome || "Produto")}</span>
+          <span class="anexo-produto">Arquivo do pedido</span>
           <span class="anexo-nome">${escapeHtml(nome)}</span>
           <a href="${escapeHtml(url)}" target="_blank" rel="noopener" download="${escapeHtml(nome)}" class="btn btn-small btn-primary anexo-btn-download">⬇ Baixar arquivo</a>
         </div>
@@ -436,7 +494,7 @@ window.exibirDetalhes = async (pedidoId) => {
     </div>
   `).join("");
 
-  const anexosHtml = buildAnexosHtml(pedido.itens);
+  const anexosHtml = buildAnexosHtml(pedido);
 
   modalBody.innerHTML = `
     <div class="detail-item"><div class="detail-label">ID Pedido</div><div>#${pedido.id.slice(0, 8)}</div></div>
@@ -460,23 +518,11 @@ window.baixarAnexosPedido = (pedidoId) => {
     return;
   }
 
-  const anexos = (pedido.itens || [])
-    .filter((item) => item.arquivoPersonalizacaoUrl)
-    .map((item) => ({
-      url: resolveArquivoUrl(item.arquivoPersonalizacaoUrl),
-      nome: item.arquivoPersonalizacaoNome || "arquivo",
-    }))
-    .filter((a) => a.url);
+  const anexos = getPedidoAnexos(pedido);
 
   if (!anexos.length) {
-    // Se nao tem URL mas tem item personalizado, mostra detalhes
-    const temPersonalizado = (pedido.itens || []).some((i) => i.personalizado);
-    if (temPersonalizado) {
-      alert("Este pedido tem item personalizado, mas o arquivo não foi anexado pelo cliente. Verifique os detalhes do pedido.");
-      exibirDetalhes(pedidoId);
-    } else {
-      alert("Este pedido nao possui arquivo anexado.");
-    }
+    alert("Nao encontramos anexos para este pedido. Vou abrir os detalhes para verificacao.");
+    exibirDetalhes(pedidoId);
     return;
   }
 

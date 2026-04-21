@@ -400,11 +400,12 @@ function configurarHeaderProduto() {
   atualizarContadorCarrinho();
   renderizarCarrinhoSidebar();
 
-  // Sincroniza com Firebase Auth
+  // Sincroniza com Firebase Auth: atualiza dados quando o usuário loga via popup
   onAuthStateChanged(auth, (user) => {
-    if (user) salvarUsuarioNoStorage(user);
-    else limparSessaoUsuario();
-    atualizarMenuUsuario();
+    if (user) {
+      salvarUsuarioNoStorage(user);
+      atualizarMenuUsuario();
+    }
   });
 }
 

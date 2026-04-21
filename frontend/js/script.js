@@ -832,11 +832,13 @@ function configurarHeaderUX() {
   atualizarContadorCarrinho();
   renderizarCarrinhoSidebar();
 
-  // Sincroniza com Firebase Auth (login em outra aba, etc.)
+  // Sincroniza com Firebase Auth: atualiza dados quando o usuário loga via popup
+  // Não apaga sessão automaticamente — só o botão Sair faz logout explícito
   onAuthStateChanged(auth, (user) => {
-    if (user) salvarUsuarioNoStorage(user);
-    else limparSessaoUsuario();
-    atualizarMenuUsuario();
+    if (user) {
+      salvarUsuarioNoStorage(user);
+      atualizarMenuUsuario();
+    }
   });
 }
 

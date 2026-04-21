@@ -174,7 +174,36 @@ const getCarrinho = () => {
 };
 
 const formatarMoeda = (v) => `R$ ${Number(v || 0).toFixed(2).replace(".", ",")}`;
-const precoNumero = (p) => Number(String(p || "0").replace("R$", "").replace(/\./g, "").replace(",", ".")) || 0;
+const precoNumero = (p) => {
+  const raw = String(p ?? "0").replace(/\s/g, "").replace("R$", "").trim();
+  if (!raw) return 0;
+
+  const hasComma = raw.includes(",");
+  const hasDot = raw.includes(".");
+
+  if (hasComma && hasDot) {
+    const normalized = raw.replace(/\./g, "").replace(",", ".");
+    const number = Number(normalized);
+    return Number.isFinite(number) ? number : 0;
+  }
+
+  if (hasComma) {
+    const normalized = raw.replace(/\./g, "").replace(",", ".");
+    const number = Number(normalized);
+    return Number.isFinite(number) ? number : 0;
+  }
+
+  if (hasDot) {
+    const parts = raw.split(".");
+    const isDecimal = parts.length === 2 && parts[1].length <= 2;
+    const normalized = isDecimal ? raw : raw.replace(/\./g, "");
+    const number = Number(normalized);
+    return Number.isFinite(number) ? number : 0;
+  }
+
+  const number = Number(raw);
+  return Number.isFinite(number) ? number : 0;
+};
 
 function isCepValido(value = "") {
   return digitsOnly(value).length === 8;
@@ -376,7 +405,7 @@ function renderFreteOptions(opcoes, selectedId) {
   container.innerHTML = opcoes.map((opcao, i) => {
     const isSelected = opcao.id === selectedId || (i === 0 && !selectedId);
     const precoDisplay = opcao.freteGratis
-      ? `<span class="frete-option-price gratis">GRÁTIS</span><span class="frete-original-price">R$ ${Number(opcao.originalPrice || 0).toFixed(2).replace(".", ",")}</span>`
+      ? `<span class="frete-option-price gratis">GRÁTIS</span>`
       : `<span class="frete-option-price">R$ ${Number(opcao.price || 0).toFixed(2).replace(".", ",")}</span>`;
 
     return `
@@ -387,6 +416,7 @@ function renderFreteOptions(opcoes, selectedId) {
             ${escapeHtml(opcao.label || opcao.service)}
             ${opcao.freteGratis ? ' <span class="frete-badge-gratis">Frete Grátis</span>' : ""}
           </div>
+          <div class="frete-option-prazo">Serviço: ${escapeHtml(opcao.service || "Entrega")} • Transportadora: ${escapeHtml(opcao.company || "-")}</div>
           <div class="frete-option-prazo">Receba em até ${Number(opcao.delivery_time) || "?"} dias úteis</div>
         </div>
         ${precoDisplay}

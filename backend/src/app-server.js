@@ -351,63 +351,57 @@ function selecionarOpcoesFrete(opcoes) {
   const isCorreios = (o) => /correios/i.test(o.company);
 
   const correios = opcoes.filter(isCorreios);
-  const todas = [...opcoes];
+  const melhorEnvio = opcoes.filter((o) => !isCorreios(o));
 
   const menorPreco = (arr) => arr.length ? arr.reduce((a, b) => a.price < b.price ? a : b) : null;
   const menorPrazo = (arr) => arr.length ? arr.reduce((a, b) => a.delivery_time < b.delivery_time ? a : b) : null;
 
   const correiosBarato = menorPreco(correios);
   const correiosRapido = menorPrazo(correios);
-  const geralBarato = menorPreco(todas);
-  const geralRapido = menorPrazo(todas);
+  const meBarato = menorPreco(melhorEnvio);
+  const meRapido = menorPrazo(melhorEnvio);
 
-  const resultMap = new Map();
+  const candidatos = [
+    { item: correiosRapido, id: "correios-rapido", tipo: "Mais rápido", grupo: "Correios" },
+    { item: correiosBarato, id: "correios-barato", tipo: "Mais barato", grupo: "Correios" },
+    { item: meBarato, id: "me-barato", tipo: "Mais barato", grupo: "Melhor Envio" },
+    { item: meRapido, id: "me-rapido", tipo: "Mais rápido", grupo: "Melhor Envio" },
+  ].filter((c) => !!c.item);
 
-  if (correiosBarato) {
-    resultMap.set(`${correiosBarato.service}-${correiosBarato.company}-barato`, {
-      ...correiosBarato,
-      id: "correios-barato",
-      label: `${correiosBarato.service} - ${correiosBarato.company} (Mais econômico)`,
+  const usados = new Set();
+  const resultadoBase = [];
+
+  candidatos.forEach(({ item, id, tipo, grupo }) => {
+    const chave = `${item.service}|${item.company}|${Number(item.price || 0).toFixed(2)}|${Number(item.delivery_time || 0)}`;
+    if (usados.has(chave)) return;
+    usados.add(chave);
+
+    resultadoBase.push({
+      ...item,
+      id,
+      label: `${grupo} • ${tipo}`,
+      escolha: tipo,
+      grupo,
     });
-  }
+  });
 
-  if (correiosRapido && (!correiosBarato || correiosRapido.service !== correiosBarato.service || correiosRapido.delivery_time !== correiosBarato.delivery_time)) {
-    resultMap.set(`${correiosRapido.service}-${correiosRapido.company}-rapido`, {
-      ...correiosRapido,
-      id: "correios-rapido",
-      label: `${correiosRapido.service} - ${correiosRapido.company} (Mais rápido)`,
-    });
-  }
+  const base = resultadoBase.length ? resultadoBase : [...opcoes].slice(0, 4).map((o, i) => ({
+    ...o,
+    id: `opcao-${i}`,
+    label: `${o.company} • ${o.service}`,
+    escolha: "",
+    grupo: o.company || "Transportadora",
+  }));
 
-  if (geralBarato && !isCorreios(geralBarato)) {
-    const key = `${geralBarato.service}-${geralBarato.company}-geral-barato`;
-    if (!resultMap.has(key)) {
-      resultMap.set(key, {
-        ...geralBarato,
-        id: "geral-barato",
-        label: `${geralBarato.service} - ${geralBarato.company} (Mais econômico geral)`,
-      });
-    }
-  }
-
-  if (geralRapido && !isCorreios(geralRapido)) {
-    const key = `${geralRapido.service}-${geralRapido.company}-geral-rapido`;
-    if (!resultMap.has(key)) {
-      resultMap.set(key, {
-        ...geralRapido,
-        id: "geral-rapido",
-        label: `${geralRapido.service} - ${geralRapido.company} (Mais rápido geral)`,
-      });
-    }
-  }
-
-  const resultado = [...resultMap.values()].map((o) => {
+  const resultado = base.map((o) => {
     const freteGratis = o.price <= 20;
     return {
       id: o.id,
       label: o.label,
       service: o.service,
       company: o.company,
+      escolha: o.escolha || "",
+      grupo: o.grupo || o.company,
       price: freteGratis ? 0 : o.price,
       originalPrice: o.originalPrice,
       delivery_time: o.delivery_time,
@@ -415,16 +409,7 @@ function selecionarOpcoesFrete(opcoes) {
     };
   });
 
-  return resultado.length ? resultado : opcoes.slice(0, 2).map((o, i) => ({
-    id: `opcao-${i}`,
-    label: `${o.service} - ${o.company}`,
-    service: o.service,
-    company: o.company,
-    price: o.price <= 20 ? 0 : o.price,
-    originalPrice: o.originalPrice,
-    delivery_time: o.delivery_time,
-    freteGratis: o.price <= 20,
-  }));
+  return resultado;
 }
 
 function removeAccents(value = "") {

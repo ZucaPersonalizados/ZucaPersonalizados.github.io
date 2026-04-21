@@ -826,19 +826,21 @@ function configurarHeaderUX() {
     }
   });
 
-  // Constrói o dropdown com base no estado de login atual
+  // Constrói o dropdown inicial (pode estar vazio — Firebase ainda não respondeu)
+  // O onAuthStateChanged abaixo atualiza assim que o Firebase confirmar o estado
   atualizarMenuUsuario();
 
   atualizarContadorCarrinho();
   renderizarCarrinhoSidebar();
 
-  // Sincroniza com Firebase Auth: atualiza dados quando o usuário loga via popup
-  // Não apaga sessão automaticamente — só o botão Sair faz logout explícito
+  // Firebase é a fonte de verdade do login
   onAuthStateChanged(auth, (user) => {
     if (user) {
       salvarUsuarioNoStorage(user);
-      atualizarMenuUsuario();
+    } else {
+      limparSessaoUsuario();
     }
+    atualizarMenuUsuario();
   });
 }
 

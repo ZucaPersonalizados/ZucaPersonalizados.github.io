@@ -1212,13 +1212,15 @@ function configurarHeaderCheckout() {
   // Menu de usuário
   atualizarMenuUsuario();
 
-  // Sincroniza com Firebase Auth: atualiza dados quando o usuário loga via popup
+  // Firebase é a fonte de verdade do login
   onAuthStateChanged(auth, (user) => {
     if (user) {
       salvarUsuarioNoStorage(user);
-      atualizarMenuUsuario();
-      atualizarAvatarCheckout();
+    } else {
+      limparSessaoUsuario();
     }
+    atualizarMenuUsuario();
+    atualizarAvatarCheckout();
   });
 }
 

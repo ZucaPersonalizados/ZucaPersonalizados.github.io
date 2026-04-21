@@ -735,6 +735,62 @@ function isItemPersonalizado(item = {}) {
   return false;
 }
 
+function obterUrlAnexoItem(item = {}) {
+  const candidatas = [
+    item.arquivoPersonalizacaoUrl,
+    item.arquivoUrl,
+    item.anexoUrl,
+    item.urlArquivo,
+    item.uploadUrl,
+    item.personalizacaoUrl,
+    item?.arquivo?.url,
+    item?.anexo?.url,
+    item?.upload?.url,
+  ];
+
+  const valor = candidatas
+    .map((v) => String(v || "").trim())
+    .find((v) => v && (/^https?:\/\//i.test(v) || v.startsWith("/upload") || v.includes("storage.googleapis.com")));
+
+  return valor || "";
+}
+
+function obterNomeAnexoItem(item = {}) {
+  const candidatas = [
+    item.arquivoPersonalizacaoNome,
+    item.arquivoNome,
+    item.anexoNome,
+    item.nomeArquivo,
+    item.personalizacaoNome,
+    item?.arquivo?.nome,
+    item?.anexo?.nome,
+    item?.upload?.nome,
+  ];
+
+  const nome = candidatas.map((v) => String(v || "").trim()).find(Boolean);
+  if (nome) return nome;
+
+  const url = obterUrlAnexoItem(item);
+  if (!url) return "";
+  const semQuery = url.split("?")[0];
+  const partes = semQuery.split("/").filter(Boolean);
+  return partes[partes.length - 1] || "arquivo";
+}
+
+function normalizarItemParaPedido(item = {}) {
+  return {
+    ...item,
+    id: String(item.id || "").trim(),
+    nome: String(item.nome || "Produto").trim(),
+    preco: precoNumero(item.preco),
+    quantidade: Number(item.quantidade || 1),
+    imagem: String(item.imagem || "").trim(),
+    personalizado: isItemPersonalizado(item),
+    arquivoPersonalizacaoUrl: obterUrlAnexoItem(item),
+    arquivoPersonalizacaoNome: obterNomeAnexoItem(item),
+  };
+}
+
 async function tratarRetornoPagamento() {
   const params = new URLSearchParams(window.location.search);
   const pedidoId = String(params.get("pedido") || "").trim();
@@ -766,7 +822,7 @@ async function tratarRetornoPagamento() {
 }
 
 async function finalizarPedido() {
-  const itens = getCarrinho();
+  const itens = getCarrinho().map(normalizarItemParaPedido);
   if (itens.length === 0) {
     showToast("Carrinho vazio.", "error");
     return;

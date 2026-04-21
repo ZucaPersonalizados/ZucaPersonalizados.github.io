@@ -794,15 +794,58 @@ app.post("/api/pedidos", requireDb, async (req, res) => {
       });
     }
 
-    const itensNormalizados = itens.map((item) => ({
-      id: String(item.id || ""),
-      nome: String(item.nome || "Produto"),
-      preco: parseMoney(item.preco),
-      quantidade: Number(item.quantidade || 1),
-      imagem: String(item.imagem || ""),
-      arquivoPersonalizacaoUrl: String(item.arquivoPersonalizacaoUrl || "").trim(),
-      arquivoPersonalizacaoNome: String(item.arquivoPersonalizacaoNome || "").trim(),
-    }));
+    const extrairUrlAnexo = (item = {}) => {
+      const candidatas = [
+        item.arquivoPersonalizacaoUrl,
+        item.arquivoUrl,
+        item.anexoUrl,
+        item.urlArquivo,
+        item.uploadUrl,
+        item.personalizacaoUrl,
+        item?.arquivo?.url,
+        item?.anexo?.url,
+        item?.upload?.url,
+      ];
+
+      return candidatas
+        .map((v) => String(v || "").trim())
+        .find((v) => v && (/^https?:\/\//i.test(v) || v.startsWith("/upload") || v.includes("storage.googleapis.com"))) || "";
+    };
+
+    const extrairNomeAnexo = (item = {}, url = "") => {
+      const candidatas = [
+        item.arquivoPersonalizacaoNome,
+        item.arquivoNome,
+        item.anexoNome,
+        item.nomeArquivo,
+        item.personalizacaoNome,
+        item?.arquivo?.nome,
+        item?.anexo?.nome,
+        item?.upload?.nome,
+      ];
+
+      const nome = candidatas.map((v) => String(v || "").trim()).find(Boolean);
+      if (nome) return nome;
+      if (!url) return "";
+
+      const semQuery = String(url).split("?")[0];
+      const partes = semQuery.split("/").filter(Boolean);
+      return partes[partes.length - 1] || "arquivo";
+    };
+
+    const itensNormalizados = itens.map((item) => {
+      const arquivoPersonalizacaoUrl = extrairUrlAnexo(item);
+      return {
+        id: String(item.id || ""),
+        nome: String(item.nome || "Produto"),
+        preco: parseMoney(item.preco),
+        quantidade: Number(item.quantidade || 1),
+        imagem: String(item.imagem || ""),
+        personalizado: !!item.personalizado,
+        arquivoPersonalizacaoUrl,
+        arquivoPersonalizacaoNome: extrairNomeAnexo(item, arquivoPersonalizacaoUrl),
+      };
+    });
 
     const invalidos = [];
     for (const item of itensNormalizados) {

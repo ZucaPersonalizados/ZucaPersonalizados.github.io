@@ -52,13 +52,11 @@
       </button>
 
       <div class="avatar-menu">
-        <button id="btn-avatar" type="button" class="avatar-btn" aria-haspopup="true" aria-expanded="false">
-          <img id="avatar-image" class="avatar-image" src="img/logo/logo.png" alt="Avatar do usuário">
+        <button id="btn-avatar" type="button" class="avatar-btn" aria-haspopup="true" aria-expanded="false" aria-label="Menu do usuário">
+          <img id="avatar-image" class="avatar-image" src="img/logo/logo.png" alt="">
         </button>
-        <div id="avatar-dropdown" class="avatar-dropdown">
-          <button id="btn-login-google" type="button">Entrar com Google</button>
-          <button id="btn-logout-user" type="button">Sair</button>
-           <a href="/minha-conta">Minha conta</a>
+        <div id="avatar-dropdown" class="avatar-dropdown" role="menu">
+          <!-- preenchido dinamicamente pelo script.js -->
         </div>
       </div>
     </div>

@@ -293,40 +293,146 @@ p {
   z-index: 3200;
 }
 
+/* Botão avatar: logado → foto | deslogado → ícone + "Entrar" */
+.avatar-btn {
+  width: 44px;
+  height: 44px;
+  padding: 2px;
+  border-radius: 999px;
+  overflow: hidden;
+  justify-content: center;
+  transition: box-shadow 0.2s, transform 0.2s, background 0.2s;
+}
+.avatar-btn.nao-logado {
+  width: auto;
+  padding: 9px 14px;
+  border-radius: 999px;
+  gap: 6px;
+  font-size: 0.875rem;
+  font-weight: 700;
+  overflow: visible;
+  color: var(--ink-deep);
+}
+.avatar-btn.nao-logado svg { flex-shrink: 0; }
+
 .avatar-dropdown {
   position: absolute;
   top: calc(100% + 10px);
   right: 0;
-  width: 210px;
+  width: 240px;
   z-index: 4000;
-  display: none;
-  border-radius: var(--radius-md);
+  border-radius: 14px;
   background: #fff;
   border: 1px solid var(--line);
-  box-shadow: var(--shadow-soft);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.13);
   overflow: hidden;
+  /* animação */
+  opacity: 0;
+  transform: translateY(-8px) scale(0.97);
+  pointer-events: none;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+  display: block; /* sempre no DOM, animado com opacity */
 }
-
 .avatar-dropdown.ativo {
-  display: block;
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
 }
 
-.avatar-dropdown button,
-.avatar-dropdown a {
+/* Cabeçalho do dropdown (logado) */
+.avatar-dd-header {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 16px 14px 12px;
+  border-bottom: 1px solid var(--line);
+}
+.avatar-dd-foto {
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 2px solid var(--line);
+}
+.avatar-dd-info { overflow: hidden; }
+.avatar-dd-nome {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--ink-deep);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.avatar-dd-email {
+  font-size: 0.75rem;
+  color: var(--ink-soft, #888);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Cabeçalho do dropdown (deslogado) */
+.avatar-dd-promo {
+  padding: 16px 14px 14px;
+  border-bottom: 1px solid var(--line);
+}
+.avatar-dd-promo p {
+  font-size: 0.82rem;
+  color: var(--ink-soft, #888);
+  margin: 0 0 10px;
+  line-height: 1.45;
+}
+.avatar-dd-btn-entrar {
+  display: block;
+  width: 100%;
+  text-align: center;
+  background: var(--accent-rose, #e9836d);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 9px 0;
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: filter 0.15s;
+  text-decoration: none;
+}
+.avatar-dd-btn-entrar:hover { filter: brightness(1.08); }
+
+/* Itens de menu */
+.avatar-dd-lista {
+  padding: 6px 0;
+}
+.avatar-dd-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   width: 100%;
   text-align: left;
-  display: block;
-  background: #fff;
-  border: 0;
-  padding: 11px 14px;
+  background: transparent;
+  border: none;
+  padding: 10px 14px;
   font: inherit;
-  font-size: 0.9rem;
+  font-size: 0.875rem;
+  color: var(--ink-deep);
   cursor: pointer;
+  text-decoration: none;
+  transition: background 0.13s;
 }
+.avatar-dd-item:hover { background: #f9f2ea; }
+.avatar-dd-item svg { flex-shrink: 0; opacity: 0.6; }
 
-.avatar-dropdown button:hover,
-.avatar-dropdown a:hover {
-  background: #f9f2ea;
+/* Sair com cor de perigo */
+.avatar-dd-item.sair { color: #dc2626; }
+.avatar-dd-item.sair svg { opacity: 0.8; }
+.avatar-dd-item.sair:hover { background: #fff1f1; }
+
+.avatar-dd-divider {
+  height: 1px;
+  background: var(--line);
+  margin: 4px 0;
 }
 
 .btn-whatsapp {

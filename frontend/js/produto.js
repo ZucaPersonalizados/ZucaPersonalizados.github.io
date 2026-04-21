@@ -77,11 +77,102 @@ function obterAvatarHeader() {
   return localStorage.getItem("zuca_avatar_url") || DEFAULT_AVATAR;
 }
 
-function atualizarAvatarHeader() {
-  const avatarImage = document.getElementById("avatar-image");
-  if (!avatarImage) return;
-  avatarImage.src = obterAvatarHeader();
+function getUsuarioLogado() {
+  try {
+    const perfil = JSON.parse(localStorage.getItem("zuca_perfil") || "{}");
+    const checkout = JSON.parse(localStorage.getItem("zuca_checkout_cliente") || "{}");
+    const nome = (perfil.nome || checkout.nome || "").trim();
+    const email = (perfil.email || checkout.email || "").trim().toLowerCase();
+    if (!nome && !email) return null;
+    return {
+      nome,
+      email,
+      primeiroNome: nome.split(" ")[0] || "Olá",
+      avatar: localStorage.getItem("zuca_avatar_url") || DEFAULT_AVATAR,
+    };
+  } catch { return null; }
 }
+
+function limparSessaoUsuario() {
+  ["zuca_checkout_cliente", "zuca_perfil", "zuca_avatar_url", "zuca_checkout_cliente_nome"].forEach(
+    (k) => localStorage.removeItem(k)
+  );
+}
+
+function atualizarMenuUsuario() {
+  const btnAvatar = document.getElementById("btn-avatar");
+  const dropdown = document.getElementById("avatar-dropdown");
+  const avatarImg = document.getElementById("avatar-image");
+  if (!btnAvatar || !dropdown) return;
+
+  const usuario = getUsuarioLogado();
+
+  if (usuario) {
+    btnAvatar.classList.remove("nao-logado");
+    if (avatarImg) { avatarImg.src = usuario.avatar; avatarImg.style.display = ""; }
+    const labelEl = btnAvatar.querySelector(".avatar-btn-label");
+    if (labelEl) labelEl.remove();
+  } else {
+    btnAvatar.classList.add("nao-logado");
+    if (avatarImg) avatarImg.style.display = "none";
+    if (!btnAvatar.querySelector(".avatar-btn-label")) {
+      const span = document.createElement("span");
+      span.className = "avatar-btn-label";
+      span.style.cssText = "display:flex;align-items:center;gap:6px;pointer-events:none;";
+      span.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg><span style="font-size:.875rem;font-weight:700;">Entrar</span>`;
+      btnAvatar.appendChild(span);
+    }
+  }
+
+  if (usuario) {
+    dropdown.innerHTML = `
+      <div class="avatar-dd-header">
+        <img class="avatar-dd-foto" src="${escapeHtml(usuario.avatar)}" alt="" onerror="this.src='${DEFAULT_AVATAR}'">
+        <div class="avatar-dd-info">
+          <div class="avatar-dd-nome">${escapeHtml(usuario.primeiroNome)}</div>
+          ${usuario.email ? `<div class="avatar-dd-email">${escapeHtml(usuario.email)}</div>` : ""}
+        </div>
+      </div>
+      <div class="avatar-dd-lista">
+        <a class="avatar-dd-item" href="/minha-conta">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+          Minha conta
+        </a>
+        <a class="avatar-dd-item" href="/minha-conta#pedidos">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="18" rx="2"/><path d="M8 10h8M8 14h5"/></svg>
+          Meus pedidos
+        </a>
+        <div class="avatar-dd-divider"></div>
+        <button class="avatar-dd-item sair" id="btn-logout-user" type="button">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          Sair
+        </button>
+      </div>`;
+    dropdown.querySelector("#btn-logout-user")?.addEventListener("click", () => {
+      dropdown.classList.remove("ativo");
+      btnAvatar.setAttribute("aria-expanded", "false");
+      limparSessaoUsuario();
+      atualizarMenuUsuario();
+      showToast("Até logo! Você saiu da sua conta.", "success");
+    });
+  } else {
+    dropdown.innerHTML = `
+      <div class="avatar-dd-promo">
+        <p>Faça login para ver seus pedidos e salvar seus dados.</p>
+        <a class="avatar-dd-btn-entrar" href="/minha-conta">Entrar / Criar conta</a>
+      </div>
+      <div class="avatar-dd-lista">
+        <a class="avatar-dd-item" href="/minha-conta#pedidos">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="18" rx="2"/><path d="M8 10h8M8 14h5"/></svg>
+          Meus pedidos
+        </a>
+      </div>`;
+  }
+}
+
+/** @deprecated */
+function atualizarAvatarHeader() { atualizarMenuUsuario(); }
+
 
 function normalizarUrlSemExtensao() {
   const path = window.location.pathname;
@@ -259,8 +350,6 @@ function configurarHeaderProduto() {
   const btnClose = document.getElementById("btn-close-cart");
   const btnAvatar = document.getElementById("btn-avatar");
   const dropdown = document.getElementById("avatar-dropdown");
-  const btnLoginGoogle = document.getElementById("btn-login-google");
-  const btnLogoutUser = document.getElementById("btn-logout-user");
 
   const abrirCarrinho = () => {
     sidebar?.classList.add("ativo");
@@ -290,18 +379,8 @@ function configurarHeaderProduto() {
     }
   });
 
-  btnLoginGoogle?.addEventListener("click", () => {
-    window.location.href = "/checkout";
-  });
-
-  btnLogoutUser?.addEventListener("click", () => {
-    localStorage.removeItem("zuca_checkout_cliente");
-    localStorage.removeItem("zuca_checkout_cliente_nome");
-    atualizarAvatarHeader();
-    dropdown?.classList.remove("ativo");
-  });
-
-  atualizarAvatarHeader();
+  // Menu de usuário (login/logout) é gerenciado pelo script.js
+  if (typeof atualizarMenuUsuario === "function") atualizarMenuUsuario();
 
   atualizarContadorCarrinho();
   renderizarCarrinhoSidebar();

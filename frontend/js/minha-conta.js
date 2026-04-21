@@ -1,3 +1,14 @@
+import {
+  auth,
+  loginComGoogle,
+  loginComApple,
+  loginComMicrosoft,
+  sairDoFirebase,
+  onAuthStateChanged,
+  salvarUsuarioNoStorage,
+  limparStorageUsuario,
+} from "./firebase-auth.js";
+
 const el = (id) => document.getElementById(id);
 
 const API_BASE = (() => {
@@ -345,7 +356,7 @@ el("email")?.addEventListener("blur", (event) => {
   if (value) listarPedidos(value);
 });
 
-/* ── Login social (simulação local) ── */
+/* ── Login social — Firebase Auth real ── */
 function setLoginSocialStatus(msg, ok = true) {
   const s = el("login-social-status");
   if (!s) return;
@@ -353,63 +364,81 @@ function setLoginSocialStatus(msg, ok = true) {
   s.style.color = ok ? "#1f8f4f" : "#b02a37";
 }
 
-function aplicarLoginSocial(email, provedor) {
-  email = email.trim().toLowerCase();
-  if (!email || !email.includes("@")) {
-    setLoginSocialStatus("E-mail inválido. Tente novamente.", false);
-    return;
-  }
-  const perfil = JSON.parse(localStorage.getItem("zuca_perfil") || "{}");
-  perfil.email = email;
-  localStorage.setItem("zuca_perfil", JSON.stringify(perfil));
-
-  const checkoutCliente = JSON.parse(localStorage.getItem("zuca_checkout_cliente") || "{}");
-  checkoutCliente.email = email;
-  localStorage.setItem("zuca_checkout_cliente", JSON.stringify(checkoutCliente));
-
-  if (el("email")) el("email").value = email;
-  setLoginSocialStatus(`Conectado como ${email} via ${provedor}.`);
-  showToast(`Bem-vindo! Conectado com ${provedor}.`, "success");
-
-  // Oculta a seção de login social e mostra o perfil
-  const sec = el("login-social-section");
-  if (sec) sec.style.display = "none";
-
-  listarPedidos(email);
-  if (perfil.email) carregarPerfil();
+function setLoginSocialLoading(loading) {
+  ["btn-login-google", "btn-login-apple", "btn-login-outlook"].forEach((id) => {
+    const btn = el(id);
+    if (!btn) return;
+    btn.disabled = loading;
+    btn.style.opacity = loading ? "0.6" : "";
+  });
 }
 
-el("btn-login-google")?.addEventListener("click", () => {
-  const atual = String(el("email")?.value || "").trim();
-  const email = window.prompt("Digite seu e-mail do Gmail (Google):", atual);
-  if (email) aplicarLoginSocial(email, "Google");
-});
-
-el("btn-login-apple")?.addEventListener("click", () => {
-  const atual = String(el("email")?.value || "").trim();
-  const email = window.prompt("Digite seu e-mail do iCloud (Apple):", atual);
-  if (email) aplicarLoginSocial(email, "Apple");
-});
-
-el("btn-login-outlook")?.addEventListener("click", () => {
-  const atual = String(el("email")?.value || "").trim();
-  const email = window.prompt("Digite seu e-mail do Outlook (Microsoft):", atual);
-  if (email) aplicarLoginSocial(email, "Outlook");
-});
-
-// Se o usuário já tem e-mail salvo, oculta a seção de login social
-(function verificarLoginSocialVisivel() {
-  const perfil = JSON.parse(localStorage.getItem("zuca_perfil") || "{}");
-  const checkout = JSON.parse(localStorage.getItem("zuca_checkout_cliente") || "{}");
-  const email = perfil.email || checkout.email || "";
-  if (email) {
+async function executarLogin(providerFn, nomeProvedor) {
+  setLoginSocialLoading(true);
+  setLoginSocialStatus(`Abrindo login com ${nomeProvedor}...`);
+  try {
+    const result = await providerFn();
+    const user = result.user;
+    salvarUsuarioNoStorage(user);
+    setLoginSocialStatus(`Bem-vindo, ${user.displayName || user.email}!`);
+    showToast(`Bem-vindo! Conectado com ${nomeProvedor}.`, "success");
+    // Oculta login social e atualiza perfil
     const sec = el("login-social-section");
     if (sec) sec.style.display = "none";
+    const btnSair = el("btn-sair-conta");
+    if (btnSair) btnSair.style.display = "";
+    carregarPerfil();
+  } catch (err) {
+    const msg = traduzirErroFirebase(err.code);
+    setLoginSocialStatus(msg, false);
+    showToast(msg, "error");
+  } finally {
+    setLoginSocialLoading(false);
   }
-})();
+}
+
+function traduzirErroFirebase(code) {
+  const erros = {
+    "auth/popup-closed-by-user": "Login cancelado. Feche o popup e tente novamente.",
+    "auth/popup-blocked": "Popup bloqueado pelo navegador. Permita popups para este site.",
+    "auth/cancelled-popup-request": "Login cancelado.",
+    "auth/account-exists-with-different-credential":
+      "Este e-mail já está vinculado a outro provedor. Tente outro método de login.",
+    "auth/network-request-failed": "Sem conexão. Verifique sua internet e tente novamente.",
+    "auth/unauthorized-domain":
+      "Domínio não autorizado no Firebase. Contate o suporte.",
+  };
+  return erros[code] || `Erro ao fazer login (${code || "desconhecido"}).`;
+}
+
+el("btn-login-google")?.addEventListener("click", () => executarLogin(loginComGoogle, "Google"));
+el("btn-login-apple")?.addEventListener("click", () => executarLogin(loginComApple, "Apple"));
+el("btn-login-outlook")?.addEventListener("click", () => executarLogin(loginComMicrosoft, "Microsoft"));
+
+el("btn-sair-conta")?.addEventListener("click", async () => {
+  try { await sairDoFirebase(); } catch (_) {}
+  limparStorageUsuario();
+  showToast("Você saiu da sua conta.", "success");
+  window.location.reload();
+});
+
+// Sincroniza UI com estado Firebase ao carregar a página
+onAuthStateChanged(auth, (user) => {
+  const sec = el("login-social-section");
+  const btnSair = el("btn-sair-conta");
+  if (user) {
+    salvarUsuarioNoStorage(user);
+    if (sec) sec.style.display = "none";
+    if (btnSair) btnSair.style.display = "";
+    carregarPerfil();
+  } else {
+    limparStorageUsuario();
+    if (sec) sec.style.display = "";
+    if (btnSair) btnSair.style.display = "none";
+  }
+});
 
 renderAvatarOptions();
-carregarPerfil();
 
 /* ========== Saved Address ========== */
 function carregarEnderecoSalvo() {

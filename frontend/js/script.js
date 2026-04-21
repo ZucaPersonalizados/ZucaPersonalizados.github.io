@@ -1,3 +1,10 @@
+import {
+  auth,
+  sairDoFirebase,
+  onAuthStateChanged,
+  salvarUsuarioNoStorage,
+} from "./firebase-auth.js";
+
 const API_BASE = (() => {
   const custom = localStorage.getItem("zuca_api_base_url");
   if (custom) return custom.replace(/\/$/, "");
@@ -796,12 +803,13 @@ function configurarHeaderUX() {
   });
 
   // Listener de logout no dropdown (elemento estável — persiste mesmo com innerHTML trocado)
-  dropdown?.addEventListener("click", (e) => {
+  dropdown?.addEventListener("click", async (e) => {
     const sairBtn = e.target.closest(".sair");
     if (!sairBtn) return;
     e.stopPropagation();
     dropdown.classList.remove("ativo");
     btnAvatar.setAttribute("aria-expanded", "false");
+    try { await sairDoFirebase(); } catch (_) {}
     limparSessaoUsuario();
     atualizarMenuUsuario();
     atualizarContadorCarrinho();
@@ -823,6 +831,13 @@ function configurarHeaderUX() {
 
   atualizarContadorCarrinho();
   renderizarCarrinhoSidebar();
+
+  // Sincroniza com Firebase Auth (login em outra aba, etc.)
+  onAuthStateChanged(auth, (user) => {
+    if (user) salvarUsuarioNoStorage(user);
+    else limparSessaoUsuario();
+    atualizarMenuUsuario();
+  });
 }
 
 function ativarSliders() {

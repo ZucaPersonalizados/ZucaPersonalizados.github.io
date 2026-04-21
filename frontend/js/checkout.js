@@ -1,3 +1,10 @@
+import {
+  auth,
+  sairDoFirebase,
+  onAuthStateChanged,
+  salvarUsuarioNoStorage,
+} from "./firebase-auth.js";
+
 const el = (id) => document.getElementById(id);
 
 const API_BASE = (() => {
@@ -1177,12 +1184,13 @@ function configurarHeaderCheckout() {
   });
 
   // Listener de logout no dropdown (elemento estável — persiste mesmo com innerHTML trocado)
-  dropdown?.addEventListener("click", (e) => {
+  dropdown?.addEventListener("click", async (e) => {
     const sairBtn = e.target.closest(".sair");
     if (!sairBtn) return;
     e.stopPropagation();
     dropdown.classList.remove("ativo");
     btnAvatar.setAttribute("aria-expanded", "false");
+    try { await sairDoFirebase(); } catch (_) {}
     limparSessaoUsuario();
     atualizarMenuUsuario();
     atualizarAvatarCheckout();
@@ -1203,6 +1211,14 @@ function configurarHeaderCheckout() {
 
   // Menu de usuário
   atualizarMenuUsuario();
+
+  // Sincroniza com Firebase Auth
+  onAuthStateChanged(auth, (user) => {
+    if (user) salvarUsuarioNoStorage(user);
+    else limparSessaoUsuario();
+    atualizarMenuUsuario();
+    atualizarAvatarCheckout();
+  });
 }
 
 function configurarCopiarPix() {

@@ -379,7 +379,7 @@ function selecionarOpcoesFrete(opcoes) {
     resultadoBase.push({
       ...item,
       id,
-      label: `${grupo} • ${tipo}`,
+      label: `${item.company || grupo || "Transportadora"}`,
       escolha: tipo,
       grupo,
     });

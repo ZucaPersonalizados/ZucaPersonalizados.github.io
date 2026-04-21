@@ -435,8 +435,12 @@ async function calcularFreteProduto(cep, produtoId) {
     }
 
     freteResultado.innerHTML = data.options.map((op) => `
-      <div class="frete-option-mini">
-        <span><strong>${escapeHtml(op.label || op.company)}</strong> - ${Number(op.delivery_time) || "?"} dias úteis</span>
+      <div class="frete-option-mini" style="display:grid; grid-template-columns: 1fr auto; gap:8px; align-items:start;">
+        <div>
+          <div><strong>${escapeHtml(op.company || "Transportadora")}</strong></div>
+          <div style="font-size: 0.92rem; color: var(--muted);">Serviço: ${escapeHtml(op.service || "Entrega")}</div>
+          <div style="font-size: 0.92rem; color: var(--muted);">Receba em até ${Number(op.delivery_time) || "?"} dias úteis</div>
+        </div>
         <span class="frete-price">${op.freteGratis ? '<span style="color: var(--accent);">GRÁTIS</span>' : formatarMoeda(op.price)}</span>
       </div>
     `).join("");

@@ -139,6 +139,15 @@ function parseMoney(value) {
   return Number(sanitized) || 0;
 }
 
+function parseDecimal(value, fallback = 0) {
+  if (typeof value === "number") return Number.isFinite(value) ? value : fallback;
+  const raw = String(value ?? "").trim();
+  if (!raw) return fallback;
+  const normalized = raw.replace(/\s/g, "").replace(",", ".");
+  const number = Number(normalized);
+  return Number.isFinite(number) ? number : fallback;
+}
+
 function digitsOnly(value) {
   return String(value || "").replace(/\D/g, "");
 }
@@ -285,16 +294,48 @@ async function calcularFreteMelhorEnvio({ cepDestino, itens }) {
     return calcularFreteFallback({ cepDestino, itens });
   }
 
-  const produtos = (Array.isArray(itens) && itens.length ? itens : [{ nome: "Pedido", quantidade: 1, preco: 0 }]).map((item, index) => ({
-    id: String(item.id || index + 1),
-    name: String(item.nome || "Produto"),
-    width: Number(item.largura || 15),
-    height: Number(item.altura || 2),
-    length: Number(item.comprimento || 20),
-    weight: Number(item.peso || 0.3),
-    insurance_value: Number(item.preco || 0),
-    quantity: Math.max(1, Number(item.quantidade || 1)),
-  }));
+  const itensNormalizados = Array.isArray(itens) && itens.length
+    ? itens
+    : [{ nome: "Pedido", quantidade: 1, preco: 0, larguraCm: 15, comprimentoCm: 20, alturaCm: 2, pesoKg: 0.3 }];
+
+  const baseMaiorArea = itensNormalizados.reduce((maior, item) => {
+    const largura = Math.max(1, parseDecimal(item.larguraCm ?? item.largura, 15));
+    const comprimento = Math.max(1, parseDecimal(item.comprimentoCm ?? item.comprimento, 20));
+    const area = largura * comprimento;
+    if (!maior || area > maior.area) {
+      return { area, largura, comprimento };
+    }
+    return maior;
+  }, null);
+
+  const alturaTotal = itensNormalizados.reduce((acc, item) => {
+    const altura = Math.max(0.1, parseDecimal(item.alturaCm ?? item.altura, 2));
+    const quantidade = Math.max(1, Number(item.quantidade || 1));
+    return acc + (altura * quantidade);
+  }, 0);
+
+  const pesoTotal = itensNormalizados.reduce((acc, item) => {
+    const peso = Math.max(0.01, parseDecimal(item.pesoKg ?? item.peso, 0.3));
+    const quantidade = Math.max(1, Number(item.quantidade || 1));
+    return acc + (peso * quantidade);
+  }, 0);
+
+  const seguroTotal = itensNormalizados.reduce((acc, item) => {
+    const valor = parseMoney(item.preco);
+    const quantidade = Math.max(1, Number(item.quantidade || 1));
+    return acc + (valor * quantidade);
+  }, 0);
+
+  const produtos = [{
+    id: "pacote-final",
+    name: "Pedido consolidado",
+    width: Number(Math.max(1, baseMaiorArea?.largura || 15).toFixed(2)),
+    height: Number(Math.max(0.1, alturaTotal || 2).toFixed(2)),
+    length: Number(Math.max(1, baseMaiorArea?.comprimento || 20).toFixed(2)),
+    weight: Number(Math.max(0.01, pesoTotal || 0.3).toFixed(3)),
+    insurance_value: Number(Math.max(0, seguroTotal).toFixed(2)),
+    quantity: 1,
+  }];
 
   const PRAZO_EXTRA = 3;
 
@@ -1101,6 +1142,10 @@ app.post("/api/admin/produtos", adminAuth, requireDb, async (req, res) => {
       tipo: String(req.body.tipo || ""),
       tamanho: String(req.body.tamanho || ""),
       gramatura: String(req.body.gramatura || ""),
+      larguraCm: Math.max(1, parseDecimal(req.body.larguraCm, 15)),
+      comprimentoCm: Math.max(1, parseDecimal(req.body.comprimentoCm, 20)),
+      alturaCm: Math.max(0.1, parseDecimal(req.body.alturaCm, 2)),
+      pesoKg: Math.max(0.01, parseDecimal(req.body.pesoKg, 0.3)),
       link: String(req.body.link || ""),
       imagens,
       personalizado: !!req.body.personalizado,
@@ -1142,6 +1187,10 @@ app.put("/api/admin/produtos/:id", adminAuth, requireDb, async (req, res) => {
       tipo: String(req.body.tipo || ""),
       tamanho: String(req.body.tamanho || ""),
       gramatura: String(req.body.gramatura || ""),
+      larguraCm: Math.max(1, parseDecimal(req.body.larguraCm, 15)),
+      comprimentoCm: Math.max(1, parseDecimal(req.body.comprimentoCm, 20)),
+      alturaCm: Math.max(0.1, parseDecimal(req.body.alturaCm, 2)),
+      pesoKg: Math.max(0.01, parseDecimal(req.body.pesoKg, 0.3)),
       link: String(req.body.link || ""),
       imagens,
       personalizado: !!req.body.personalizado,
@@ -1530,7 +1579,7 @@ app.post("/processar-pagamento", async (req, res) => {
   }
 });
 
-app.get("/api/frete/calcular", async (req, res) => {
+app.get("/api/frete/calcular", requireDb, async (req, res) => {
   try {
     const cepDestino = String(req.query.cep || "").trim();
     const itensRaw = String(req.query.itens || "").trim();
@@ -1549,7 +1598,31 @@ app.get("/api/frete/calcular", async (req, res) => {
       }
     }
 
-    const resultado = await calcularFreteMelhorEnvio({ cepDestino, itens });
+    const itensComDimensao = await Promise.all((Array.isArray(itens) ? itens : []).map(async (item) => {
+      const id = String(item?.id || "").trim();
+      const quantidade = Math.max(1, Number(item?.quantidade || 1));
+      const preco = parseMoney(item?.preco);
+
+      let produtoData = null;
+      if (id) {
+        const snap = await db.collection("produtos").doc(id).get();
+        if (snap.exists) produtoData = snap.data() || null;
+      }
+
+      const base = produtoData || {};
+      return {
+        id,
+        nome: String(item?.nome || base.nome || "Produto"),
+        quantidade,
+        preco,
+        larguraCm: Math.max(1, parseDecimal(base.larguraCm ?? base.largura, 15)),
+        comprimentoCm: Math.max(1, parseDecimal(base.comprimentoCm ?? base.comprimento, 20)),
+        alturaCm: Math.max(0.1, parseDecimal(base.alturaCm ?? base.altura, 2)),
+        pesoKg: Math.max(0.01, parseDecimal(base.pesoKg ?? base.peso, 0.3)),
+      };
+    }));
+
+    const resultado = await calcularFreteMelhorEnvio({ cepDestino, itens: itensComDimensao });
     return res.json({ success: true, ...resultado });
   } catch (error) {
     return res.status(500).json({ success: false, error: error.message });

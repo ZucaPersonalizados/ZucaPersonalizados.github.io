@@ -255,6 +255,14 @@ function parsePreco(preco = "") {
   return Number.isFinite(number) ? number : 0;
 }
 
+function parseNumeroDecimal(value, fallback = 0) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return fallback;
+  const normalized = raw.replace(/\s/g, "").replace(",", ".");
+  const number = Number(normalized);
+  return Number.isFinite(number) ? number : fallback;
+}
+
 function obterProdutoDoFormulario() {
   return {
     id: String(document.getElementById("id")?.value || "").trim(),
@@ -265,6 +273,10 @@ function obterProdutoDoFormulario() {
     tipo: String(document.getElementById("tipo")?.value || "").trim(),
     tamanho: String(document.getElementById("tamanho")?.value || "").trim(),
     gramatura: String(document.getElementById("gramatura")?.value || "").trim(),
+    larguraCm: parseNumeroDecimal(document.getElementById("larguraCm")?.value, 15),
+    comprimentoCm: parseNumeroDecimal(document.getElementById("comprimentoCm")?.value, 20),
+    alturaCm: parseNumeroDecimal(document.getElementById("alturaCm")?.value, 2),
+    pesoKg: parseNumeroDecimal(document.getElementById("pesoKg")?.value, 0.3),
     link: String(document.getElementById("link")?.value || "").trim(),
     imagens: String(document.getElementById("imagens")?.value || "")
       .split(",")
@@ -294,6 +306,10 @@ function preencherFormularioProduto(produto) {
   document.getElementById("tipo").value = produto.tipo || "";
   document.getElementById("tamanho").value = produto.tamanho || "";
   document.getElementById("gramatura").value = produto.gramatura || "";
+  document.getElementById("larguraCm").value = Number(produto.larguraCm || 15);
+  document.getElementById("comprimentoCm").value = Number(produto.comprimentoCm || 20);
+  document.getElementById("alturaCm").value = Number(produto.alturaCm || 2);
+  document.getElementById("pesoKg").value = Number(produto.pesoKg || 0.3);
   document.getElementById("link").value = produto.link || "";
   document.getElementById("imagens").value = Array.isArray(produto.imagens) ? produto.imagens.join(", ") : "";
   document.getElementById("descricaoCurta").value = produto.descricaoCurta || "";
@@ -321,6 +337,7 @@ function renderProdutos() {
         <div class="item-title">${escapeHtml(produto.nome || "Produto")}</div>
         <div class="item-meta">ID: ${escapeHtml(produto.id)} | Preco: ${formatarMoeda(preco)} | Estoque: ${Number(produto.estoque || 0)}</div>
         <div class="item-meta">Categoria: ${escapeHtml(produto.categoria || "-")} | Tipo: ${escapeHtml(produto.tipo || "-")}</div>
+        <div class="item-meta">Dimensões: ${Number(produto.larguraCm || 15)}x${Number(produto.comprimentoCm || 20)}x${Number(produto.alturaCm || 2)} cm | Peso: ${Number(produto.pesoKg || 0.3)} kg</div>
         <div class="table-actions">
           <button class="btn btn-small btn-secondary" type="button" data-action="editar-produto">Editar</button>
           <button class="btn btn-small btn-danger" type="button" data-action="excluir-produto">Excluir</button>

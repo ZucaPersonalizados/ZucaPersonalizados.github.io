@@ -407,48 +407,6 @@ function calcularParcelas(preco) {
   return { parcelas, valor, valorFormatado: formatarMoeda(valor) };
 }
 
-/* ========== Calcular Frete no Produto ========== */
-async function calcularFreteProduto(cep, produtoId) {
-  const freteResultado = document.getElementById("frete-produto-resultado");
-  if (!freteResultado) return;
-
-  cep = cep.replace(/\D/g, "");
-  if (cep.length !== 8) {
-    showToast("CEP inválido. Informe 8 dígitos.", "error");
-    return;
-  }
-
-  freteResultado.innerHTML = '<p style="color: var(--muted);">Calculando frete...</p>';
-
-  try {
-    const qty = Number(document.getElementById("qty-input")?.value || 1);
-    const url = new URL(getApiUrl("/api/frete/calcular"));
-    url.searchParams.set("cep", cep);
-    url.searchParams.set("itens", JSON.stringify([{ id: produtoId, quantidade: qty }]));
-
-    const response = await fetch(url.toString());
-
-    const data = await response.json();
-    if (!response.ok || !data.options?.length) {
-      freteResultado.innerHTML = '<p style="color: var(--accent-rose);">Nenhuma opção de frete encontrada.</p>';
-      return;
-    }
-
-    freteResultado.innerHTML = data.options.map((op) => `
-      <div class="frete-option-mini" style="display:grid; grid-template-columns: 1fr auto; gap:8px; align-items:start;">
-        <div>
-          <div><strong>${escapeHtml(op.company || "Transportadora")}</strong></div>
-          <div style="font-size: 0.92rem; color: var(--muted);">Serviço: ${escapeHtml(op.service || "Entrega")}</div>
-          <div style="font-size: 0.92rem; color: var(--muted);">Receba em até ${Number(op.delivery_time) || "?"} dias úteis</div>
-        </div>
-        <span class="frete-price">${op.freteGratis ? '<span style="color: var(--accent);">GRÁTIS</span>' : formatarMoeda(op.price)}</span>
-      </div>
-    `).join("");
-  } catch {
-    freteResultado.innerHTML = '<p style="color: var(--error);">Erro ao calcular frete.</p>';
-  }
-}
-
 /* ========== Compartilhar Produto ========== */
 function compartilharWhatsApp(nome) {
   const url = encodeURIComponent(window.location.href);
@@ -572,35 +530,6 @@ async function carregarProduto() {
     document.getElementById("btn-wishlist")?.addEventListener("click", () => toggleWishlist(id));
     document.getElementById("btn-share-whatsapp")?.addEventListener("click", () => compartilharWhatsApp(produto.nome || ""));
     document.getElementById("btn-share-link")?.addEventListener("click", copiarLink);
-
-    /* ========== Frete Calculator ========== */
-    const freteHtml = `
-      <div class="frete-produto" style="margin-top: 20px; padding: 16px; background: var(--bg-secondary, #f9f7f4); border-radius: 10px;">
-        <p style="font-weight: 600; margin: 0 0 8px;">📦 Calcular frete</p>
-        <div style="display: flex; gap: 8px;">
-          <input type="text" id="cep-produto" placeholder="00000-000" maxlength="9"
-            style="flex: 1; padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px;">
-          <button type="button" id="btn-calcular-frete-produto" class="btn btn-sm"
-            style="padding: 8px 16px; border-radius: 6px;">Calcular</button>
-        </div>
-        <div id="frete-produto-resultado" style="margin-top: 10px;"></div>
-      </div>
-    `;
-    const estoqueContainer = document.getElementById("estoque-container");
-    if (estoqueContainer) {
-      estoqueContainer.insertAdjacentHTML("afterend", freteHtml);
-    }
-
-    document.getElementById("cep-produto")?.addEventListener("input", (e) => {
-      let v = e.target.value.replace(/\D/g, "");
-      if (v.length > 5) v = v.slice(0, 5) + "-" + v.slice(5, 8);
-      e.target.value = v;
-    });
-
-    document.getElementById("btn-calcular-frete-produto")?.addEventListener("click", () => {
-      const cep = document.getElementById("cep-produto")?.value || "";
-      calcularFreteProduto(cep, id);
-    });
 
     document.getElementById("btn-adicionar-carrinho")?.addEventListener("click", async () => {
       if (estoque <= 0) {

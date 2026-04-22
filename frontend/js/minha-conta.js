@@ -21,6 +21,9 @@ function getApiUrl(path) {
   return `${API_BASE}${path}`;
 }
 
+// UID do usuário logado — chave para isolar dados por conta
+let currentUid = null;
+
 const AVATARS = [
   "https://api.dicebear.com/8.x/fun-emoji/svg?seed=Zuca1",
   "https://api.dicebear.com/8.x/fun-emoji/svg?seed=Zuca2",
@@ -117,9 +120,23 @@ function carregarPerfil() {
   if (el("telefone")) el("telefone").value = telefone;
   if (el("avatar-preview")) el("avatar-preview").src = avatarSelecionado;
 
+  carregarEnderecoSalvo();
+
   if (email) {
     listarPedidos(email);
   }
+}
+
+function limparTodosInputs() {
+  ["nome", "email", "telefone"].forEach((id) => { if (el(id)) el(id).value = ""; });
+  ["end-cep", "end-endereco", "end-numero", "end-bairro", "end-cidade", "end-estado"].forEach(
+    (id) => { if (el(id)) el(id).value = ""; }
+  );
+  const list = el("pedido-list");
+  if (list) list.innerHTML = "";
+  avatarSelecionado = AVATARS[0];
+  if (el("avatar-preview")) el("avatar-preview").src = AVATARS[0];
+  renderAvatarOptions();
 }
 
 function renderAvatarOptions() {
@@ -428,12 +445,15 @@ onAuthStateChanged(auth, (user) => {
   const sec = el("login-social-section");
   const btnSair = el("btn-sair-conta");
   if (user) {
+    currentUid = user.uid;
     salvarUsuarioNoStorage(user);
     if (sec) sec.style.display = "none";
     if (btnSair) btnSair.style.display = "";
     carregarPerfil();
   } else {
+    currentUid = null;
     limparStorageUsuario();
+    limparTodosInputs();
     if (sec) sec.style.display = "";
     if (btnSair) btnSair.style.display = "none";
   }
@@ -442,8 +462,14 @@ onAuthStateChanged(auth, (user) => {
 renderAvatarOptions();
 
 /* ========== Saved Address ========== */
+function enderecoKey() {
+  return currentUid ? `zuca_endereco_${currentUid}` : null;
+}
+
 function carregarEnderecoSalvo() {
-  const end = JSON.parse(localStorage.getItem("zuca_endereco") || "{}");
+  const key = enderecoKey();
+  if (!key) return; // não carrega sem login
+  const end = JSON.parse(localStorage.getItem(key) || "{}");
   if (el("end-cep")) el("end-cep").value = end.cep || "";
   if (el("end-endereco")) el("end-endereco").value = end.endereco || "";
   if (el("end-numero")) el("end-numero").value = end.numero || "";
@@ -453,6 +479,8 @@ function carregarEnderecoSalvo() {
 }
 
 function salvarEndereco() {
+  const key = enderecoKey();
+  if (!key) { showToast("Faça login para salvar o endereço.", "error"); return; }
   const end = {
     cep: String(el("end-cep")?.value || "").trim(),
     endereco: String(el("end-endereco")?.value || "").trim(),
@@ -461,9 +489,9 @@ function salvarEndereco() {
     cidade: String(el("end-cidade")?.value || "").trim(),
     estado: String(el("end-estado")?.value || "").trim().toUpperCase(),
   };
-  localStorage.setItem("zuca_endereco", JSON.stringify(end));
+  localStorage.setItem(key, JSON.stringify(end));
 
-  // Also update checkout client data
+  // Sincroniza com checkout
   const cliente = JSON.parse(localStorage.getItem("zuca_checkout_cliente") || "{}");
   Object.assign(cliente, end);
   localStorage.setItem("zuca_checkout_cliente", JSON.stringify(cliente));
@@ -487,7 +515,7 @@ el("end-cep")?.addEventListener("blur", async () => {
 });
 
 el("btn-salvar-endereco")?.addEventListener("click", salvarEndereco);
-carregarEnderecoSalvo();
+// Endereço só é carregado via carregarPerfil() após login (onAuthStateChanged)
 
 /* ========== Timeline ========== */
 const TIMELINE_STEPS = [

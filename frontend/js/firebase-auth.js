@@ -81,7 +81,7 @@ export function salvarUsuarioNoStorage(user) {
 
 /** Remove todos os dados de sessão do localStorage */
 export function limparStorageUsuario() {
-  ["zuca_checkout_cliente", "zuca_perfil", "zuca_avatar_url", "zuca_checkout_cliente_nome"].forEach(
+  ["zuca_checkout_cliente", "zuca_perfil", "zuca_avatar_url", "zuca_checkout_cliente_nome", "zuca_endereco"].forEach(
     (k) => localStorage.removeItem(k)
   );
 }

@@ -251,9 +251,10 @@ async function listarPedidos(email) {
 
     list.innerHTML = pedidos.map((pedido) => {
       const status = String(pedido.status || "pendente").toLowerCase();
+      const statusPedido = String(pedido.statusPedido || "").toLowerCase();
       const paid = status === "pagto";
-      const canceled = status === "cancelado";
-      const timeline = renderTimeline(status);
+      const canceled = status === "cancelado" || statusPedido === "cancelado";
+      const timeline = renderTimeline(status, statusPedido);
       return `
         <article class="pedido-item ${paid ? "is-paid" : "is-pending"}">
           <div class="pedido-top">
@@ -490,16 +491,28 @@ carregarEnderecoSalvo();
 
 /* ========== Timeline ========== */
 const TIMELINE_STEPS = [
-  { key: "pendente", label: "Pedido" },
-  { key: "pagto", label: "Pago" },
-  { key: "producao", label: "Produção" },
-  { key: "enviado", label: "Enviado" },
-  { key: "entregue", label: "Entregue" },
+  { key: "pendente",    label: "Pedido"   },
+  { key: "pagto",       label: "Pago"     },
+  { key: "em_producao", label: "Produção" },
+  { key: "enviado",     label: "Enviado"  },
+  { key: "entregue",    label: "Entregue" },
 ];
 
-function renderTimeline(currentStatus) {
-  const idx = TIMELINE_STEPS.findIndex((s) => s.key === currentStatus);
-  const activeIdx = idx >= 0 ? idx : 0;
+// statusPagto: "pagto" | "pendente" | "cancelado"
+// statusPedido: "" | "pendente" | "em_producao" | "enviado" | "entregue" | "cancelado"
+function renderTimeline(statusPagto, statusPedido) {
+  const fulfillOrder = ["pendente", "em_producao", "enviado", "entregue"];
+  const fulfillIdx = fulfillOrder.indexOf(statusPedido);
+
+  let activeIdx;
+  if (fulfillIdx >= 1) {
+    // em_producao(1)→timeline 2, enviado(2)→3, entregue(3)→4
+    activeIdx = fulfillIdx + 1;
+  } else if (statusPagto === "pagto") {
+    activeIdx = 1;
+  } else {
+    activeIdx = 0;
+  }
 
   let html = '<div class="pedido-timeline">';
   TIMELINE_STEPS.forEach((step, i) => {

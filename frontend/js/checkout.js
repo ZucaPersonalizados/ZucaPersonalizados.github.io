@@ -83,7 +83,7 @@ function limparSessaoUsuario() {
 
 function atualizarMenuUsuario() {
   const btnAvatar = document.getElementById("btn-avatar");
-  const dropdown = document.getElementById("avatar-dropdown");
+  const dropdown  = document.getElementById("avatar-dropdown");
   const avatarImg = document.getElementById("avatar-image");
   if (!btnAvatar || !dropdown) return;
 
@@ -91,8 +91,7 @@ function atualizarMenuUsuario() {
 
   if (usuario) {
     btnAvatar.classList.remove("nao-logado");
-    const labelEl = btnAvatar.querySelector(".avatar-btn-label");
-    if (labelEl) labelEl.remove();
+    btnAvatar.querySelector(".avatar-btn-label")?.remove();
     if (avatarImg) { avatarImg.src = usuario.avatar; avatarImg.style.display = ""; }
   } else {
     btnAvatar.classList.add("nao-logado");
@@ -100,48 +99,55 @@ function atualizarMenuUsuario() {
     if (!btnAvatar.querySelector(".avatar-btn-label")) {
       const span = document.createElement("span");
       span.className = "avatar-btn-label";
-      span.style.cssText = "display:flex;align-items:center;gap:6px;pointer-events:none;";
-      span.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg><span style="font-size:.875rem;font-weight:700;">Entrar</span>`;
+      span.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg><span>Entrar</span>`;
       btnAvatar.appendChild(span);
     }
   }
 
   if (usuario) {
     dropdown.innerHTML = `
-      <div class="avatar-dd-header">
-        <img class="avatar-dd-foto" src="${escapeHtml(usuario.avatar)}" alt="" onerror="this.src='${DEFAULT_AVATAR}'">
-        <div class="avatar-dd-info">
-          <div class="avatar-dd-nome">${escapeHtml(usuario.primeiroNome)}</div>
-          ${usuario.email ? `<div class="avatar-dd-email">${escapeHtml(usuario.email)}</div>` : ""}
+      <div class="add-header">
+        <img class="add-foto" src="${escapeHtml(usuario.avatar)}" alt="" onerror="this.src='${DEFAULT_AVATAR}'">
+        <div class="add-info">
+          <div class="add-nome">${escapeHtml(usuario.primeiroNome)}</div>
+          ${usuario.email ? `<div class="add-email">${escapeHtml(usuario.email)}</div>` : ""}
         </div>
       </div>
-      <div class="avatar-dd-lista">
-        <a class="avatar-dd-item" href="/minha-conta">
+      <nav class="add-lista">
+        <a class="add-item" href="/minha-conta">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
           Minha conta
         </a>
-        <a class="avatar-dd-item" href="/minha-conta#pedidos">
+        <a class="add-item" href="/minha-conta#pedidos">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="18" rx="2"/><path d="M8 10h8M8 14h5"/></svg>
           Meus pedidos
         </a>
-        <div class="avatar-dd-divider"></div>
-        <button class="avatar-dd-item sair" type="button">
+        <div class="add-divider"></div>
+        <button class="add-item sair" type="button">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-          Sair
+          Sair da conta
         </button>
-      </div>`;
-
+      </nav>`;
   } else {
     dropdown.innerHTML = `
-      <div class="avatar-dd-promo">
-        <p>Faça login para ver seus pedidos e salvar seus dados.</p>
-        <a class="avatar-dd-btn-entrar" href="/minha-conta">Entrar</a>
+      <div class="add-login-header">
+        <strong>Entre na sua conta</strong>
+        <span>Veja seus pedidos e dados salvos</span>
       </div>
-      <div class="avatar-dd-lista">
-        <a class="avatar-dd-item" href="/minha-conta#pedidos">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="18" rx="2"/><path d="M8 10h8M8 14h5"/></svg>
-          Meus pedidos
-        </a>
+      <div class="add-login-body">
+        <button class="add-oauth-btn add-oauth-google" type="button" data-provider="google">
+          <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.08 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.35-8.16 2.35-6.26 0-11.57-3.59-13.46-8.83l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+          Continuar com Google
+        </button>
+        <button class="add-oauth-btn add-oauth-apple" type="button" data-provider="apple">
+          <svg width="18" height="18" viewBox="0 0 814 1000" aria-hidden="true"><path d="M788.1 340.9c-5.8 4.5-108.2 62.2-108.2 190.5 0 148.4 130.3 200.9 134.2 202.2-.6 3.2-20.7 71.9-68.7 141.9-42.8 61.6-87.5 123.1-155.5 123.1s-85.5-39.5-164-39.5c-76 0-103.7 40.8-165.9 40.8s-105-37.8-155.5-127.4C46 790.5 0 665.1 0 546c0-201.3 131.2-307.4 260.5-307.4 70 0 127.9 46.5 168.3 46.5 39.3 0 107-49.3 184.6-49.3zm-194.1-24.9c3.2-16.7 4.5-33.4 4.5-50.1 0-51.7-19.2-107-55.4-148.4-35-40.8-91.7-70.1-147.9-70.1-1.3 0-2.6 0-3.8.1 1.2 52.4 16.8 109.9 48.3 150 29.3 37.2 81 64.8 154.3 118.5z"/></svg>
+          Continuar com Apple
+        </button>
+        <button class="add-oauth-btn add-oauth-ms" type="button" data-provider="microsoft">
+          <svg width="18" height="18" viewBox="0 0 23 23" aria-hidden="true"><rect x="1" y="1" width="10" height="10" fill="#f25022"/><rect x="12" y="1" width="10" height="10" fill="#7fba00"/><rect x="1" y="12" width="10" height="10" fill="#00a4ef"/><rect x="12" y="12" width="10" height="10" fill="#ffb900"/></svg>
+          Continuar com Microsoft
+        </button>
+        <p class="add-login-status" aria-live="polite"></p>
       </div>`;
   }
 }
@@ -1183,20 +1189,49 @@ function configurarHeaderCheckout() {
     btnAvatar.setAttribute("aria-expanded", ativo ? "true" : "false");
   });
 
-  // Listener de logout no dropdown (elemento estável — persiste mesmo com innerHTML trocado)
+  // Listener de logout + login OAuth no dropdown (elemento estável)
   dropdown?.addEventListener("click", async (e) => {
-    const sairBtn = e.target.closest(".sair");
-    if (!sairBtn) return;
+    if (e.target.closest(".sair")) {
+      e.stopPropagation();
+      dropdown.classList.remove("ativo");
+      btnAvatar.setAttribute("aria-expanded", "false");
+      try { await sairDoFirebase(); } catch (_) {}
+      limparSessaoUsuario();
+      atualizarMenuUsuario();
+      atualizarAvatarCheckout();
+      if (el("nome")) el("nome").value = "";
+      if (el("email")) el("email").value = "";
+      showToast("Até logo! Você saiu da sua conta.", "success");
+      return;
+    }
+    const oauthBtn = e.target.closest("[data-provider]");
+    if (!oauthBtn) return;
     e.stopPropagation();
-    dropdown.classList.remove("ativo");
-    btnAvatar.setAttribute("aria-expanded", "false");
-    try { await sairDoFirebase(); } catch (_) {}
-    limparSessaoUsuario();
-    atualizarMenuUsuario();
-    atualizarAvatarCheckout();
-    if (el("nome")) el("nome").value = "";
-    if (el("email")) el("email").value = "";
-    showToast("Até logo! Você saiu da sua conta.", "success");
+    const provider = oauthBtn.getAttribute("data-provider");
+    const status = dropdown.querySelector(".add-login-status");
+    const allBtns = dropdown.querySelectorAll(".add-oauth-btn");
+    allBtns.forEach(b => { b.disabled = true; b.style.opacity = "0.55"; });
+    if (status) status.textContent = "Aguarde…";
+    try {
+      const { loginComGoogle, loginComApple, loginComMicrosoft, salvarUsuarioNoStorage } = await import("./firebase-auth.js");
+      const fn = provider === "google" ? loginComGoogle : provider === "apple" ? loginComApple : loginComMicrosoft;
+      const result = await fn();
+      salvarUsuarioNoStorage(result.user);
+      dropdown.classList.remove("ativo");
+      btnAvatar.setAttribute("aria-expanded", "false");
+      atualizarMenuUsuario();
+      atualizarAvatarCheckout();
+      showToast(`Bem-vindo, ${result.user.displayName || result.user.email}!`, "success");
+    } catch (err) {
+      const msgs = {
+        "auth/popup-closed-by-user": "Login cancelado.",
+        "auth/popup-blocked": "Popup bloqueado. Permita popups para este site.",
+        "auth/network-request-failed": "Sem conexão. Verifique sua internet.",
+      };
+      const msg = msgs[err.code] || "Erro ao entrar. Tente novamente.";
+      if (status) status.textContent = msg;
+      allBtns.forEach(b => { b.disabled = false; b.style.opacity = ""; });
+    }
   });
 
   // Fecha dropdown ao clicar fora

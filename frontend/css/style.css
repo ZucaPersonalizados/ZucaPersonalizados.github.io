@@ -435,6 +435,131 @@ p {
   margin: 4px 0;
 }
 
+/* ========== Dropdown inline OAuth (add-*) ========== */
+.add-login-header {
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid var(--line);
+}
+.add-login-header strong {
+  display: block;
+  font-size: .9375rem;
+  font-weight: 700;
+  color: var(--dark);
+  margin-bottom: 3px;
+}
+.add-login-header span {
+  font-size: .78rem;
+  color: var(--gray);
+}
+.add-login-body {
+  padding: 14px 16px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.add-oauth-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1.5px solid var(--line);
+  background: #fff;
+  font-size: .875rem;
+  font-weight: 600;
+  color: var(--dark);
+  cursor: pointer;
+  transition: background .15s, border-color .15s, box-shadow .15s;
+  text-align: left;
+}
+.add-oauth-btn:hover:not(:disabled) {
+  background: #f5f5f5;
+  border-color: #bbb;
+  box-shadow: 0 2px 6px rgba(0,0,0,.07);
+}
+.add-oauth-btn:disabled {
+  cursor: not-allowed;
+}
+.add-oauth-apple {
+  background: #000;
+  border-color: #000;
+  color: #fff;
+}
+.add-oauth-apple:hover:not(:disabled) {
+  background: #1a1a1a;
+  border-color: #1a1a1a;
+}
+.add-oauth-apple svg { fill: #fff; }
+.add-login-status {
+  min-height: 18px;
+  font-size: .78rem;
+  color: #c0392b;
+  margin: 0;
+  text-align: center;
+}
+
+/* Dropdown — estado logado (add-*) */
+.add-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 18px 14px;
+  border-bottom: 1px solid var(--line);
+}
+.add-foto {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 2px solid var(--line);
+}
+.add-info { min-width: 0; }
+.add-nome {
+  font-size: .875rem;
+  font-weight: 700;
+  color: var(--dark);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.add-email {
+  font-size: .75rem;
+  color: var(--gray);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.add-lista {
+  padding: 6px 0;
+  list-style: none;
+  margin: 0;
+}
+.add-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 18px;
+  font-size: .875rem;
+  color: var(--dark);
+  text-decoration: none;
+  background: none;
+  border: none;
+  width: 100%;
+  cursor: pointer;
+  transition: background .12s;
+  text-align: left;
+}
+.add-item:hover { background: #f5f5f5; }
+.add-item.sair { color: #c0392b; }
+.add-item.sair:hover { background: #fff1f1; }
+.add-divider {
+  height: 1px;
+  background: var(--line);
+  margin: 4px 0;
+}
+
 .btn-whatsapp {
   background: var(--mint);
   color: #fff;

@@ -169,6 +169,7 @@ function normalizarUrlSemExtensao() {
 }
 
 let descontoAtual = 0;
+let currentUid = null;
 let cupomAplicado = null;
 let mpConfigCache = null;
 let monitorPagamentoTimer = null;
@@ -355,6 +356,26 @@ function salvarDadosClienteLocal() {
   return dados;
 }
 
+function carregarEnderecoSalvoNoCheckout() {
+  if (!currentUid) return;
+  const key = `zuca_endereco_${currentUid}`;
+  const end = JSON.parse(localStorage.getItem(key) || "{}");
+  if (!end.cep) return;
+  // Preenche os campos de endereço se ainda estiverem vazios
+  if (el("cep")      && !el("cep").value)      el("cep").value      = end.cep      || "";
+  if (el("endereco") && !el("endereco").value) el("endereco").value = end.endereco || "";
+  if (el("numero")   && !el("numero").value)   el("numero").value   = end.numero   || "";
+  if (el("bairro")   && !el("bairro").value)   el("bairro").value   = end.bairro   || "";
+  if (el("cidade")   && !el("cidade").value)   el("cidade").value   = end.cidade   || "";
+  if (el("estado")   && !el("estado").value)   el("estado").value   = end.estado   || "";
+}
+
+function limparCamposEndereco() {
+  ["cep", "endereco", "numero", "bairro", "cidade", "estado"].forEach(
+    (id) => { if (el(id)) el(id).value = ""; }
+  );
+}
+
 function carregarDadosClienteLocal() {
   try {
     const raw = localStorage.getItem("zuca_checkout_cliente");
@@ -364,17 +385,8 @@ function carregarDadosClienteLocal() {
         if (el(key)) el(key).value = value || "";
       });
     }
-    // Also load saved address
-    const endRaw = localStorage.getItem("zuca_endereco");
-    if (endRaw) {
-      const end = JSON.parse(endRaw);
-      if (end.cep && el("cep") && !el("cep").value) el("cep").value = end.cep;
-      if (end.endereco && el("endereco") && !el("endereco").value) el("endereco").value = end.endereco;
-      if (end.numero && el("numero") && !el("numero").value) el("numero").value = end.numero;
-      if (end.bairro && el("bairro") && !el("bairro").value) el("bairro").value = end.bairro;
-      if (end.cidade && el("cidade") && !el("cidade").value) el("cidade").value = end.cidade;
-      if (end.estado && el("estado") && !el("estado").value) el("estado").value = end.estado;
-    }
+    // Endereço salvo por UID (carregado após onAuthStateChanged definir currentUid)
+    carregarEnderecoSalvoNoCheckout();
   } catch {
     // noop
   }
@@ -423,21 +435,36 @@ function renderCarrinho() {
   renderizarCarrinhoSidebar();
 }
 
+async function buscarViaCep(cepLimpo) {
+  // Tenta backend primeiro, cai no ViaCEP direto como fallback
+  try {
+    const resp = await fetch(getApiUrl(`/api/cep/${cepLimpo}`));
+    const payload = await resp.json();
+    if (resp.ok && payload.success) return payload;
+  } catch { /* fallback */ }
+  // Fallback ViaCEP
+  const resp = await fetch(`https://viacep.com.br/ws/${cepLimpo}/json/`);
+  const data = await resp.json();
+  if (data.erro) throw new Error("CEP nao encontrado");
+  return {
+    logradouro: data.logradouro || "",
+    bairro: data.bairro || "",
+    localidade: data.localidade || "",
+    uf: data.uf || "",
+  };
+}
+
 async function preencherEnderecoPorCep(cep) {
   const cepLimpo = digitsOnly(cep).slice(0, 8);
   if (cepLimpo.length !== 8) return;
 
   try {
-    const response = await fetch(getApiUrl(`/api/cep/${cepLimpo}`));
-    const payload = await response.json();
-    if (!response.ok || !payload.success) {
-      throw new Error(payload.error || "CEP nao encontrado");
-    }
-
-    if (el("endereco") && !el("endereco").value.trim()) el("endereco").value = payload.logradouro || "";
-    if (el("bairro") && !el("bairro").value.trim()) el("bairro").value = payload.bairro || "";
-    if (el("cidade") && !el("cidade").value.trim()) el("cidade").value = payload.localidade || "";
-    if (el("estado") && !el("estado").value.trim()) el("estado").value = payload.uf || "";
+    const payload = await buscarViaCep(cepLimpo);
+    // Preenche sempre (sobrescreve) — usuário digitou novo CEP intencionalmente
+    if (el("endereco")) el("endereco").value = payload.logradouro || "";
+    if (el("bairro"))   el("bairro").value   = payload.bairro     || "";
+    if (el("cidade"))   el("cidade").value   = payload.localidade || "";
+    if (el("estado"))   el("estado").value   = payload.uf         || "";
     salvarDadosClienteLocal();
   } catch {
     // Nao bloqueia checkout quando o CEP falhar.
@@ -1250,9 +1277,20 @@ function configurarHeaderCheckout() {
   // Firebase é a fonte de verdade do login
   onAuthStateChanged(auth, (user) => {
     if (user) {
+      currentUid = user.uid;
       salvarUsuarioNoStorage(user);
+      // Preenche nome/email com dados do Firebase se campos estiverem vazios
+      if (el("nome") && !el("nome").value.trim()) el("nome").value = user.displayName || "";
+      if (el("email") && !el("email").value.trim()) el("email").value = user.email || "";
+      // Carrega endereço salvo do perfil deste usuário
+      carregarEnderecoSalvoNoCheckout();
     } else {
+      currentUid = null;
       limparSessaoUsuario();
+      // Limpa campos de endereço ao deslogar
+      limparCamposEndereco();
+      if (el("nome"))  el("nome").value  = "";
+      if (el("email")) el("email").value = "";
     }
     atualizarMenuUsuario();
     atualizarAvatarCheckout();

@@ -506,12 +506,13 @@ el("end-cep")?.addEventListener("blur", async () => {
   try {
     const resp = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
     const data = await resp.json();
-    if (data.erro) return;
-    if (data.logradouro && el("end-endereco")) el("end-endereco").value = data.logradouro;
-    if (data.bairro && el("end-bairro")) el("end-bairro").value = data.bairro;
-    if (data.localidade && el("end-cidade")) el("end-cidade").value = data.localidade;
-    if (data.uf && el("end-estado")) el("end-estado").value = data.uf;
-  } catch { /* silent */ }
+    if (data.erro) { showToast("CEP não encontrado.", "error"); return; }
+    // Preenche sempre — usuário digitou novo CEP intencionalmente
+    if (el("end-endereco")) el("end-endereco").value = data.logradouro || "";
+    if (el("end-bairro"))   el("end-bairro").value   = data.bairro     || "";
+    if (el("end-cidade"))   el("end-cidade").value   = data.localidade || "";
+    if (el("end-estado"))   el("end-estado").value   = data.uf         || "";
+  } catch { showToast("Erro ao buscar CEP. Verifique sua conexão.", "error"); }
 });
 
 el("btn-salvar-endereco")?.addEventListener("click", salvarEndereco);

@@ -499,20 +499,28 @@ function salvarEndereco() {
   showToast("Endereço salvo com sucesso!", "success");
 }
 
-// CEP auto-fill via ViaCEP
-el("end-cep")?.addEventListener("blur", async () => {
-  const cep = String(el("end-cep")?.value || "").replace(/\D/g, "");
-  if (cep.length !== 8) return;
+// CEP: máscara + auto-fill ao digitar (8 dígitos) e no blur
+async function autoPreencherCep(cepLimpo) {
   try {
-    const resp = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+    const resp = await fetch(`https://viacep.com.br/ws/${cepLimpo}/json/`);
     const data = await resp.json();
     if (data.erro) { showToast("CEP não encontrado.", "error"); return; }
-    // Preenche sempre — usuário digitou novo CEP intencionalmente
     if (el("end-endereco")) el("end-endereco").value = data.logradouro || "";
     if (el("end-bairro"))   el("end-bairro").value   = data.bairro     || "";
     if (el("end-cidade"))   el("end-cidade").value   = data.localidade || "";
     if (el("end-estado"))   el("end-estado").value   = data.uf         || "";
   } catch { showToast("Erro ao buscar CEP. Verifique sua conexão.", "error"); }
+}
+
+el("end-cep")?.addEventListener("input", (event) => {
+  const digits = String(event.target.value || "").replace(/\D/g, "").slice(0, 8);
+  event.target.value = digits.replace(/(\d{5})(\d{1,3})$/, "$1-$2");
+  if (digits.length === 8) autoPreencherCep(digits);
+});
+
+el("end-cep")?.addEventListener("blur", () => {
+  const cep = String(el("end-cep")?.value || "").replace(/\D/g, "");
+  if (cep.length === 8) autoPreencherCep(cep);
 });
 
 el("btn-salvar-endereco")?.addEventListener("click", salvarEndereco);

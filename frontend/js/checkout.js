@@ -356,18 +356,18 @@ function salvarDadosClienteLocal() {
   return dados;
 }
 
-function carregarEnderecoSalvoNoCheckout() {
+function carregarEnderecoSalvoNoCheckout(force = false) {
   if (!currentUid) return;
   const key = `zuca_endereco_${currentUid}`;
   const end = JSON.parse(localStorage.getItem(key) || "{}");
   if (!end.cep) return;
-  // Preenche os campos de endereço se ainda estiverem vazios
-  if (el("cep")      && !el("cep").value)      el("cep").value      = end.cep      || "";
-  if (el("endereco") && !el("endereco").value) el("endereco").value = end.endereco || "";
-  if (el("numero")   && !el("numero").value)   el("numero").value   = end.numero   || "";
-  if (el("bairro")   && !el("bairro").value)   el("bairro").value   = end.bairro   || "";
-  if (el("cidade")   && !el("cidade").value)   el("cidade").value   = end.cidade   || "";
-  if (el("estado")   && !el("estado").value)   el("estado").value   = end.estado   || "";
+  const set = (id, val) => { if (el(id) && (force || !el(id).value)) el(id).value = val || ""; };
+  set("cep",      end.cep);
+  set("endereco", end.endereco);
+  set("numero",   end.numero);
+  set("bairro",   end.bairro);
+  set("cidade",   end.cidade);
+  set("estado",   end.estado);
 }
 
 function limparCamposEndereco() {
@@ -1282,8 +1282,8 @@ function configurarHeaderCheckout() {
       // Preenche nome/email com dados do Firebase se campos estiverem vazios
       if (el("nome") && !el("nome").value.trim()) el("nome").value = user.displayName || "";
       if (el("email") && !el("email").value.trim()) el("email").value = user.email || "";
-      // Carrega endereço salvo do perfil deste usuário
-      carregarEnderecoSalvoNoCheckout();
+      // Carrega endereço salvo do perfil deste usuário (force=true sobrescreve campos já preenchidos)
+      carregarEnderecoSalvoNoCheckout(true);
     } else {
       currentUid = null;
       limparSessaoUsuario();
@@ -1322,6 +1322,10 @@ function configurarMascarasFormulario() {
 
   cep?.addEventListener("input", (event) => {
     event.target.value = formatarCep(event.target.value);
+    // Auto-preenche endereço ao completar 8 dígitos (sem precisar sair do campo)
+    if (digitsOnly(event.target.value).length === 8) {
+      preencherEnderecoPorCep(event.target.value).then(() => recalcularFrete());
+    }
   });
 
   cep?.addEventListener("blur", async (event) => {

@@ -592,6 +592,77 @@
         <p>Anexe o arquivo com o nome, logo ou referência visual antes de adicionar ao carrinho. Formatos aceitos: PDF, JPG ou PNG.</p>
         <input id="arquivo-personalizacao" type="file" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png">
         <div id="arquivo-personalizacao-status" class="arquivo-status"></div>
+        <div class="arte-ia-divider">
+          <span>ou</span>
+        </div>
+        <button id="btn-abrir-arte-ia" class="btn-arte-ia" type="button">
+          ✨ Criar arte com Inteligência Artificial
+        </button>
+      </div>
+
+      <!-- Modal: Geração de Arte com IA -->
+      <div id="modal-arte-ia" class="arte-modal" role="dialog" aria-modal="true" aria-labelledby="arte-modal-titulo" hidden>
+        <div class="arte-modal-backdrop"></div>
+        <div class="arte-modal-inner">
+          <button class="arte-modal-close" id="btn-fechar-arte-ia" aria-label="Fechar">&times;</button>
+          <h2 id="arte-modal-titulo" class="arte-modal-title">✨ Criar Arte com IA</h2>
+          <p class="arte-modal-desc">Descreva sua arte e a IA gerará uma imagem profissional pronta para impressão em A4.</p>
+
+          <div class="arte-form">
+            <div class="arte-form-row">
+              <label for="arte-tipo">Tipo de produto</label>
+              <select id="arte-tipo">
+                <option value="camiseta">Camiseta</option>
+                <option value="caneca">Caneca</option>
+                <option value="placa">Placa decorativa</option>
+                <option value="banner">Banner</option>
+                <option value="convite">Convite</option>
+                <option value="adesivo">Adesivo</option>
+                <option value="quadro">Quadro</option>
+                <option value="produto personalizado">Produto personalizado</option>
+              </select>
+            </div>
+            <div class="arte-form-row">
+              <label for="arte-texto">Texto principal da arte</label>
+              <input id="arte-texto" type="text" placeholder='Ex: "João, 10 anos — Turma do Bem!"' maxlength="120">
+            </div>
+            <div class="arte-form-row">
+              <label for="arte-estilo">Estilo visual</label>
+              <select id="arte-estilo">
+                <option value="moderno e clean">Moderno e clean</option>
+                <option value="infantil e colorido">Infantil e colorido</option>
+                <option value="elegante e minimalista">Elegante e minimalista</option>
+                <option value="vintage e retrô">Vintage e retrô</option>
+                <option value="tropical e festivo">Tropical e festivo</option>
+                <option value="esportivo e dinâmico">Esportivo e dinâmico</option>
+                <option value="floral e romantico">Floral e romântico</option>
+              </select>
+            </div>
+            <div class="arte-form-row">
+              <label for="arte-cor">Cor principal</label>
+              <input id="arte-cor" type="text" placeholder='Ex: azul royal, rosa, dourado...' maxlength="60" value="azul">
+            </div>
+            <button id="btn-gerar-arte" class="btn-arte-gerar" type="button">🎨 Gerar Arte</button>
+          </div>
+
+          <div id="arte-loading" class="arte-loading" hidden>
+            <div class="arte-spinner"></div>
+            <p>Gerando sua arte... isso pode levar até 20 segundos.</p>
+          </div>
+
+          <div id="arte-resultado" class="arte-resultado" hidden>
+            <div class="arte-preview-wrap">
+              <canvas id="arte-canvas" width="420" height="594" class="arte-canvas"></canvas>
+              <div id="arte-safe-zone" class="arte-safe-zone"></div>
+            </div>
+            <p class="arte-safe-info">A área tracejada representa a margem de segurança de 1cm para impressão.</p>
+            <div class="arte-resultado-acoes">
+              <button id="btn-baixar-arte" class="btn-arte-baixar" type="button">⬇️ Baixar Arte (PNG)</button>
+              <button id="btn-usar-arte" class="btn-arte-usar" type="button">✅ Usar esta arte</button>
+              <button id="btn-gerar-nova" class="btn-arte-nova" type="button">🔄 Gerar nova versão</button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div class="produto-actions">
@@ -689,7 +760,7 @@
     </div>
   </nav>
 
-  <script type="module" src="js/produto.js?v=3"></script>
+  <script type="module" src="js/produto.js?v=4"></script>
 
 </body>
 </html>

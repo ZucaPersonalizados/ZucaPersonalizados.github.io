@@ -1129,3 +1129,129 @@ renderVistosRecentemente();
     });
   }, { passive: true });
 })();
+
+/* ========== Arte com IA ========== */
+(function arteIA() {
+  const btnAbrir   = document.getElementById("btn-abrir-arte-ia");
+  const modal      = document.getElementById("modal-arte-ia");
+  const btnFechar  = document.getElementById("btn-fechar-arte-ia");
+  const backdrop   = modal?.querySelector(".arte-modal-backdrop");
+  const btnGerar   = document.getElementById("btn-gerar-arte");
+  const btnNova    = document.getElementById("btn-gerar-nova");
+  const btnBaixar  = document.getElementById("btn-baixar-arte");
+  const btnUsar    = document.getElementById("btn-usar-arte");
+  const loading    = document.getElementById("arte-loading");
+  const resultado  = document.getElementById("arte-resultado");
+  const canvas     = document.getElementById("arte-canvas");
+
+  if (!btnAbrir || !modal) return;
+
+  let ultimaImageUrl = null;
+
+  function abrirModal() {
+    modal.hidden = false;
+    document.body.style.overflow = "hidden";
+    modal.querySelector("#arte-texto")?.focus();
+  }
+
+  function fecharModal() {
+    modal.hidden = true;
+    document.body.style.overflow = "";
+  }
+
+  btnAbrir.addEventListener("click", abrirModal);
+  btnFechar.addEventListener("click", fecharModal);
+  backdrop?.addEventListener("click", fecharModal);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !modal.hidden) fecharModal();
+  });
+
+  async function gerarArte() {
+    const tipo = document.getElementById("arte-tipo")?.value || "produto";
+    const texto = document.getElementById("arte-texto")?.value?.trim() || "";
+    const estilo = document.getElementById("arte-estilo")?.value || "moderno";
+    const cor = document.getElementById("arte-cor")?.value?.trim() || "azul";
+
+    loading.hidden = false;
+    resultado.hidden = true;
+    btnGerar.disabled = true;
+    btnNova.disabled = true;
+
+    try {
+      const resp = await fetch(getApiUrl("/api/gerar-arte"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tipo, texto, estilo, corPrincipal: cor }),
+      });
+      const data = await resp.json();
+      if (!data.success) throw new Error(data.error || "Erro desconhecido");
+
+      ultimaImageUrl = data.imageUrl;
+      await renderizarArteNoCanvas(data.imageUrl);
+      resultado.hidden = false;
+    } catch (err) {
+      alert("Erro ao gerar arte: " + err.message);
+    } finally {
+      loading.hidden = true;
+      btnGerar.disabled = false;
+      btnNova.disabled = false;
+    }
+  }
+
+  async function renderizarArteNoCanvas(url) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => {
+        const ctx = canvas.getContext("2d");
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        // Margem segura: ~20px (representa 1cm em proporção A4 de 420px largura)
+        const margin = Math.round(canvas.width * 0.047);
+        ctx.strokeStyle = "rgba(255,255,255,0.85)";
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([6, 4]);
+        ctx.strokeRect(margin, margin, canvas.width - margin * 2, canvas.height - margin * 2);
+        ctx.setLineDash([]);
+        resolve();
+      };
+      img.onerror = reject;
+      img.src = url;
+    });
+  }
+
+  function baixarArte() {
+    if (!ultimaImageUrl) return;
+    canvas.toBlob((blob) => {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "arte-personalizada.png";
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+    }, "image/png");
+  }
+
+  function usarArte() {
+    if (!ultimaImageUrl) return;
+    // Cria um arquivo fake a partir do canvas para o input de arquivo
+    canvas.toBlob((blob) => {
+      const file = new File([blob], "arte-ia.png", { type: "image/png" });
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      const input = document.getElementById("arquivo-personalizacao");
+      if (input) {
+        input.files = dt.files;
+        // Dispara change para atualizar status
+        input.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+      fecharModal();
+      showToast?.("Arte adicionada! Clique em 'Adicionar ao carrinho' para continuar.", "success");
+    }, "image/png");
+  }
+
+  btnGerar.addEventListener("click", gerarArte);
+  btnNova.addEventListener("click", gerarArte);
+  btnBaixar.addEventListener("click", baixarArte);
+  btnUsar.addEventListener("click", usarArte);
+})();

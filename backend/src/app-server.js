@@ -12,6 +12,7 @@ import { db, firebaseDebug } from "./firebase.js";
 import { buildNfePayload, emitirNfe, consultarNfe, getDanfePdfBuffer } from "./services/nfeService.js";
 import { sendNotaFiscalEmail } from "./services/emailService.js";
 
+import OpenAI from "openai";
 import produtosRoutes from "./routes/produtos.js";
 import uploadRoutes from "./routes/upload.js";
 
@@ -2089,6 +2090,32 @@ app.post("/api/admin/pedidos/:id/nota-fiscal/reenviar-email", adminAuth, require
     return res.json({ success: true, message: "E-mail reenviado com sucesso" });
   } catch (error) {
     return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ───────────────────────────────────────────────────────────────────────────
+// IA: Geração de Arte com DALL-E 3
+// ───────────────────────────────────────────────────────────────────────────
+
+app.post("/api/gerar-arte", async (req, res) => {
+  const { tipo = "produto", texto = "", estilo = "moderno", corPrincipal = "azul" } = req.body || {};
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) return res.status(503).json({ success: false, error: "OpenAI não configurado no servidor." });
+  try {
+    const openai = new OpenAI({ apiKey });
+    const prompt = `Professional print-ready artwork for a personalized ${tipo}. Style: ${estilo}. Main color: ${corPrincipal}. Full bleed background filling entire image edge to edge. Text "${texto}" centered, bold, clearly readable. CMYK-safe flat colors, clean vector-like illustration style. High contrast, A4 portrait format proportions. Keep 1cm safe margin inside edges for all text and important elements. No watermarks, no frames, solid vibrant background fill. Professional graphic design quality.`;
+    const response = await openai.images.generate({
+      model: "dall-e-3",
+      prompt,
+      n: 1,
+      size: "1024x1792",
+      quality: "hd",
+      response_format: "url",
+    });
+    return res.json({ success: true, imageUrl: response.data[0].url, prompt });
+  } catch (err) {
+    console.error("[ZUCA] Erro DALL-E:", err.message);
+    return res.status(500).json({ success: false, error: err.message });
   }
 });
 

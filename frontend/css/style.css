@@ -3017,3 +3017,196 @@ textarea:focus-visible {
 .header.header-hidden {
   transform: translateY(-100%);
 }
+
+/* ===== Arte com IA ===== */
+
+.arte-ia-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 16px 0 12px;
+  color: var(--muted, #999);
+  font-size: 13px;
+}
+.arte-ia-divider::before,
+.arte-ia-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--line, #e0e0e0);
+}
+
+.btn-arte-ia {
+  width: 100%;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, #7c3aed 0%, #2563eb 100%);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-md, 8px);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s, transform 0.1s;
+}
+.btn-arte-ia:hover { opacity: 0.92; transform: translateY(-1px); }
+.btn-arte-ia:active { transform: translateY(0); }
+
+/* Modal overlay */
+.arte-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+.arte-modal[hidden] { display: none; }
+
+.arte-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(3px);
+}
+
+.arte-modal-inner {
+  position: relative;
+  background: #fff;
+  border-radius: 16px;
+  padding: 28px 24px 24px;
+  width: 100%;
+  max-width: 560px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 24px 60px rgba(0,0,0,0.25);
+}
+
+.arte-modal-close {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  background: none;
+  border: none;
+  font-size: 26px;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--muted, #777);
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+.arte-modal-close:hover { background: var(--line, #eee); color: #333; }
+
+.arte-modal-title {
+  font-size: 20px;
+  font-weight: 700;
+  margin: 0 0 6px;
+  color: #1a1a1a;
+}
+.arte-modal-desc {
+  font-size: 13px;
+  color: var(--muted, #666);
+  margin: 0 0 20px;
+}
+
+/* Formulário */
+.arte-form { display: flex; flex-direction: column; gap: 14px; }
+.arte-form-row { display: flex; flex-direction: column; gap: 5px; }
+.arte-form-row label { font-size: 13px; font-weight: 600; color: #333; }
+.arte-form-row input,
+.arte-form-row select {
+  padding: 9px 12px;
+  border: 1.5px solid var(--line, #ddd);
+  border-radius: 8px;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.arte-form-row input:focus,
+.arte-form-row select:focus { border-color: #7c3aed; }
+
+.btn-arte-gerar {
+  padding: 13px;
+  background: linear-gradient(135deg, #7c3aed 0%, #2563eb 100%);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  margin-top: 4px;
+  transition: opacity 0.2s;
+}
+.btn-arte-gerar:hover { opacity: 0.9; }
+.btn-arte-gerar:disabled { opacity: 0.55; cursor: not-allowed; }
+
+/* Loading */
+.arte-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 24px 0;
+  color: var(--muted, #666);
+  font-size: 14px;
+}
+.arte-loading[hidden] { display: none; }
+.arte-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #e0e0e0;
+  border-top-color: #7c3aed;
+  border-radius: 50%;
+  animation: arte-spin 0.9s linear infinite;
+}
+@keyframes arte-spin { to { transform: rotate(360deg); } }
+
+/* Resultado / Canvas */
+.arte-resultado[hidden] { display: none; }
+.arte-preview-wrap {
+  position: relative;
+  display: inline-block;
+  width: 100%;
+  margin: 16px 0 0;
+}
+.arte-canvas {
+  width: 100%;
+  height: auto;
+  border-radius: 8px;
+  display: block;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+}
+.arte-safe-zone {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.arte-safe-info {
+  font-size: 12px;
+  color: var(--muted, #888);
+  text-align: center;
+  margin: 8px 0 16px;
+}
+
+.arte-resultado-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.arte-resultado-acoes button {
+  flex: 1;
+  min-width: 130px;
+  padding: 11px 14px;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+.btn-arte-baixar  { background: #f3f4f6; color: #1a1a1a; border: 1.5px solid #ddd !important; }
+.btn-arte-usar    { background: #22c55e; color: #fff; }
+.btn-arte-nova    { background: #f59e0b; color: #fff; }
+.btn-arte-nova:disabled { opacity: 0.55; cursor: not-allowed; }
+.arte-resultado-acoes button:hover { opacity: 0.88; }

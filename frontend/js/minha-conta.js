@@ -397,6 +397,7 @@ async function executarLogin(providerFn, nomeProvedor) {
   try {
     const result = await providerFn();
     const user = result.user;
+    currentUid = user.uid;
     salvarUsuarioNoStorage(user);
     setLoginSocialStatus(`Bem-vindo, ${user.displayName || user.email}!`);
     showToast(`Bem-vindo! Conectado com ${nomeProvedor}.`, "success");

@@ -170,6 +170,7 @@ function normalizarUrlSemExtensao() {
 
 let descontoAtual = 0;
 let currentUid = null;
+let prevUid = null;
 let cupomAplicado = null;
 let mpConfigCache = null;
 let monitorPagamentoTimer = null;
@@ -1277,6 +1278,7 @@ function configurarHeaderCheckout() {
   // Firebase é a fonte de verdade do login
   onAuthStateChanged(auth, (user) => {
     if (user) {
+      prevUid = user.uid;
       currentUid = user.uid;
       salvarUsuarioNoStorage(user);
       // Preenche nome/email com dados do Firebase se campos estiverem vazios
@@ -1285,12 +1287,16 @@ function configurarHeaderCheckout() {
       // Carrega endereço salvo do perfil deste usuário (force=true sobrescreve campos já preenchidos)
       carregarEnderecoSalvoNoCheckout(true);
     } else {
+      const wasLoggedIn = prevUid !== null;
       currentUid = null;
+      prevUid = null;
       limparSessaoUsuario();
-      // Limpa campos de endereço ao deslogar
-      limparCamposEndereco();
-      if (el("nome"))  el("nome").value  = "";
-      if (el("email")) el("email").value = "";
+      // Só limpa campos se estava logado antes (evita apagar dados de convidados)
+      if (wasLoggedIn) {
+        limparCamposEndereco();
+        if (el("nome"))  el("nome").value  = "";
+        if (el("email")) el("email").value = "";
+      }
     }
     atualizarMenuUsuario();
     atualizarAvatarCheckout();

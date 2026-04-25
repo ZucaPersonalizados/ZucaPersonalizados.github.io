@@ -2094,8 +2094,61 @@ app.post("/api/admin/pedidos/:id/nota-fiscal/reenviar-email", adminAuth, require
 });
 
 // ───────────────────────────────────────────────────────────────────────────
-// IA: Geração de Arte (gpt-image-1 com fallback DALL-E 3)
+// IA: Geração de Arte (OpenAI → Pollinations.ai fallback gratuito)
 // ───────────────────────────────────────────────────────────────────────────
+
+/** Gera prompt de texto a partir dos parâmetros */
+function buildArtePrompt({ tipo, texto, estilo, corPrincipal, receitNome, receitProfissao, receitContato, receitEndereco }) {
+  if (tipo === "receituario") {
+    const nomeBloco = receitNome
+      ? `Professional name at top: "${receitNome}" in large elegant serif font.`
+      : "Professional full name at top in large elegant serif font.";
+    const profBloco = receitProfissao
+      ? `Below name, specialty in spaced uppercase small letters: "${receitProfissao}".`
+      : "Below name, a professional title/specialty in spaced uppercase letters.";
+    const contatoBloco = receitContato
+      ? `Footer contact info with small icons (WhatsApp, Instagram, location pin): "${receitContato}".`
+      : "Footer with WhatsApp, Instagram and location icons with placeholder contact info.";
+    const endBloco = receitEndereco ? `Address in footer: "${receitEndereco}".` : "";
+    return `Design a professional prescription pad letterhead (receituário) in A4 portrait format. White or very light background. ${nomeBloco} ${profBloco} In the center/body of the page: a very large, extremely faint watermark illustration (opacity ~8%) related to health/beauty — could be botanical leaves, flowers, or abstract elegant motif. Accent color "${corPrincipal}" used sparingly: thin decorative stripe on left edge, or curved wave at bottom footer. Style: ${estilo}. ${contatoBloco} ${endBloco} The body/middle area MUST be completely empty white space for handwriting. Elegant luxury stationery look, print-ready, no extra borders, no placeholder text in body.`;
+  }
+  return `Professional print-ready artwork for a personalized ${tipo}. Style: ${estilo}. Main color: ${corPrincipal}. Full bleed background filling entire image. ${texto ? `Text "${texto}" centered, bold, clearly readable.` : ""} CMYK-safe flat colors, clean vector-like illustration style. A4 portrait format. Keep 1cm safe margin inside for text and elements. Professional graphic design quality.`;
+}
+
+/** Tenta gerar via OpenAI (gpt-image-1 → dall-e-3) */
+async function gerarViaOpenAI(openai, prompt) {
+  try {
+    const r = await openai.images.generate({
+      model: "gpt-image-1",
+      prompt,
+      n: 1,
+      size: "1024x1536",
+      quality: "high",
+    });
+    return { imageBase64: `data:image/png;base64,${r.data[0].b64_json}` };
+  } catch (_e) {
+    const r = await openai.images.generate({
+      model: "dall-e-3",
+      prompt,
+      n: 1,
+      size: "1024x1792",
+      quality: "hd",
+      response_format: "url",
+    });
+    return { imageUrl: r.data[0].url };
+  }
+}
+
+/** Gera via Pollinations.ai (gratuito, sem chave) */
+async function gerarViaPollinations(prompt) {
+  const encoded = encodeURIComponent(prompt);
+  const seed = Math.floor(Math.random() * 999999);
+  const url = `https://image.pollinations.ai/prompt/${encoded}?width=768&height=1088&model=flux&seed=${seed}&nologo=true&enhance=true`;
+  // Valida que a URL retorna imagem
+  const check = await axios.head(url, { timeout: 30000 });
+  if (!check.headers["content-type"]?.startsWith("image/")) throw new Error("Pollinations não retornou imagem");
+  return { imageUrl: url };
+}
 
 app.post("/api/gerar-arte", async (req, res) => {
   const {
@@ -2109,59 +2162,27 @@ app.post("/api/gerar-arte", async (req, res) => {
     receitEndereco = "",
   } = req.body || {};
 
+  const prompt = buildArtePrompt({ tipo, texto, estilo, corPrincipal, receitNome, receitProfissao, receitContato, receitEndereco });
   const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) return res.status(503).json({ success: false, error: "OpenAI não configurado no servidor." });
 
-  try {
-    const openai = new OpenAI({ apiKey });
-    let prompt;
-
-    if (tipo === "receituario") {
-      const nomeBloco = receitNome
-        ? `Professional name at top: "${receitNome}" in large elegant serif font.`
-        : "Professional full name at top in large elegant serif font.";
-      const profBloco = receitProfissao
-        ? `Below name, specialty in spaced uppercase small letters: "${receitProfissao}".`
-        : "Below name, a professional title/specialty in spaced uppercase letters.";
-      const contatoBloco = receitContato
-        ? `Footer contact info with small icons (WhatsApp, Instagram, location pin): "${receitContato}".`
-        : "Footer with WhatsApp, Instagram and location icons with placeholder contact info.";
-      const endBloco = receitEndereco ? `Address in footer: "${receitEndereco}".` : "";
-
-      prompt = `Design a professional prescription pad letterhead (receituário) in A4 portrait format. White or very light background. ${nomeBloco} ${profBloco} In the center/body of the page: a very large, extremely faint watermark illustration (opacity ~8%) related to health/beauty — could be a medical caduceus symbol, botanical leaves, flowers, or abstract elegant motif. Accent color "${corPrincipal}" used sparingly: thin vertical decorative stripe on left edge, or curved wave at bottom footer, or small ornamental lines. Style: ${estilo}. ${contatoBloco} ${endBloco} The body/middle area MUST be completely empty white space — it is where text will be handwritten. Small circular social media icons in footer. Elegant luxury stationery look, print-ready, no extra borders, no lorem ipsum, no placeholder text in body.`;
-    } else {
-      prompt = `Professional print-ready artwork for a personalized ${tipo}. Style: ${estilo}. Main color: ${corPrincipal}. Full bleed background filling entire image. ${texto ? `Text "${texto}" centered, bold, clearly readable.` : ""} CMYK-safe flat colors, clean vector-like illustration style. A4 portrait format. Keep 1cm safe margin inside for text and elements. Professional graphic design quality.`;
-    }
-
-    // Tenta gpt-image-1 primeiro, com fallback para dall-e-3
-    let imageBase64 = null;
-    let imageUrl = null;
-
+  // 1ª tentativa: OpenAI (se chave configurada)
+  if (apiKey) {
     try {
-      const response = await openai.images.generate({
-        model: "gpt-image-1",
-        prompt,
-        n: 1,
-        size: "1024x1536",
-        quality: "high",
-      });
-      imageBase64 = `data:image/png;base64,${response.data[0].b64_json}`;
-    } catch (_e1) {
-      const response = await openai.images.generate({
-        model: "dall-e-3",
-        prompt,
-        n: 1,
-        size: "1024x1792",
-        quality: "hd",
-        response_format: "url",
-      });
-      imageUrl = response.data[0].url;
+      const openai = new OpenAI({ apiKey });
+      const result = await gerarViaOpenAI(openai, prompt);
+      return res.json({ success: true, ...result, prompt, engine: "openai" });
+    } catch (errOpenAI) {
+      console.warn("[ZUCA] OpenAI falhou, usando Pollinations:", errOpenAI.message);
     }
+  }
 
-    return res.json({ success: true, imageBase64, imageUrl, prompt });
-  } catch (err) {
-    console.error("[ZUCA] Erro geração arte:", err.message);
-    return res.status(500).json({ success: false, error: err.message });
+  // 2ª tentativa: Pollinations.ai (gratuito)
+  try {
+    const result = await gerarViaPollinations(prompt);
+    return res.json({ success: true, ...result, prompt, engine: "pollinations" });
+  } catch (errPollinations) {
+    console.error("[ZUCA] Pollinations falhou:", errPollinations.message);
+    return res.status(500).json({ success: false, error: "Não foi possível gerar a arte no momento. Tente novamente." });
   }
 });
 

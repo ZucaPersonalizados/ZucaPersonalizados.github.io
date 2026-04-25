@@ -3210,3 +3210,24 @@ textarea:focus-visible {
 .btn-arte-nova    { background: #f59e0b; color: #fff; }
 .btn-arte-nova:disabled { opacity: 0.55; cursor: not-allowed; }
 .arte-resultado-acoes button:hover { opacity: 0.88; }
+
+/* Seção de campos específicos do receituário */
+.arte-receituario-section {
+  background: #faf9f7;
+  border: 1.5px solid #e8e0d8;
+  border-radius: 10px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.arte-receituario-section[hidden] { display: none; }
+
+.arte-receituario-info {
+  font-size: 12.5px;
+  color: #8a7a6a;
+  margin: 0;
+  line-height: 1.5;
+}
+
+#arte-row-texto[hidden] { display: none; }

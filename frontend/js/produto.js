@@ -1148,6 +1148,21 @@ renderVistosRecentemente();
 
   let ultimaImageUrl = null;
 
+  // Mostrar/ocultar campos de receituário conforme tipo selecionado
+  const selectTipo = document.getElementById("arte-tipo");
+  const secaoReceituario = document.getElementById("arte-campos-receituario");
+  const rowTexto = document.getElementById("arte-row-texto");
+
+  function atualizarCamposTipo() {
+    const isReceituario = selectTipo?.value === "receituario";
+    if (secaoReceituario) secaoReceituario.hidden = !isReceituario;
+    if (rowTexto) rowTexto.hidden = isReceituario;
+  }
+
+  selectTipo?.addEventListener("change", atualizarCamposTipo);
+  // Estado inicial: receituário é padrão (primeira opção)
+  atualizarCamposTipo();
+
   function abrirModal() {
     modal.hidden = false;
     document.body.style.overflow = "hidden";
@@ -1168,9 +1183,21 @@ renderVistosRecentemente();
 
   async function gerarArte() {
     const tipo = document.getElementById("arte-tipo")?.value || "produto";
-    const texto = document.getElementById("arte-texto")?.value?.trim() || "";
-    const estilo = document.getElementById("arte-estilo")?.value || "moderno";
-    const cor = document.getElementById("arte-cor")?.value?.trim() || "azul";
+    const estilo = document.getElementById("arte-estilo")?.value || "elegante";
+    const cor = document.getElementById("arte-cor")?.value?.trim() || "dourado";
+
+    // Dados extras para receituário
+    const isReceituario = tipo === "receituario";
+    const payload = { tipo, estilo, corPrincipal: cor };
+
+    if (isReceituario) {
+      payload.receitNome     = document.getElementById("receit-nome")?.value?.trim() || "";
+      payload.receitProfissao = document.getElementById("receit-profissao")?.value?.trim() || "";
+      payload.receitContato  = document.getElementById("receit-contato")?.value?.trim() || "";
+      payload.receitEndereco = document.getElementById("receit-endereco")?.value?.trim() || "";
+    } else {
+      payload.texto = document.getElementById("arte-texto")?.value?.trim() || "";
+    }
 
     loading.hidden = false;
     resultado.hidden = true;
@@ -1181,13 +1208,15 @@ renderVistosRecentemente();
       const resp = await fetch(getApiUrl("/api/gerar-arte"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tipo, texto, estilo, corPrincipal: cor }),
+        body: JSON.stringify(payload),
       });
       const data = await resp.json();
       if (!data.success) throw new Error(data.error || "Erro desconhecido");
 
-      ultimaImageUrl = data.imageUrl;
-      await renderizarArteNoCanvas(data.imageUrl);
+      // Suporta tanto URL (DALL-E 3) quanto base64 (gpt-image-1)
+      const imageSrc = data.imageBase64 || data.imageUrl;
+      ultimaImageUrl = imageSrc;
+      await renderizarArteNoCanvas(imageSrc);
       resultado.hidden = false;
     } catch (err) {
       alert("Erro ao gerar arte: " + err.message);

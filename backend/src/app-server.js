@@ -2094,27 +2094,73 @@ app.post("/api/admin/pedidos/:id/nota-fiscal/reenviar-email", adminAuth, require
 });
 
 // ───────────────────────────────────────────────────────────────────────────
-// IA: Geração de Arte com DALL-E 3
+// IA: Geração de Arte (gpt-image-1 com fallback DALL-E 3)
 // ───────────────────────────────────────────────────────────────────────────
 
 app.post("/api/gerar-arte", async (req, res) => {
-  const { tipo = "produto", texto = "", estilo = "moderno", corPrincipal = "azul" } = req.body || {};
+  const {
+    tipo = "produto",
+    texto = "",
+    estilo = "elegante e minimalista",
+    corPrincipal = "dourado",
+    receitNome = "",
+    receitProfissao = "",
+    receitContato = "",
+    receitEndereco = "",
+  } = req.body || {};
+
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) return res.status(503).json({ success: false, error: "OpenAI não configurado no servidor." });
+
   try {
     const openai = new OpenAI({ apiKey });
-    const prompt = `Professional print-ready artwork for a personalized ${tipo}. Style: ${estilo}. Main color: ${corPrincipal}. Full bleed background filling entire image edge to edge. Text "${texto}" centered, bold, clearly readable. CMYK-safe flat colors, clean vector-like illustration style. High contrast, A4 portrait format proportions. Keep 1cm safe margin inside edges for all text and important elements. No watermarks, no frames, solid vibrant background fill. Professional graphic design quality.`;
-    const response = await openai.images.generate({
-      model: "dall-e-3",
-      prompt,
-      n: 1,
-      size: "1024x1792",
-      quality: "hd",
-      response_format: "url",
-    });
-    return res.json({ success: true, imageUrl: response.data[0].url, prompt });
+    let prompt;
+
+    if (tipo === "receituario") {
+      const nomeBloco = receitNome
+        ? `Professional name at top: "${receitNome}" in large elegant serif font.`
+        : "Professional full name at top in large elegant serif font.";
+      const profBloco = receitProfissao
+        ? `Below name, specialty in spaced uppercase small letters: "${receitProfissao}".`
+        : "Below name, a professional title/specialty in spaced uppercase letters.";
+      const contatoBloco = receitContato
+        ? `Footer contact info with small icons (WhatsApp, Instagram, location pin): "${receitContato}".`
+        : "Footer with WhatsApp, Instagram and location icons with placeholder contact info.";
+      const endBloco = receitEndereco ? `Address in footer: "${receitEndereco}".` : "";
+
+      prompt = `Design a professional prescription pad letterhead (receituário) in A4 portrait format. White or very light background. ${nomeBloco} ${profBloco} In the center/body of the page: a very large, extremely faint watermark illustration (opacity ~8%) related to health/beauty — could be a medical caduceus symbol, botanical leaves, flowers, or abstract elegant motif. Accent color "${corPrincipal}" used sparingly: thin vertical decorative stripe on left edge, or curved wave at bottom footer, or small ornamental lines. Style: ${estilo}. ${contatoBloco} ${endBloco} The body/middle area MUST be completely empty white space — it is where text will be handwritten. Small circular social media icons in footer. Elegant luxury stationery look, print-ready, no extra borders, no lorem ipsum, no placeholder text in body.`;
+    } else {
+      prompt = `Professional print-ready artwork for a personalized ${tipo}. Style: ${estilo}. Main color: ${corPrincipal}. Full bleed background filling entire image. ${texto ? `Text "${texto}" centered, bold, clearly readable.` : ""} CMYK-safe flat colors, clean vector-like illustration style. A4 portrait format. Keep 1cm safe margin inside for text and elements. Professional graphic design quality.`;
+    }
+
+    // Tenta gpt-image-1 primeiro, com fallback para dall-e-3
+    let imageBase64 = null;
+    let imageUrl = null;
+
+    try {
+      const response = await openai.images.generate({
+        model: "gpt-image-1",
+        prompt,
+        n: 1,
+        size: "1024x1536",
+        quality: "high",
+      });
+      imageBase64 = `data:image/png;base64,${response.data[0].b64_json}`;
+    } catch (_e1) {
+      const response = await openai.images.generate({
+        model: "dall-e-3",
+        prompt,
+        n: 1,
+        size: "1024x1792",
+        quality: "hd",
+        response_format: "url",
+      });
+      imageUrl = response.data[0].url;
+    }
+
+    return res.json({ success: true, imageBase64, imageUrl, prompt });
   } catch (err) {
-    console.error("[ZUCA] Erro DALL-E:", err.message);
+    console.error("[ZUCA] Erro geração arte:", err.message);
     return res.status(500).json({ success: false, error: err.message });
   }
 });

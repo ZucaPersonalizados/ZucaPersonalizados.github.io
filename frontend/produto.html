@@ -612,9 +612,8 @@
             <div class="arte-form-row">
               <label for="arte-tipo">Tipo de produto</label>
               <select id="arte-tipo">
-                <option value="camiseta">Camiseta</option>
-                <option value="caneca">Caneca</option>
-                <option value="placa">Placa decorativa</option>
+                <option value="receituario">Receituário</option>
+                <option value="capa de agenda">Capa de Agenda</option>
                 <option value="banner">Banner</option>
                 <option value="convite">Convite</option>
                 <option value="adesivo">Adesivo</option>
@@ -622,25 +621,47 @@
                 <option value="produto personalizado">Produto personalizado</option>
               </select>
             </div>
-            <div class="arte-form-row">
-              <label for="arte-texto">Texto principal da arte</label>
+
+            <!-- Campos específicos para Receituário (exibidos apenas quando tipo = receituário) -->
+            <div id="arte-campos-receituario" class="arte-receituario-section">
+              <p class="arte-receituario-info">📋 Preencha os dados que aparecerão no receituário. Todos os campos são opcionais.</p>
+              <div class="arte-form-row">
+                <label for="receit-nome">Nome do profissional</label>
+                <input id="receit-nome" type="text" placeholder='Ex: Dra. Ana Paula Silva' maxlength="80">
+              </div>
+              <div class="arte-form-row">
+                <label for="receit-profissao">Profissão / Especialidade</label>
+                <input id="receit-profissao" type="text" placeholder='Ex: Biomédica Esteta · CRBM 1234' maxlength="100">
+              </div>
+              <div class="arte-form-row">
+                <label for="receit-contato">Dados de contato</label>
+                <input id="receit-contato" type="text" placeholder='Ex: (48) 99999-0000 · @dra.ana' maxlength="150">
+              </div>
+              <div class="arte-form-row">
+                <label for="receit-endereco">Endereço</label>
+                <input id="receit-endereco" type="text" placeholder='Ex: Rua das Flores, 100 – Florianópolis' maxlength="150">
+              </div>
+            </div>
+
+            <div class="arte-form-row" id="arte-row-texto">
+              <label for="arte-texto">Texto / observação adicional</label>
               <input id="arte-texto" type="text" placeholder='Ex: "João, 10 anos — Turma do Bem!"' maxlength="120">
             </div>
             <div class="arte-form-row">
               <label for="arte-estilo">Estilo visual</label>
               <select id="arte-estilo">
-                <option value="moderno e clean">Moderno e clean</option>
-                <option value="infantil e colorido">Infantil e colorido</option>
                 <option value="elegante e minimalista">Elegante e minimalista</option>
-                <option value="vintage e retrô">Vintage e retrô</option>
+                <option value="moderno e clean">Moderno e clean</option>
+                <option value="clássico e sofisticado">Clássico e sofisticado</option>
+                <option value="floral e delicado">Floral e delicado</option>
+                <option value="infantil e colorido">Infantil e colorido</option>
                 <option value="tropical e festivo">Tropical e festivo</option>
-                <option value="esportivo e dinâmico">Esportivo e dinâmico</option>
-                <option value="floral e romantico">Floral e romântico</option>
+                <option value="vintage e retrô">Vintage e retrô</option>
               </select>
             </div>
             <div class="arte-form-row">
               <label for="arte-cor">Cor principal</label>
-              <input id="arte-cor" type="text" placeholder='Ex: azul royal, rosa, dourado...' maxlength="60" value="azul">
+              <input id="arte-cor" type="text" placeholder='Ex: dourado, rose gold, verde sage...' maxlength="60" value="dourado">
             </div>
             <button id="btn-gerar-arte" class="btn-arte-gerar" type="button">🎨 Gerar Arte</button>
           </div>

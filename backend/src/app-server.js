@@ -2143,11 +2143,24 @@ async function gerarViaOpenAI(openai, prompt) {
 async function gerarViaPollinations(prompt) {
   const encoded = encodeURIComponent(prompt);
   const seed = Math.floor(Math.random() * 999999);
-  const url = `https://image.pollinations.ai/prompt/${encoded}?width=768&height=1088&model=flux&seed=${seed}&nologo=true&enhance=true`;
-  // Valida que a URL retorna imagem
-  const check = await axios.head(url, { timeout: 30000 });
-  if (!check.headers["content-type"]?.startsWith("image/")) throw new Error("Pollinations não retornou imagem");
-  return { imageUrl: url };
+  const url = `https://image.pollinations.ai/prompt/${encoded}?width=768&height=1088&model=flux&seed=${seed}&nologo=true`;
+
+  // Faz o download da imagem no servidor e devolve como base64.
+  // Isso elimina a requisição HEAD extra (que causava 429) e evita
+  // problemas de CORS ao renderizar no canvas do cliente.
+  const response = await axios.get(url, {
+    responseType: "arraybuffer",
+    timeout: 60000,
+    headers: { Accept: "image/*" },
+  });
+
+  const contentType = response.headers["content-type"] || "image/jpeg";
+  if (!contentType.startsWith("image/")) {
+    throw new Error("Pollinations não retornou imagem");
+  }
+
+  const base64 = Buffer.from(response.data).toString("base64");
+  return { imageBase64: `data:${contentType};base64,${base64}` };
 }
 
 app.post("/api/gerar-arte", async (req, res) => {

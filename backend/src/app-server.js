@@ -2097,57 +2097,40 @@ app.post("/api/admin/pedidos/:id/nota-fiscal/reenviar-email", adminAuth, require
 // IA: Geração de Arte (OpenAI → Pollinations.ai fallback gratuito)
 // ───────────────────────────────────────────────────────────────────────────
 
-/** Gera prompt de texto a partir dos parâmetros */
+/** Gera prompt de texto a partir dos parâmetros.
+ * Retorna { prompt, negativePrompt, model } */
 function buildArtePrompt({ tipo, texto, estilo, corPrincipal, receitNome, receitProfissao, receitContato, receitEndereco }) {
   if (tipo === "receituario") {
     const nome    = receitNome      || "Nome do Profissional";
-    const prof    = receitProfissao || "Especialidade · Registro Profissional";
+    const prof    = receitProfissao || "Especialidade";
     const contato = receitContato   || "";
     const ende    = receitEndereco  || "";
+    const footerBloco = [contato, ende].filter(Boolean).join("   ");
 
-    const footerBloco = [contato, ende].filter(Boolean).join(" | ");
+    const iniciais = nome.split(" ").filter(Boolean).map(w => w[0]).join("").slice(0, 2).toUpperCase();
 
-    // Mapa de motivos decorativos por estilo
-    const motivo = estilo.toLowerCase().includes("floral") || estilo.toLowerCase().includes("botânico")
-      ? "delicate botanical leaves and flowers"
-      : estilo.toLowerCase().includes("geom")
-        ? "subtle geometric abstract pattern"
-        : "elegant abstract botanical silhouette";
-
-    return [
-      // ── Tipo e formato ──────────────────────────────────────────────────
-      "A4 portrait prescription pad letterhead for professional printing (210×297 mm ratio).",
-      "The ENTIRE image IS the document itself — pure white paper background filling the whole canvas edge to edge.",
-      "No external background, no drop shadow, no page border, no frame around the page.",
-      "All content is placed strictly within a 1 cm safe margin from every edge.",
-
-      // ── Cabeçalho ───────────────────────────────────────────────────────
-      `HEADER (top area, inside 1 cm margin): Professional name "${nome}" printed in large bold elegant serif font,`,
-      `dark near-black color (#1a1a1a), clearly legible at high contrast against the white background.`,
-      `Directly below the name: "${prof}" in smaller spaced uppercase letters, same dark color, clearly readable.`,
-      `A thin horizontal rule (color: ${corPrincipal}) separates the header from the body writing area.`,
-
-      // ── Elemento decorativo lateral ─────────────────────────────────────
-      `A single thin vertical accent bar (color: ${corPrincipal}) on the left edge of the header area only.`,
-
-      // ── Corpo ───────────────────────────────────────────────────────────
-      "BODY (center, largest area): completely empty white space reserved for handwritten prescription — NO text, NO lines, NO content here.",
-      `A single centered watermark illustration at 4% opacity (almost invisible): ${motivo}. It must not interfere with readability.`,
-
-      // ── Rodapé ──────────────────────────────────────────────────────────
+    // Abordagem: documento em pé contra backdrop branco de estúdio, vista frontal
+    // — evita flat lay (que adiciona props de lifestyle) e gera resultado limpo
+    const prompt = [
+      `A portrait A4 professional letterhead displayed flat against a pure white studio backdrop, photographed straight-on from directly in front, perfectly orthogonal, no perspective distortion. Paper is perfectly upright and centered.`,
+      `On the paper: elegant calligraphic monogram '${iniciais}' in dark navy at top center.`,
+      `Below: name '${nome}' in large refined serif font.`,
+      `Below: '${prof}' in small spaced uppercase.`,
+      `Thin ${corPrincipal} horizontal rule.`,
+      `Large blank white body.`,
       footerBloco
-        ? `FOOTER (bottom, inside 1 cm margin): "${footerBloco}" in small clean sans-serif font, dark color, fully legible.`
-        : `FOOTER (bottom, inside 1 cm margin): a minimal decorative line in color ${corPrincipal}.`,
-
-      // ── Regras de impressão e qualidade ─────────────────────────────────
-      `Style: ${estilo}. Accent color ${corPrincipal} used ONLY for the horizontal rule, vertical bar and footer line — never on body text.`,
-      "All text rendered in dark near-black (#1a1a1a) with no gradients, no glows, no shadows — pure flat print-ready typography.",
-      "CMYK-safe flat colors throughout. High-resolution clean vector-like rendering. Professional luxury stationery quality.",
-      "No lorem ipsum. No fake placeholder text in body. No decorative borders outside the 1 cm margin.",
+        ? `Soft ${corPrincipal}-tinted stripe at bottom with small text: '${footerBloco}'.`
+        : `Soft ${corPrincipal}-tinted stripe at the very bottom.`,
+      `Style: ${estilo}. Minimal luxury stationery.`,
     ].join(" ");
+
+    const negativePrompt = "clip, binder clip, bulldog clip, cactus, succulent, plant, eucalyptus, flower, leaf, greenery, glasses, pencil, pen, brush, bowl, cup, coffee, table surface, desk, any object, tilt, perspective, angle";
+
+    return { prompt, negativePrompt, model: "flux" };
   }
 
-  return `Professional print-ready artwork for a personalized ${tipo}. Style: ${estilo}. Main color: ${corPrincipal}. Full bleed background filling entire image. ${texto ? `Text "${texto}" centered, bold, clearly readable.` : ""} CMYK-safe flat colors, clean vector-like illustration style. A4 portrait format. Keep 1cm safe margin inside for text and elements. Professional graphic design quality.`;
+  const prompt = `Professional print-ready artwork for a personalized ${tipo}. Style: ${estilo}. Main color: ${corPrincipal}. Full bleed background filling entire image. ${texto ? `Text "${texto}" centered, bold, clearly readable.` : ""} CMYK-safe flat colors, clean vector-like illustration style. A4 portrait format. Keep 1cm safe margin inside for text and elements. Professional graphic design quality.`;
+  return { prompt, negativePrompt: "", model: "flux" };
 }
 
 /** Tenta gerar via OpenAI (gpt-image-1 → dall-e-3) */
@@ -2175,12 +2158,13 @@ async function gerarViaOpenAI(openai, prompt) {
 }
 
 /** Gera via Pollinations.ai (gratuito, sem chave) — com retry automático em caso de 429 */
-async function gerarViaPollinations(prompt) {
+async function gerarViaPollinations(prompt, negativePrompt = "", model = "flux") {
   const encoded = encodeURIComponent(prompt);
+  const encodedNeg = negativePrompt ? `&negative_prompt=${encodeURIComponent(negativePrompt)}` : "";
 
   const tentativa = async () => {
     const seed = Math.floor(Math.random() * 999999);
-    const url = `https://image.pollinations.ai/prompt/${encoded}?width=768&height=1088&model=flux&seed=${seed}&nologo=true`;
+    const url = `https://image.pollinations.ai/prompt/${encoded}?width=768&height=1088&model=${model}&seed=${seed}&nologo=true${encodedNeg}`;
 
     const response = await axios.get(url, {
       responseType: "arraybuffer",
@@ -2220,7 +2204,7 @@ app.post("/api/gerar-arte", async (req, res) => {
     receitEndereco = "",
   } = req.body || {};
 
-  const prompt = buildArtePrompt({ tipo, texto, estilo, corPrincipal, receitNome, receitProfissao, receitContato, receitEndereco });
+  const { prompt, negativePrompt, model } = buildArtePrompt({ tipo, texto, estilo, corPrincipal, receitNome, receitProfissao, receitContato, receitEndereco });
   const apiKey = process.env.OPENAI_API_KEY;
 
   // 1ª tentativa: OpenAI (se chave configurada)
@@ -2236,7 +2220,7 @@ app.post("/api/gerar-arte", async (req, res) => {
 
   // 2ª tentativa: Pollinations.ai (gratuito)
   try {
-    const result = await gerarViaPollinations(prompt);
+    const result = await gerarViaPollinations(prompt, negativePrompt, model);
     return res.json({ success: true, ...result, prompt, engine: "pollinations" });
   } catch (errPollinations) {
     console.error("[ZUCA] Pollinations falhou:", errPollinations.message);

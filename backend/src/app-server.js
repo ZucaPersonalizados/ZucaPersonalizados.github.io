@@ -2100,18 +2100,53 @@ app.post("/api/admin/pedidos/:id/nota-fiscal/reenviar-email", adminAuth, require
 /** Gera prompt de texto a partir dos parâmetros */
 function buildArtePrompt({ tipo, texto, estilo, corPrincipal, receitNome, receitProfissao, receitContato, receitEndereco }) {
   if (tipo === "receituario") {
-    const nomeBloco = receitNome
-      ? `Professional name at top: "${receitNome}" in large elegant serif font.`
-      : "Professional full name at top in large elegant serif font.";
-    const profBloco = receitProfissao
-      ? `Below name, specialty in spaced uppercase small letters: "${receitProfissao}".`
-      : "Below name, a professional title/specialty in spaced uppercase letters.";
-    const contatoBloco = receitContato
-      ? `Footer contact info with small icons (WhatsApp, Instagram, location pin): "${receitContato}".`
-      : "Footer with WhatsApp, Instagram and location icons with placeholder contact info.";
-    const endBloco = receitEndereco ? `Address in footer: "${receitEndereco}".` : "";
-    return `Design a professional prescription pad letterhead (receituário) in A4 portrait format. White or very light background. ${nomeBloco} ${profBloco} In the center/body of the page: a very large, extremely faint watermark illustration (opacity ~8%) related to health/beauty — could be botanical leaves, flowers, or abstract elegant motif. Accent color "${corPrincipal}" used sparingly: thin decorative stripe on left edge, or curved wave at bottom footer. Style: ${estilo}. ${contatoBloco} ${endBloco} The body/middle area MUST be completely empty white space for handwriting. Elegant luxury stationery look, print-ready, no extra borders, no placeholder text in body.`;
+    const nome    = receitNome      || "Nome do Profissional";
+    const prof    = receitProfissao || "Especialidade · Registro Profissional";
+    const contato = receitContato   || "";
+    const ende    = receitEndereco  || "";
+
+    const footerBloco = [contato, ende].filter(Boolean).join(" | ");
+
+    // Mapa de motivos decorativos por estilo
+    const motivo = estilo.toLowerCase().includes("floral") || estilo.toLowerCase().includes("botânico")
+      ? "delicate botanical leaves and flowers"
+      : estilo.toLowerCase().includes("geom")
+        ? "subtle geometric abstract pattern"
+        : "elegant abstract botanical silhouette";
+
+    return [
+      // ── Tipo e formato ──────────────────────────────────────────────────
+      "A4 portrait prescription pad letterhead for professional printing (210×297 mm ratio).",
+      "The ENTIRE image IS the document itself — pure white paper background filling the whole canvas edge to edge.",
+      "No external background, no drop shadow, no page border, no frame around the page.",
+      "All content is placed strictly within a 1 cm safe margin from every edge.",
+
+      // ── Cabeçalho ───────────────────────────────────────────────────────
+      `HEADER (top area, inside 1 cm margin): Professional name "${nome}" printed in large bold elegant serif font,`,
+      `dark near-black color (#1a1a1a), clearly legible at high contrast against the white background.`,
+      `Directly below the name: "${prof}" in smaller spaced uppercase letters, same dark color, clearly readable.`,
+      `A thin horizontal rule (color: ${corPrincipal}) separates the header from the body writing area.`,
+
+      // ── Elemento decorativo lateral ─────────────────────────────────────
+      `A single thin vertical accent bar (color: ${corPrincipal}) on the left edge of the header area only.`,
+
+      // ── Corpo ───────────────────────────────────────────────────────────
+      "BODY (center, largest area): completely empty white space reserved for handwritten prescription — NO text, NO lines, NO content here.",
+      `A single centered watermark illustration at 4% opacity (almost invisible): ${motivo}. It must not interfere with readability.`,
+
+      // ── Rodapé ──────────────────────────────────────────────────────────
+      footerBloco
+        ? `FOOTER (bottom, inside 1 cm margin): "${footerBloco}" in small clean sans-serif font, dark color, fully legible.`
+        : `FOOTER (bottom, inside 1 cm margin): a minimal decorative line in color ${corPrincipal}.`,
+
+      // ── Regras de impressão e qualidade ─────────────────────────────────
+      `Style: ${estilo}. Accent color ${corPrincipal} used ONLY for the horizontal rule, vertical bar and footer line — never on body text.`,
+      "All text rendered in dark near-black (#1a1a1a) with no gradients, no glows, no shadows — pure flat print-ready typography.",
+      "CMYK-safe flat colors throughout. High-resolution clean vector-like rendering. Professional luxury stationery quality.",
+      "No lorem ipsum. No fake placeholder text in body. No decorative borders outside the 1 cm margin.",
+    ].join(" ");
   }
+
   return `Professional print-ready artwork for a personalized ${tipo}. Style: ${estilo}. Main color: ${corPrincipal}. Full bleed background filling entire image. ${texto ? `Text "${texto}" centered, bold, clearly readable.` : ""} CMYK-safe flat colors, clean vector-like illustration style. A4 portrait format. Keep 1cm safe margin inside for text and elements. Professional graphic design quality.`;
 }
 
@@ -2139,28 +2174,38 @@ async function gerarViaOpenAI(openai, prompt) {
   }
 }
 
-/** Gera via Pollinations.ai (gratuito, sem chave) */
+/** Gera via Pollinations.ai (gratuito, sem chave) — com retry automático em caso de 429 */
 async function gerarViaPollinations(prompt) {
   const encoded = encodeURIComponent(prompt);
-  const seed = Math.floor(Math.random() * 999999);
-  const url = `https://image.pollinations.ai/prompt/${encoded}?width=768&height=1088&model=flux&seed=${seed}&nologo=true`;
 
-  // Faz o download da imagem no servidor e devolve como base64.
-  // Isso elimina a requisição HEAD extra (que causava 429) e evita
-  // problemas de CORS ao renderizar no canvas do cliente.
-  const response = await axios.get(url, {
-    responseType: "arraybuffer",
-    timeout: 60000,
-    headers: { Accept: "image/*" },
-  });
+  const tentativa = async () => {
+    const seed = Math.floor(Math.random() * 999999);
+    const url = `https://image.pollinations.ai/prompt/${encoded}?width=768&height=1088&model=flux&seed=${seed}&nologo=true`;
 
-  const contentType = response.headers["content-type"] || "image/jpeg";
-  if (!contentType.startsWith("image/")) {
-    throw new Error("Pollinations não retornou imagem");
+    const response = await axios.get(url, {
+      responseType: "arraybuffer",
+      timeout: 70000,
+      headers: { Accept: "image/*" },
+    });
+
+    const contentType = response.headers["content-type"] || "image/jpeg";
+    if (!contentType.startsWith("image/")) throw new Error("Pollinations não retornou imagem");
+
+    const base64 = Buffer.from(response.data).toString("base64");
+    return { imageBase64: `data:${contentType};base64,${base64}` };
+  };
+
+  try {
+    return await tentativa();
+  } catch (err) {
+    // 429 ou timeout: aguarda 7s e tenta uma vez mais com nova seed
+    if (err?.response?.status === 429 || err.code === "ECONNABORTED" || /timeout/i.test(err.message)) {
+      console.warn("[ZUCA] Pollinations rate-limit/timeout, aguardando 7s para retry...");
+      await new Promise(r => setTimeout(r, 7000));
+      return await tentativa();
+    }
+    throw err;
   }
-
-  const base64 = Buffer.from(response.data).toString("base64");
-  return { imageBase64: `data:${contentType};base64,${base64}` };
 }
 
 app.post("/api/gerar-arte", async (req, res) => {

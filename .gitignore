@@ -6,6 +6,7 @@ backend/.env
 backend/.env.*
 !backend/.env.example
 backend/src/config/firebase-key.json
+backend/src/config/set-admin.cjs
 frontend/js/config.local.js
 frontend/js/config.local.*.js
 js/config.local.js

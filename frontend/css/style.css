@@ -2956,6 +2956,27 @@ textarea:focus-visible {
   }
 }
 
+/* Badge de contagem do carrinho na bottom-nav */
+.nav-cart-badge {
+  display: none;
+  position: absolute;
+  top: -6px;
+  right: -8px;
+  min-width: 17px;
+  height: 17px;
+  border-radius: 999px;
+  background: var(--accent-rose, #e9836d);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 800;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+  line-height: 1;
+  border: 1.5px solid #fff;
+  pointer-events: none;
+}
+
 /* ========== Mobile Bottom Nav ========== */
 .bottom-nav {
   display: none;
@@ -3000,22 +3021,146 @@ textarea:focus-visible {
   color: var(--accent);
 }
 
-@media (max-width: 768px) {
-  .bottom-nav {
-    display: block;
-  }
-  body {
-    padding-bottom: 70px;
-  }
-}
-
-/* ========== Sticky Header Auto-hide ========== */
+/* ========== Sticky Header Auto-hide (desktop only) ========== */
 .header {
   transition: transform 0.3s ease;
 }
 
 .header.header-hidden {
   transform: translateY(-100%);
+}
+
+/* ========== Mobile: oculta header e ribbon, exibe bottom-nav ========== */
+@media (max-width: 768px) {
+  /* 1. Oculta elementos de topo — a bottom-nav substitui a navegação */
+  .top-ribbon,
+  .header {
+    display: none !important;
+  }
+
+  /* 2. Corpo com espaço suficiente para a bottom-nav + safe area */
+  body {
+    padding-top: 0;
+    padding-bottom: calc(68px + env(safe-area-inset-bottom));
+  }
+
+  /* 3. Seções com scroll-margin sem o header fixo */
+  #sobre,
+  #produtos,
+  #colecoes,
+  #inicio {
+    scroll-margin-top: 12px;
+  }
+
+  /* 4. Exibe a bottom-nav */
+  .bottom-nav {
+    display: block;
+  }
+
+  /* 5. Bottom-nav com visual refinado (glass morphism) */
+  .bottom-nav {
+    background: rgba(255, 252, 247, 0.95);
+    backdrop-filter: blur(14px) saturate(160%);
+    -webkit-backdrop-filter: blur(14px) saturate(160%);
+    border-top: 1px solid rgba(210, 185, 155, 0.4);
+    box-shadow: 0 -1px 0 rgba(0,0,0,0.04), 0 -6px 20px rgba(30,20,10,0.08);
+    padding: 4px 0 calc(4px + env(safe-area-inset-bottom));
+    height: calc(60px + env(safe-area-inset-bottom));
+  }
+
+  .bottom-nav-inner {
+    display: flex;
+    justify-content: space-around;
+    align-items: stretch;
+    height: 100%;
+    padding: 0 4px;
+  }
+
+  .bottom-nav-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    border-radius: 14px;
+    padding: 4px 6px;
+    min-height: 48px;
+    color: var(--muted);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-decoration: none;
+    transition: color 0.15s, background 0.15s;
+    -webkit-tap-highlight-color: transparent;
+    position: relative;
+  }
+
+  .bottom-nav-item .nav-icon {
+    font-size: 22px;
+    line-height: 1;
+    transition: transform 0.2s cubic-bezier(.34,1.56,.64,1);
+    display: block;
+  }
+
+  .bottom-nav-item.active {
+    color: var(--accent-deep, #aa7041);
+  }
+
+  .bottom-nav-item.active .nav-icon {
+    transform: scale(1.18) translateY(-1px);
+  }
+
+  /* Indicador de ativo: pílula acima do ícone */
+  .bottom-nav-item.active::before {
+    content: "";
+    position: absolute;
+    top: 4px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 20px;
+    height: 3px;
+    border-radius: 999px;
+    background: var(--accent, #c98d59);
+  }
+
+  .bottom-nav-item:active .nav-icon {
+    transform: scale(0.88);
+  }
+
+  /* 6. Toast notificações acima da bottom-nav */
+  #toast-container {
+    bottom: calc(68px + env(safe-area-inset-bottom) + 10px);
+    right: 12px;
+    left: 12px;
+    max-width: none;
+  }
+
+  /* 7. Barra flutuante de "Adicionar ao carrinho" acima da nav */
+  .sticky-add-bar {
+    bottom: calc(60px + env(safe-area-inset-bottom));
+  }
+
+  /* 8. Hero ocupa bem a tela sem o ribbon+header */
+  .hero {
+    padding: 32px 0 40px;
+  }
+
+  /* 9. Seção de produtos sem topo excessivo */
+  .produtos {
+    padding-top: 40px;
+  }
+
+  /* 10. Container padrão com margens menores */
+  .container {
+    width: calc(100% - 24px);
+  }
+
+  /* 11. Produto interno: menos margens */
+  .produto-container,
+  .descricao-longa {
+    width: calc(100% - 24px);
+  }
 }
 
 /* ===== Arte com IA ===== */
@@ -3231,3 +3376,183 @@ textarea:focus-visible {
 }
 
 #arte-row-texto[hidden] { display: none; }
+
+/* ========== Gerador de Receituário por Modelos Prontos ========== */
+
+/* Botões lado a lado no bloco de personalização */
+.arte-ia-botoes {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.arte-ia-botoes > button {
+  flex: 1;
+  min-width: 140px;
+}
+
+/* Botão "Usar Modelo Pronto" */
+.btn-arte-modelo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-deep) 100%);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.2s, transform 0.15s;
+}
+.btn-arte-modelo:hover  { opacity: 0.92; transform: translateY(-1px); }
+.btn-arte-modelo:active { transform: translateY(0); }
+
+/* Modal de modelos — inner maior para acomodar layout 2 colunas */
+.modelos-modal-inner {
+  max-width: 860px !important;
+  width: 96vw !important;
+}
+
+/* ── Etapa 1: Galeria de thumbnails ── */
+.modelos-galeria {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 14px;
+  margin-top: 8px;
+}
+
+.modelos-card {
+  background: #fff;
+  border: 2px solid var(--line, #ddd);
+  border-radius: 12px;
+  padding: 8px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.15s;
+  text-align: center;
+}
+.modelos-card:hover {
+  border-color: var(--accent);
+  box-shadow: 0 4px 14px rgba(201, 141, 89, 0.25);
+  transform: translateY(-2px);
+}
+.modelos-card--ativo {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(201, 141, 89, 0.3);
+}
+
+.modelos-card-thumb {
+  width: 100%;
+  aspect-ratio: 210 / 297;
+  object-fit: cover;
+  border-radius: 8px;
+  background: #f0ece6;
+  display: block;
+}
+
+.modelos-card-nome {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.3;
+}
+
+/* ── Etapa 2: Header com botão Voltar ── */
+.modelos-etapa2-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 4px;
+}
+
+.modelos-btn-voltar {
+  background: none;
+  border: 1.5px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+}
+.modelos-btn-voltar:hover { background: var(--paper-soft); color: var(--text); }
+
+/* ── Etapa 2: Layout 2 colunas ── */
+.modelos-etapa2-layout {
+  display: grid;
+  grid-template-columns: 1fr 240px;
+  gap: 20px;
+  align-items: start;
+  margin-top: 12px;
+}
+
+@media (max-width: 640px) {
+  .modelos-etapa2-layout {
+    grid-template-columns: 1fr;
+  }
+  .modelos-preview {
+    order: -1;
+  }
+}
+
+.modelos-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.modelos-logo-input {
+  padding: 6px 8px;
+  border: 1.5px solid var(--line, #ddd);
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+/* ── Etapa 2: Botões de ação ── */
+.modelos-acoes {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+.modelos-btn-pdf,
+.modelos-btn-usar {
+  flex: 1;
+  min-width: 120px;
+  padding: 11px 14px;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+.modelos-btn-pdf:disabled { opacity: 0.55; cursor: not-allowed; }
+.modelos-btn-pdf:hover:not(:disabled),
+.modelos-btn-usar:hover { opacity: 0.88; }
+
+/* ── Preview canvas na etapa 2 ── */
+.modelos-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.modelos-preview .arte-preview-wrap {
+  width: 100%;
+  margin: 0;
+}
+.modelos-preview .arte-canvas {
+  width: 100%;
+  height: auto;
+  border-radius: 8px;
+  display: block;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+}

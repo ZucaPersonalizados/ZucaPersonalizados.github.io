@@ -4,6 +4,7 @@ import {
   onAuthStateChanged,
   salvarUsuarioNoStorage,
 } from "./firebase-auth.js";
+import RECEITUARIO_MODELOS from "./receituario-modelos.js";
 
 const API_BASE = (() => {
   const custom = localStorage.getItem("zuca_api_base_url");
@@ -1283,4 +1284,364 @@ renderVistosRecentemente();
   btnNova.addEventListener("click", gerarArte);
   btnBaixar.addEventListener("click", baixarArte);
   btnUsar.addEventListener("click", usarArte);
+})();
+
+/* ========== Gerador de Receituário por Modelos Prontos ========== */
+(async function modelosReceituario() {
+  const btnAbrir  = document.getElementById("btn-abrir-modelos");
+  const modal     = document.getElementById("modal-modelos");
+  const btnFechar = document.getElementById("btn-fechar-modelos");
+  const backdrop  = modal?.querySelector(".arte-modal-backdrop");
+  const etapa1    = document.getElementById("modelos-etapa-1");
+  const etapa2    = document.getElementById("modelos-etapa-2");
+  const galeria   = document.getElementById("modelos-galeria");
+  const btnVoltar = document.getElementById("btn-modelos-voltar");
+  const canvas    = document.getElementById("modelos-canvas");
+  const btnPdf    = document.getElementById("btn-mod-pdf");
+  const btnUsar   = document.getElementById("btn-mod-usar");
+  const semImagem = document.getElementById("modelos-sem-imagem");
+
+  if (!btnAbrir || !modal || !canvas) return;
+
+  const ctx = canvas.getContext("2d");
+  let modeloAtual = null;   // objeto do modelo selecionado
+  let logoDataUrl  = null;  // data URL da logo carregada pelo usuário
+  let templateImg  = null;  // HTMLImageElement do template atual
+
+  // ─── Abrir / Fechar modal ───────────────────────────────────────────────
+  function abrirModal() {
+    modal.hidden = false;
+    document.body.style.overflow = "hidden";
+  }
+
+  function fecharModal() {
+    modal.hidden = true;
+    document.body.style.overflow = "";
+  }
+
+  btnAbrir.addEventListener("click", abrirModal);
+  btnFechar.addEventListener("click", fecharModal);
+  backdrop?.addEventListener("click", fecharModal);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !modal.hidden) fecharModal();
+  });
+
+  // ─── Etapa 1: Galeria ──────────────────────────────────────────────────
+  function renderizarGaleria() {
+    galeria.innerHTML = "";
+    if (!RECEITUARIO_MODELOS.length) {
+      galeria.innerHTML = "<p style='color:#888;text-align:center'>Nenhum modelo disponível no momento.</p>";
+      return;
+    }
+    RECEITUARIO_MODELOS.forEach((modelo) => {
+      const card = document.createElement("button");
+      card.type = "button";
+      card.className = "modelos-card";
+      card.dataset.id = modelo.id;
+      card.innerHTML = `
+        <img src="${modelo.thumbnail}" alt="${modelo.nome}" class="modelos-card-thumb"
+             onerror="this.style.background='#e8e0d8';this.src='data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs='">
+        <span class="modelos-card-nome">${modelo.nome}</span>
+      `;
+      card.addEventListener("click", () => selecionarModelo(modelo));
+      galeria.appendChild(card);
+    });
+  }
+
+  renderizarGaleria();
+
+  // ─── Etapa 2: Seleção de modelo ────────────────────────────────────────
+  async function selecionarModelo(modelo) {
+    modeloAtual = modelo;
+    templateImg = null;
+
+    etapa1.hidden = true;
+    etapa2.hidden = false;
+
+    // Destaca card selecionado
+    galeria.querySelectorAll(".modelos-card").forEach((c) => {
+      c.classList.toggle("modelos-card--ativo", c.dataset.id === modelo.id);
+    });
+
+    // Carrega imagem do template
+    try {
+      templateImg = await carregarImagem(modelo.imagem);
+      semImagem.hidden = true;
+    } catch {
+      semImagem.hidden = false;
+      semImagem.textContent = "⚠️ Imagem do modelo não encontrada. Adicione o arquivo em img/modelos/.";
+      limparCanvas();
+      return;
+    }
+
+    renderizarPreview();
+  }
+
+  btnVoltar?.addEventListener("click", () => {
+    etapa1.hidden = false;
+    etapa2.hidden = true;
+  });
+
+  // ─── Inputs — atualização ao vivo ──────────────────────────────────────
+  ["mod-nome", "mod-especialidade", "mod-telefone", "mod-email", "mod-endereco"].forEach((id) => {
+    document.getElementById(id)?.addEventListener("input", renderizarPreview);
+  });
+
+  document.getElementById("mod-logo")?.addEventListener("change", async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) { logoDataUrl = null; renderizarPreview(); return; }
+    if (file.size > 2 * 1024 * 1024) {
+      alert("A logo deve ter no máximo 2 MB.");
+      e.target.value = "";
+      return;
+    }
+    logoDataUrl = await lerArquivoComoDataUrl(file);
+    renderizarPreview();
+  });
+
+  // ─── Renderização no canvas de preview (420×594) ───────────────────────
+  function renderizarPreview() {
+    if (!modeloAtual || !templateImg) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // 1. Template de fundo (já limpo, sem placeholders)
+    ctx.drawImage(templateImg, 0, 0, canvas.width, canvas.height);
+
+    // 2. Logo (se houver)
+    if (logoDataUrl) {
+      const logoImg = new Image();
+      logoImg.onload = () => {
+        const { x, y, w, h } = modeloAtual.logoZone;
+        // Ajusta proporção da logo sem distorcer
+        const scale = Math.min(w / logoImg.width, h / logoImg.height);
+        const lw = logoImg.width * scale;
+        const lh = logoImg.height * scale;
+        const lx = x + (w - lw) / 2;
+        const ly = y + (h - lh) / 2;
+        ctx.drawImage(logoImg, lx, ly, lw, lh);
+        desenharTextos();
+      };
+      logoImg.src = logoDataUrl;
+    } else {
+      desenharTextos();
+    }
+  }
+
+  function desenharTextos() {
+    if (!modeloAtual) return;
+    const campos = modeloAtual.campos;
+    const valores = {
+      nome:          document.getElementById("mod-nome")?.value?.trim() || "",
+      especialidade: document.getElementById("mod-especialidade")?.value?.trim() || "",
+      telefone:      document.getElementById("mod-telefone")?.value?.trim() || "",
+      email:         document.getElementById("mod-email")?.value?.trim() || "",
+      endereco:      document.getElementById("mod-endereco")?.value?.trim() || "",
+    };
+
+    Object.entries(campos).forEach(([chave, cfg]) => {
+      const texto = valores[chave];
+      if (!texto) return;
+      const peso = cfg.fontWeight || "400";
+      ctx.font = `${peso} ${cfg.fontSize}px 'Mulish', 'Segoe UI', sans-serif`;
+      ctx.fillStyle = cfg.color;
+      ctx.textAlign = cfg.align || "left";
+      ctx.textBaseline = "middle";
+      // Trunca o texto se for mais largo que maxWidth
+      let textoFinal = texto;
+      if (ctx.measureText(texto).width > cfg.maxWidth) {
+        while (textoFinal.length > 1 && ctx.measureText(textoFinal + "…").width > cfg.maxWidth) {
+          textoFinal = textoFinal.slice(0, -1);
+        }
+        textoFinal += "…";
+      }
+      ctx.fillText(textoFinal, cfg.x, cfg.y);
+    });
+  }
+
+  function limparCanvas() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "#f5f0ea";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "#bbb";
+    ctx.font = "13px sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("Selecione um modelo para visualizar", canvas.width / 2, canvas.height / 2);
+  }
+  limparCanvas();
+
+  // ─── Exportar PDF via pdf-lib (texto vetorial) ────────────────────────
+  btnPdf?.addEventListener("click", async () => {
+    if (!modeloAtual || !templateImg) {
+      alert("Selecione e preencha um modelo antes de gerar o PDF.");
+      return;
+    }
+
+    const PDFLib = window.PDFLib;
+    if (!PDFLib) {
+      alert("Erro: biblioteca de PDF não carregada. Verifique sua conexão e recarregue a página.");
+      return;
+    }
+
+    btnPdf.disabled = true;
+    btnPdf.textContent = "⏳ Gerando…";
+
+    try {
+      const { PDFDocument, rgb, StandardFonts } = PDFLib;
+
+      // Constantes de conversão: canvas 420×594 → PDF A4 595.28×841.89 pts
+      const PDF_W = 595.28, PDF_H = 841.89;
+      const PDF_SCALE = PDF_W / 420;
+      const toPdfX = (cx) => cx * PDF_SCALE;
+      const toPdfY = (cy) => PDF_H - cy * PDF_SCALE; // PDF: y=0 na base
+
+      // 1. Criar documento
+      const pdfDoc = await PDFDocument.create();
+      const page = pdfDoc.addPage([PDF_W, PDF_H]);
+
+      // 2. Template como imagem de fundo (PNG ou JPG)
+      const templateResp = await fetch(modeloAtual.imagem);
+      const templateBytes = await templateResp.arrayBuffer();
+      const templateImage = modeloAtual.imagem.toLowerCase().endsWith(".png")
+        ? await pdfDoc.embedPng(templateBytes)
+        : await pdfDoc.embedJpg(templateBytes);
+      page.drawImage(templateImage, { x: 0, y: 0, width: PDF_W, height: PDF_H });
+
+      // 3. (template já limpo — sem clearZones necessários)
+
+      // 4. Logo do cliente (PNG ou JPG)
+      if (logoDataUrl) {
+        const logoBytes = dataUrlParaUint8Array(logoDataUrl);
+        const logoImage = logoDataUrl.startsWith("data:image/png")
+          ? await pdfDoc.embedPng(logoBytes)
+          : await pdfDoc.embedJpg(logoBytes);
+        const { x: lx, y: ly, w: lw, h: lh } = modeloAtual.logoZone;
+        const pdfLW = lw * PDF_SCALE, pdfLH = lh * PDF_SCALE;
+        const s = Math.min(pdfLW / logoImage.width, pdfLH / logoImage.height);
+        const fw = logoImage.width * s, fh = logoImage.height * s;
+        page.drawImage(logoImage, {
+          x: toPdfX(lx) + (pdfLW - fw) / 2,
+          y: toPdfY(ly + lh) + (pdfLH - fh) / 2,
+          width: fw,
+          height: fh,
+        });
+      }
+
+      // 5. Fontes padrão PDF (Helvetica — sem necessidade de upload)
+      const fontBold    = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+      const fontRegular = await pdfDoc.embedFont(StandardFonts.Helvetica);
+
+      // 6. Campos de texto (vetoriais, nítidos em qualquer zoom/impressão)
+      const hexParaRgb = (hex) => rgb(
+        parseInt(hex.slice(1, 3), 16) / 255,
+        parseInt(hex.slice(3, 5), 16) / 255,
+        parseInt(hex.slice(5, 7), 16) / 255,
+      );
+
+      const valores = {
+        nome:          document.getElementById("mod-nome")?.value?.trim() || "",
+        especialidade: document.getElementById("mod-especialidade")?.value?.trim() || "",
+        telefone:      document.getElementById("mod-telefone")?.value?.trim() || "",
+        email:         document.getElementById("mod-email")?.value?.trim() || "",
+        endereco:      document.getElementById("mod-endereco")?.value?.trim() || "",
+      };
+
+      Object.entries(modeloAtual.campos).forEach(([chave, cfg]) => {
+        const texto = valores[chave];
+        if (!texto) return;
+
+        const font = cfg.fontWeight === "700" ? fontBold : fontRegular;
+        const fontSize = Math.round(cfg.fontSize * PDF_SCALE);
+        const maxWidthPdf = cfg.maxWidth * PDF_SCALE;
+        const color = hexParaRgb(cfg.color);
+
+        // Trunca se necessário
+        let textoFinal = texto;
+        if (font.widthOfTextAtSize(texto, fontSize) > maxWidthPdf) {
+          while (textoFinal.length > 1 && font.widthOfTextAtSize(textoFinal + "…", fontSize) > maxWidthPdf) {
+            textoFinal = textoFinal.slice(0, -1);
+          }
+          textoFinal += "…";
+        }
+
+        const textWidth = font.widthOfTextAtSize(textoFinal, fontSize);
+        let drawX = toPdfX(cfg.x);
+        if (cfg.align === "center")      drawX -= textWidth / 2;
+        else if (cfg.align === "right") drawX -= textWidth;
+
+        page.drawText(textoFinal, {
+          x: drawX,
+          y: toPdfY(cfg.y) - fontSize / 2,  // centraliza verticalmente no y do canvas
+          font,
+          size: fontSize,
+          color,
+        });
+      });
+
+      // 7. Salvar e disparar download
+      const pdfBytes = await pdfDoc.save();
+      const blob = new Blob([pdfBytes], { type: "application/pdf" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const nomeProfissional = document.getElementById("mod-nome")?.value?.trim() || "receituario";
+      a.download = `receituario-${nomeProfissional.replace(/\s+/g, "-").toLowerCase()}.pdf`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+    } catch (err) {
+      alert("Erro ao gerar PDF: " + err.message);
+      console.error(err);
+    } finally {
+      btnPdf.disabled = false;
+      btnPdf.textContent = "⬇️ Baixar PDF";
+    }
+  });
+
+  // ─── Usar como Arte ────────────────────────────────────────────────────
+  btnUsar?.addEventListener("click", () => {
+    if (!modeloAtual || !templateImg) {
+      alert("Selecione e preencha um modelo antes de usar como arte.");
+      return;
+    }
+    canvas.toBlob((blob) => {
+      const file = new File([blob], `receituario-${modeloAtual.id}.png`, { type: "image/png" });
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      const input = document.getElementById("arquivo-personalizacao");
+      if (input) {
+        input.files = dt.files;
+        input.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+      fecharModal();
+      showToast?.("Arte adicionada! Clique em 'Adicionar ao carrinho' para continuar.", "success");
+    }, "image/png");
+  });
+
+  // ─── Utilitários ───────────────────────────────────────────────────────
+  function carregarImagem(src) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error(`Falha ao carregar imagem: ${src}`));
+      img.src = src;
+    });
+  }
+
+  function lerArquivoComoDataUrl(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => resolve(e.target.result);
+      reader.onerror = () => reject(new Error("Falha ao ler arquivo."));
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function dataUrlParaUint8Array(dataUrl) {
+    const base64 = dataUrl.split(",")[1];
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return bytes;
+  }
 })();

@@ -595,9 +595,77 @@
         <div class="arte-ia-divider">
           <span>ou</span>
         </div>
-        <button id="btn-abrir-arte-ia" class="btn-arte-ia" type="button">
-          ✨ Criar arte com Inteligência Artificial
+        <button id="btn-abrir-modelos" class="btn-arte-modelo" type="button">
+          📋 Usar Modelo Pronto
         </button>
+      </div>
+
+      <!-- Modal: Gerador de Receituário por Modelos Prontos -->
+      <div id="modal-modelos" class="arte-modal" role="dialog" aria-modal="true" aria-labelledby="modelos-modal-titulo" hidden>
+        <div class="arte-modal-backdrop"></div>
+        <div class="arte-modal-inner modelos-modal-inner">
+          <button class="arte-modal-close" id="btn-fechar-modelos" aria-label="Fechar">&times;</button>
+
+          <!-- ETAPA 1: Galeria de modelos -->
+          <div id="modelos-etapa-1">
+            <h2 id="modelos-modal-titulo" class="arte-modal-title">📋 Escolha um Modelo</h2>
+            <p class="arte-modal-desc">Selecione o layout desejado para o seu receituário personalizado.</p>
+            <div id="modelos-galeria" class="modelos-galeria"></div>
+          </div>
+
+          <!-- ETAPA 2: Formulário + Preview -->
+          <div id="modelos-etapa-2" hidden>
+            <div class="modelos-etapa2-header">
+              <button id="btn-modelos-voltar" class="modelos-btn-voltar" type="button">← Voltar</button>
+              <h2 class="arte-modal-title" style="margin:0">✏️ Preencha os Dados</h2>
+            </div>
+            <p class="arte-modal-desc">Os dados serão aplicados sobre o modelo selecionado em tempo real.</p>
+
+            <div class="modelos-etapa2-layout">
+              <!-- Formulário -->
+              <div class="modelos-form">
+                <div class="arte-form-row">
+                  <label for="mod-nome">Nome do profissional</label>
+                  <input id="mod-nome" type="text" placeholder="Ex: Dra. Ana Paula Silva" maxlength="80">
+                </div>
+                <div class="arte-form-row">
+                  <label for="mod-especialidade">Especialidade / Profissão</label>
+                  <input id="mod-especialidade" type="text" placeholder="Ex: Biomédica Esteta · CRBM 1234" maxlength="100">
+                </div>
+                <div class="arte-form-row">
+                  <label for="mod-telefone">Telefone / WhatsApp</label>
+                  <input id="mod-telefone" type="tel" placeholder="Ex: (67) 99999-0000" maxlength="20">
+                </div>
+                <div class="arte-form-row">
+                  <label for="mod-email">E-mail</label>
+                  <input id="mod-email" type="email" placeholder="Ex: contato@clinica.com.br" maxlength="100">
+                </div>
+                <div class="arte-form-row">
+                  <label for="mod-endereco">Endereço / Cidade</label>
+                  <input id="mod-endereco" type="text" placeholder="Ex: Rua das Flores, 100 – Campo Grande/MS" maxlength="120">
+                </div>
+                <div class="arte-form-row">
+                  <label for="mod-logo">Logo (opcional)</label>
+                  <input id="mod-logo" type="file" accept="image/jpeg,image/png,image/webp" class="modelos-logo-input">
+                  <span class="arte-receituario-info">JPG ou PNG, até 2 MB. Será posicionada automaticamente no modelo.</span>
+                </div>
+                <div class="modelos-acoes">
+                  <button id="btn-mod-pdf" class="btn-arte-baixar modelos-btn-pdf" type="button">⬇️ Baixar PDF</button>
+                  <button id="btn-mod-usar" class="btn-arte-usar modelos-btn-usar" type="button">✅ Usar como Arte</button>
+                </div>
+              </div>
+
+              <!-- Preview canvas -->
+              <div class="modelos-preview">
+                <div class="arte-preview-wrap">
+                  <canvas id="modelos-canvas" width="420" height="594" class="arte-canvas"></canvas>
+                </div>
+                <p class="arte-safe-info">Preview do receituário em proporção A4.</p>
+                <p id="modelos-sem-imagem" class="arte-receituario-info" style="text-align:center">Selecione um modelo para ver o preview.</p>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- Modal: Geração de Arte com IA -->
@@ -776,11 +844,12 @@
     <div class="bottom-nav-inner">
       <a href="/" class="bottom-nav-item" aria-label="Início"><span class="nav-icon">🏠</span>Início</a>
       <a href="/#produtos" class="bottom-nav-item" aria-label="Produtos"><span class="nav-icon">🔍</span>Buscar</a>
-      <a href="/checkout" class="bottom-nav-item" aria-label="Carrinho"><span class="nav-icon">🛒</span>Carrinho</a>
+      <a href="/checkout" class="bottom-nav-item" aria-label="Carrinho"><span class="nav-icon" style="position:relative">🛒<span class="nav-cart-badge" id="nav-cart-badge"></span></span>Carrinho</a>
       <a href="/minha-conta" class="bottom-nav-item" aria-label="Conta"><span class="nav-icon">👤</span>Conta</a>
     </div>
   </nav>
 
+  <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js" crossorigin="anonymous"></script>
   <script type="module" src="js/produto.js?v=4"></script>
 
 </body>

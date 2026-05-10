@@ -621,6 +621,36 @@ window.editarStatus = async (pedidoId) => {
           <option value="cancelado" ${pedido.statusPedido === "cancelado" ? "selected" : ""}>Cancelado</option>
         </select>
       </div>
+
+      <div style="border:1px solid var(--border-color); border-radius:10px; padding:14px; background:var(--bg-primary);">
+        <p style="margin:0 0 12px; font-weight:700; font-size:14px;">📦 Código de Rastreio</p>
+        <div style="display:grid; gap:10px;">
+          <div>
+            <label style="display:block; margin-bottom:6px; font-size:13px; font-weight:600;">Código de Rastreio</label>
+            <input id="input-rastreio" type="text" value="${escapeHtml(pedido.codigoRastreio || "")}"
+              placeholder="Ex: AA123456789BR ou ID Melhor Envio"
+              style="padding:8px 12px; border:1px solid var(--border-color); border-radius:6px; width:100%; text-transform:uppercase; font-family:monospace; letter-spacing:1px;" />
+          </div>
+          <div>
+            <label style="display:block; margin-bottom:6px; font-size:13px; font-weight:600;">Transportadora</label>
+            <select id="select-transportadora" style="padding:8px 12px; border:1px solid var(--border-color); border-radius:6px; width:100%;">
+              <option value="">— Selecione —</option>
+              <option value="Correios" ${(pedido.transportadora || "") === "Correios" ? "selected" : ""}>Correios</option>
+              <option value="Jadlog" ${(pedido.transportadora || "") === "Jadlog" ? "selected" : ""}>Jadlog</option>
+              <option value="Total Express" ${(pedido.transportadora || "") === "Total Express" ? "selected" : ""}>Total Express</option>
+              <option value="Azul Cargo" ${(pedido.transportadora || "") === "Azul Cargo" ? "selected" : ""}>Azul Cargo</option>
+              <option value="Loggi" ${(pedido.transportadora || "") === "Loggi" ? "selected" : ""}>Loggi</option>
+              <option value="Melhor Envio" ${(pedido.transportadora || "") === "Melhor Envio" ? "selected" : ""}>Melhor Envio</option>
+              <option value="Outro" ${(pedido.transportadora || "") === "Outro" ? "selected" : ""}>Outro</option>
+            </select>
+          </div>
+          <p style="margin:0; font-size:12px; color:var(--text-secondary);">
+            💡 Ao salvar com código preenchido, o status do pedido avança para <strong>Enviado</strong> automaticamente
+            e o cliente poderá acompanhar em <em>Minha Conta</em>.
+          </p>
+        </div>
+      </div>
+
       <button id="btn-salvar-status" class="btn btn-primary" style="width:100%; margin-top:8px;" type="button">Salvar Mudancas</button>
     </div>
   `;
@@ -632,6 +662,8 @@ window.editarStatus = async (pedidoId) => {
     try {
       const status = document.getElementById("select-status-pagto").value;
       const statusPedido = document.getElementById("select-status-pedido").value;
+      const codigoRastreio = String(document.getElementById("input-rastreio")?.value || "").trim().toUpperCase();
+      const transportadora = String(document.getElementById("select-transportadora")?.value || "").trim();
 
       const response = await fetchApi(`/api/admin/pedidos/${pedidoId}/status`, {
         method: "PATCH",
@@ -643,6 +675,20 @@ window.editarStatus = async (pedidoId) => {
       const payload = await response.json();
       if (!response.ok || !payload.success) {
         throw new Error(payload.error || "Falha ao atualizar");
+      }
+
+      // Salva código de rastreio se informado (ou limpa se apagado)
+      if (codigoRastreio || pedido.codigoRastreio) {
+        const rastreioResp = await fetchApi(`/api/admin/pedidos/${pedidoId}/rastreio`, {
+          method: "PATCH",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ codigoRastreio, transportadora }),
+        });
+        const rastreioPayload = await rastreioResp.json();
+        if (!rastreioResp.ok || !rastreioPayload.success) {
+          throw new Error(rastreioPayload.error || "Falha ao salvar rastreio");
+        }
       }
 
       detailsModal.classList.remove("active");

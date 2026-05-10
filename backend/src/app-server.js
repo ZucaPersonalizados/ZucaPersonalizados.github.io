@@ -2228,6 +2228,134 @@ app.post("/api/gerar-arte", async (req, res) => {
   }
 });
 
+// ─── Rastreio de Pedidos ──────────────────────────────────────────────────
+
+/**
+ * PATCH /api/admin/pedidos/:id/rastreio
+ * Admin salva o código de rastreio e transportadora do pedido.
+ * Se o código for informado, o statusPedido é atualizado para "enviado" automaticamente.
+ */
+app.patch("/api/admin/pedidos/:id/rastreio", adminAuth, requireDb, async (req, res) => {
+  try {
+    const pedidoId = String(req.params.id || "").trim();
+    const codigoRastreio = String(req.body.codigoRastreio || "").trim().toUpperCase();
+    const transportadora = String(req.body.transportadora || "").trim();
+
+    if (!pedidoId) return res.status(400).json({ success: false, error: "ID do pedido inválido" });
+
+    const pedidoRef = db.collection("pedidos").doc(pedidoId);
+    const snap = await pedidoRef.get();
+    if (!snap.exists) return res.status(404).json({ success: false, error: "Pedido não encontrado" });
+
+    const updates = {
+      codigoRastreio: codigoRastreio || null,
+      transportadora: transportadora || null,
+      atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
+      atualizadoPor: req.adminSession.email,
+    };
+
+    // Ao informar código, avança o status para enviado automaticamente
+    if (codigoRastreio) {
+      const dadosAtuais = snap.data() || {};
+      const statusAtual = String(dadosAtuais.statusPedido || "pendente");
+      const estadosAntes = ["pendente", "em_producao"];
+      if (estadosAntes.includes(statusAtual)) {
+        updates.statusPedido = "enviado";
+      }
+    }
+
+    await pedidoRef.update(updates);
+    return res.json({ success: true, codigoRastreio, transportadora });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/pedidos/:id/rastreio?email=X
+ * Cliente consulta o código de rastreio do seu próprio pedido (autenticado por e-mail).
+ */
+app.get("/api/pedidos/:id/rastreio", requireDb, async (req, res) => {
+  try {
+    const pedidoId = String(req.params.id || "").trim();
+    const email = String(req.query.email || "").trim().toLowerCase();
+
+    if (!pedidoId || !email) {
+      return res.status(400).json({ success: false, error: "ID e e-mail são obrigatórios" });
+    }
+
+    const snap = await db.collection("pedidos").doc(pedidoId).get();
+    if (!snap.exists) return res.status(404).json({ success: false, error: "Pedido não encontrado" });
+
+    const pedido = snap.data();
+    if (String(pedido?.cliente?.email || "").trim().toLowerCase() !== email) {
+      return res.status(403).json({ success: false, error: "Acesso negado" });
+    }
+
+    return res.json({
+      success: true,
+      codigoRastreio: String(pedido.codigoRastreio || ""),
+      transportadora: String(pedido.transportadora || ""),
+      statusPedido: String(pedido.statusPedido || "pendente"),
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/rastreio/consultar?codigo=X
+ * Consulta eventos de rastreio via Melhor Envio.
+ * Funciona para envios criados na plataforma Melhor Envio.
+ */
+app.get("/api/rastreio/consultar", async (req, res) => {
+  try {
+    const codigo = String(req.query.codigo || "").trim().toUpperCase();
+    if (!codigo) return res.status(400).json({ success: false, error: "Código de rastreio obrigatório" });
+
+    if (!melhorEnvioToken) {
+      return res.json({ success: true, code: codigo, events: [], fonte: "sem_token" });
+    }
+
+    const response = await axios.get("https://melhorenvio.com.br/api/v2/me/shipment/tracking", {
+      params: { "orders[]": codigo },
+      headers: {
+        Authorization: `Bearer ${melhorEnvioToken}`,
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        "User-Agent": "ZucaPersonalizados (contato@zuca.com)",
+      },
+      timeout: 10000,
+    });
+
+    const data = response.data || {};
+    const trackingData = data[codigo] || null;
+
+    if (!trackingData) {
+      return res.json({ success: true, code: codigo, events: [], fonte: "melhorenvio" });
+    }
+
+    const events = Array.isArray(trackingData.events)
+      ? trackingData.events.map((e) => ({
+          description: String(e.description || e.status || ""),
+          date: String(e.created_at || e.date || ""),
+          location: String(e.location || ""),
+        }))
+      : [];
+
+    return res.json({
+      success: true,
+      code: codigo,
+      status: String(trackingData.status || ""),
+      events,
+      fonte: "melhorenvio",
+    });
+  } catch (error) {
+    // Não propaga erro — retorna resposta vazia para não quebrar o cliente
+    return res.json({ success: true, code: String(req.query.codigo || ""), events: [], fonte: "erro" });
+  }
+});
+
 // ───────────────────────────────────────────────────────────────────────────
 
 app.listen(PORT, () => {

@@ -696,14 +696,19 @@ function atualizarBotoesCarrinho() {
 }
 
 function atualizarContadorCarrinho() {
-  const contador = document.getElementById("cart-count");
+  const quantidade = obterCarrinho().reduce((acc, item) => acc + (item.quantidade || 1), 0);
 
-  if (!contador) {
-    return;
+  const contador = document.getElementById("cart-count");
+  if (contador) {
+    contador.textContent = String(quantidade);
   }
 
-  const quantidade = obterCarrinho().reduce((acc, item) => acc + (item.quantidade || 1), 0);
-  contador.textContent = String(quantidade);
+  // Badge na bottom-nav (visível no mobile mesmo com header oculto)
+  const navBadge = document.getElementById("nav-cart-badge");
+  if (navBadge) {
+    navBadge.textContent = quantidade > 0 ? String(quantidade > 99 ? "99+" : quantidade) : "";
+    navBadge.style.display = quantidade > 0 ? "flex" : "none";
+  }
 }
 
 function renderizarCarrinhoSidebar() {

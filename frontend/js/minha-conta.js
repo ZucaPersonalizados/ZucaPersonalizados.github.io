@@ -272,6 +272,36 @@ async function listarPedidos(email) {
       const paid = status === "pagto";
       const canceled = status === "cancelado" || statusPedido === "cancelado";
       const timeline = renderTimeline(status, statusPedido);
+
+      const codigoRastreio = String(pedido.codigoRastreio || "").trim();
+      const transportadora = String(pedido.transportadora || "").trim();
+      const trackingUrl = getTrackingUrl(codigoRastreio, transportadora);
+
+      const trackingBlock = codigoRastreio ? `
+        <div class="rastreio-block" style="background:#fdf8f3;border:1px solid #eddcc7;border-radius:10px;padding:10px 12px;margin-top:4px;">
+          <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:0.5px;color:#a07040;margin-bottom:6px;">
+            📦 Rastreamento
+            ${transportadora ? `<span style="font-weight:400;color:#888;text-transform:none;"> · ${escapeHtml(transportadora)}</span>` : ""}
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+            <code style="font-family:monospace;font-size:13px;font-weight:700;background:#fff;padding:3px 10px;border-radius:6px;border:1px solid #e5ddd4;letter-spacing:1px;">${escapeHtml(codigoRastreio)}</code>
+            <button type="button" class="btn-copiar-rastreio" data-codigo="${escapeHtml(codigoRastreio)}"
+              style="font-size:11px;padding:3px 8px;border:1px solid #ccc;border-radius:6px;background:#fff;cursor:pointer;white-space:nowrap;">
+              📋 Copiar
+            </button>
+            <a href="${trackingUrl}" target="_blank" rel="noopener noreferrer"
+              style="font-size:11px;padding:3px 10px;border:1px solid #ef6f21;border-radius:6px;background:#fff8f4;color:#ef6f21;text-decoration:none;font-weight:700;white-space:nowrap;">
+              🔍 Rastrear
+            </a>
+            <button type="button" class="btn-ver-eventos" data-codigo="${escapeHtml(codigoRastreio)}"
+              style="font-size:11px;padding:3px 8px;border:1px solid #ccc;border-radius:6px;background:#fff;cursor:pointer;white-space:nowrap;">
+              📋 Ver eventos
+            </button>
+          </div>
+          <div class="rastreio-eventos-container" data-codigo="${escapeHtml(codigoRastreio)}" style="display:none;"></div>
+        </div>
+      ` : "";
+
       return `
         <article class="pedido-item ${paid ? "is-paid" : "is-pending"}">
           <div class="pedido-top">
@@ -281,6 +311,7 @@ async function listarPedidos(email) {
           <div>Total: R$ ${Number(pedido.total || 0).toFixed(2).replace(".", ",")}</div>
           <div>Pagamento: ${escapeHtml(String(pedido.pagamento || "pix").toUpperCase())}</div>
           ${timeline}
+          ${trackingBlock}
           <div style="display:flex; gap:8px; flex-wrap:wrap;">
             ${paid || canceled ? "" : `<button type="button" class="checkout-btn secondary btn-verificar" data-id="${escapeHtml(pedido.id)}">Verificar pagamento</button>
             <button type="button" class="checkout-btn secondary btn-pagar" data-id="${escapeHtml(pedido.id)}" data-pag="${escapeHtml(String(pedido.pagamento || "pix").toLowerCase())}">Pagar agora</button>`}
@@ -290,6 +321,39 @@ async function listarPedidos(email) {
         </article>
       `;
     }).join("");
+
+    list.querySelectorAll(".btn-copiar-rastreio").forEach((button) => {
+      button.addEventListener("click", async () => {
+        const codigo = button.getAttribute("data-codigo") || "";
+        if (!codigo) return;
+        try {
+          await navigator.clipboard.writeText(codigo);
+          const original = button.textContent;
+          button.textContent = "✅ Copiado!";
+          setTimeout(() => { button.textContent = original; }, 2000);
+        } catch {
+          showToast(`Código: ${codigo}`, "info");
+        }
+      });
+    });
+
+    list.querySelectorAll(".btn-ver-eventos").forEach((button) => {
+      button.addEventListener("click", async () => {
+        const codigo = button.getAttribute("data-codigo") || "";
+        if (!codigo) return;
+        const container = button.closest(".rastreio-block")?.querySelector(".rastreio-eventos-container");
+        if (!container) return;
+        const aberto = container.style.display !== "none";
+        if (aberto) {
+          container.style.display = "none";
+          button.textContent = "📋 Ver eventos";
+          return;
+        }
+        container.style.display = "";
+        button.textContent = "▲ Ocultar";
+        await carregarEventosRastreio(codigo, container);
+      });
+    });
 
     list.querySelectorAll(".btn-verificar").forEach((button) => {
       button.addEventListener("click", async () => {
@@ -527,7 +591,75 @@ el("end-cep")?.addEventListener("blur", () => {
 el("btn-salvar-endereco")?.addEventListener("click", salvarEndereco);
 // Endereço só é carregado via carregarPerfil() após login (onAuthStateChanged)
 
-/* ========== Timeline ========== */
+/* ========== Rastreio ========== */
+
+/**
+ * Retorna a URL de rastreio de acordo com a transportadora e formato do código.
+ * Para Correios, detecta pelo padrão AA999999999BR.
+ */
+function getTrackingUrl(codigo, transportadora) {
+  if (!codigo) return "#";
+  const carrier = String(transportadora || "").toLowerCase();
+  const enc = encodeURIComponent(codigo);
+
+  if (carrier.includes("jadlog")) {
+    return `https://www.jadlog.com.br/jadlog/tracking.jad?cte=${enc}`;
+  }
+  if (carrier.includes("total express")) {
+    return `https://totalexpress.com.br/rastreio/${enc}`;
+  }
+  if (carrier.includes("azul")) {
+    return `https://www.azulcargo.com.br/br/track/?code=${enc}`;
+  }
+  if (carrier.includes("loggi")) {
+    return `https://www.loggi.com/rastreamento/`;
+  }
+  // Correios: 2 letras + 9 dígitos + 2 letras (ex: AA123456789BR)
+  if (/^[A-Z]{2}\d{9}[A-Z]{2}$/i.test(codigo) || carrier.includes("correios")) {
+    return `https://rastreamento.correios.com.br/app/index.php?objetos=${enc}`;
+  }
+  // Fallback: Melhor Rastreamento (agrega múltiplas transportadoras)
+  return `https://melhorrastreamento.com.br/rastreamento/?codigo=${enc}`;
+}
+
+/**
+ * Carrega eventos de rastreio via Melhor Envio para o código informado.
+ * Exibe no contêiner indicado.
+ */
+async function carregarEventosRastreio(codigo, container) {
+  if (!codigo || !container) return;
+  container.innerHTML = '<p style="font-size:12px;color:#888;margin:6px 0 0;">Carregando eventos...</p>';
+
+  try {
+    const resp = await fetch(getApiUrl(`/api/rastreio/consultar?codigo=${encodeURIComponent(codigo)}`));
+    const data = await resp.json();
+
+    if (!data.success || !data.events || data.events.length === 0) {
+      container.innerHTML = '<p style="font-size:12px;color:#aaa;margin:6px 0 0;">Nenhum evento encontrado. Use o botão "Rastrear" para verificar no site da transportadora.</p>';
+      return;
+    }
+
+    const html = data.events.map((ev) => {
+      const dataFormatada = ev.date ? new Date(ev.date).toLocaleString("pt-BR") : "";
+      return `
+        <div style="display:flex;gap:8px;padding:6px 0;border-bottom:1px solid #f0e8df;">
+          <span style="font-size:18px;line-height:1;">📍</span>
+          <div>
+            <div style="font-size:12px;font-weight:700;color:#333;">${escapeHtml(ev.description)}</div>
+            ${ev.location ? `<div style="font-size:11px;color:#888;">${escapeHtml(ev.location)}</div>` : ""}
+            ${dataFormatada ? `<div style="font-size:11px;color:#aaa;">${dataFormatada}</div>` : ""}
+          </div>
+        </div>
+      `;
+    }).join("");
+
+    container.innerHTML = `<div style="margin-top:8px;">${html}</div>`;
+  } catch {
+    container.innerHTML = '<p style="font-size:12px;color:#aaa;margin:6px 0 0;">Não foi possível carregar os eventos agora.</p>';
+  }
+}
+
+
 const TIMELINE_STEPS = [
   { key: "pendente",    label: "Pedido"   },
   { key: "pagto",       label: "Pago"     },

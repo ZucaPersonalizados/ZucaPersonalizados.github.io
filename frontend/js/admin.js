@@ -77,8 +77,25 @@ const inputProdutoId = document.getElementById("id");
 // Garantir estado inicial da seção de modelo (por segurança contra cache de HTML antigo)
 {
   const secao = document.getElementById("secao-modelo");
-  const cb    = document.getElementById("ehModelo");
-  if (secao) secao.style.display = (cb && cb.checked) ? "flex" : "none";
+  if (secao) secao.style.display = "none";
+  setTipoProdutoVisual("nenhum");
+}
+
+// ─── Helpers de tipo de produto ────────────────────────────────────────────
+function getTipoProduto() {
+  const radio = document.querySelector('input[name="tipoProduto"]:checked');
+  return radio ? radio.value : "nenhum";
+}
+
+function setTipoProdutoVisual(valor) {
+  document.querySelectorAll(".tipo-produto-opcao").forEach((el) => {
+    const radio = el.querySelector("input[type=radio]");
+    el.classList.toggle("selecionado", radio?.value === valor);
+  });
+  const radio = document.querySelector(`input[name="tipoProduto"][value="${valor}"]`);
+  if (radio) radio.checked = true;
+  const secao = document.getElementById("secao-modelo");
+  if (secao) secao.style.display = valor === "modelo" ? "flex" : "none";
 }
 
 const formCupom = document.getElementById("form-cupom");
@@ -291,12 +308,12 @@ function obterProdutoDoFormulario() {
       .filter(Boolean),
     descricaoCurta: String(document.getElementById("descricaoCurta")?.value || "").trim(),
     descricaoLonga: String(document.getElementById("descricaoLonga")?.value || "").trim(),
-    personalizado: !!document.getElementById("personalizado")?.checked,
+    personalizado: getTipoProduto() === "personalizado",
     ncm: String(document.getElementById("ncm")?.value || "").replace(/\D/g, "").slice(0, 8) || "48201010",
-    ehModelo: !!document.getElementById("ehModelo")?.checked,
+    ehModelo: getTipoProduto() === "modelo",
     modeloNome: String(document.getElementById("modeloNome")?.value || "").trim(),
     modeloConfig: (() => {
-      if (!document.getElementById("ehModelo")?.checked) return undefined;
+      if (getTipoProduto() !== "modelo") return undefined;
       const logoX = Number(document.getElementById("logoX")?.value || 0);
       const logoY = Number(document.getElementById("logoY")?.value || 0);
       const logoW = Number(document.getElementById("logoW")?.value || 0);
@@ -317,8 +334,7 @@ function limparFormularioProduto() {
   selectedProductId = null;
   if (inputProdutoId) inputProdutoId.disabled = false;
   if (btnExcluirProduto) btnExcluirProduto.style.display = "none";
-  const secaoModeloEl = document.getElementById("secao-modelo");
-  if (secaoModeloEl) secaoModeloEl.style.display = "none";
+  setTipoProdutoVisual("nenhum");
   setProdutoStatus("Pronto para cadastrar.");
 }
 
@@ -339,15 +355,12 @@ function preencherFormularioProduto(produto) {
   document.getElementById("imagens").value = Array.isArray(produto.imagens) ? produto.imagens.join(", ") : "";
   document.getElementById("descricaoCurta").value = produto.descricaoCurta || "";
   document.getElementById("descricaoLonga").value = produto.descricaoLonga || "";
-  document.getElementById("personalizado").checked = !!produto.personalizado;
   const ncmEl = document.getElementById("ncm");
   if (ncmEl) ncmEl.value = produto.ncm || "";
 
-  // Campos de modelo
-  const ehModeloEl = document.getElementById("ehModelo");
-  const secaoModeloEl = document.getElementById("secao-modelo");
-  if (ehModeloEl) ehModeloEl.checked = !!produto.ehModelo;
-  if (secaoModeloEl) secaoModeloEl.style.display = produto.ehModelo ? "flex" : "none";
+  // Tipo do produto (radio buttons)
+  const tipo = produto.ehModelo ? "modelo" : (produto.personalizado ? "personalizado" : "nenhum");
+  setTipoProdutoVisual(tipo);
   if (produto.ehModelo && produto.modeloConfig) {
     const { logoZone, campos } = produto.modeloConfig;
     if (document.getElementById("modeloNome")) document.getElementById("modeloNome").value = produto.modeloNome || "";
@@ -853,23 +866,15 @@ btnEsqueciSenha?.addEventListener("click", () => {
   setLoginStatus("No modo backend-only, redefina a senha do admin via variavel ADMIN_PASSWORD no servidor.", "ok");
 });
 
-// Toggle seção de modelo de receituário — mutuamente exclusivo com 'personalizado'
-document.getElementById("ehModelo")?.addEventListener("change", (e) => {
-  const secao = document.getElementById("secao-modelo");
-  if (secao) secao.style.display = e.target.checked ? "flex" : "none";
-  if (e.target.checked) {
-    const cbPersonalizado = document.getElementById("personalizado");
-    if (cbPersonalizado) cbPersonalizado.checked = false;
-  }
+// Radio buttons do tipo de produto
+document.querySelectorAll('input[name="tipoProduto"]').forEach((radio) => {
+  radio.addEventListener("change", () => setTipoProdutoVisual(radio.value));
 });
-
-document.getElementById("personalizado")?.addEventListener("change", (e) => {
-  if (e.target.checked) {
-    const cbEhModelo = document.getElementById("ehModelo");
-    const secao = document.getElementById("secao-modelo");
-    if (cbEhModelo) cbEhModelo.checked = false;
-    if (secao) secao.style.display = "none";
-  }
+document.querySelectorAll(".tipo-produto-opcao").forEach((label) => {
+  label.addEventListener("click", () => {
+    const radio = label.querySelector("input[type=radio]");
+    if (radio) setTipoProdutoVisual(radio.value);
+  });
 });
 
 // Inserir template JSON de campos de modelo

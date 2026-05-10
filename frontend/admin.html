@@ -638,17 +638,29 @@
                   <textarea id="descricaoLonga"></textarea>
                 </div>
 
-                <div class="field field-full" style="display:flex; align-items:center; gap:8px;">
-                  <input id="personalizado" type="checkbox" style="width:auto;" />
-                  <label for="personalizado" style="margin:0;">Produto personalizado?</label>
+                <!-- Tipo do produto: mutuamente exclusivo -->
+                <div class="field field-full">
+                  <label style="display:block; margin-bottom:8px; font-weight:600;">Tipo do produto</label>
+                  <div class="tipo-produto-grupo">
+                    <label class="tipo-produto-opcao" id="label-tipo-nenhum">
+                      <input type="radio" name="tipoProduto" id="tipo-nenhum" value="nenhum" checked style="display:none;" />
+                      <span>🛍️ Produto simples</span>
+                    </label>
+                    <label class="tipo-produto-opcao" id="label-tipo-personalizado">
+                      <input type="radio" name="tipoProduto" id="tipo-personalizado" value="personalizado" style="display:none;" />
+                      <span>✏️ Personalizado<br><small>Cliente envia a arte</small></span>
+                    </label>
+                    <label class="tipo-produto-opcao" id="label-tipo-modelo">
+                      <input type="radio" name="tipoProduto" id="tipo-modelo" value="modelo" style="display:none;" />
+                      <span>📋 Modelo de receituário<br><small>Template A4</small></span>
+                    </label>
+                  </div>
+                  <!-- inputs ocultos mantidos para compatibilidade com o JS existente -->
+                  <input type="hidden" id="personalizado" />
+                  <input type="hidden" id="ehModelo" />
                 </div>
 
-                <div class="field field-full" style="display:flex; align-items:center; gap:8px;">
-                  <input id="ehModelo" type="checkbox" style="width:auto;" />
-                  <label for="ehModelo" style="margin:0;">É modelo de receituário?</label>
-                </div>
-
-                <!-- Seção de configuração de modelo — visível apenas quando #ehModelo está marcado -->
+                <!-- Seção de configuração de modelo — visível apenas quando tipo-modelo está selecionado -->
                 <div id="secao-modelo" class="field field-full" style="display:none; border:1.5px solid #c8a020; border-radius:12px; padding:16px 18px; background:#fdfbf3; flex-direction:column; gap:14px;">
                   <strong style="color:#9a7800; font-size:0.95rem;">⚙️ Configuração do Modelo de Receituário</strong>
 

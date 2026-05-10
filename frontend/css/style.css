@@ -3557,6 +3557,49 @@ textarea:focus-visible {
   box-shadow: 0 4px 20px rgba(0,0,0,0.15);
 }
 
+/* ── Grupo de tipo de produto (admin) ── */
+.tipo-produto-grupo {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.tipo-produto-opcao {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  cursor: pointer;
+  border: 2px solid #ddd;
+  border-radius: 10px;
+  padding: 10px 16px;
+  min-width: 130px;
+  font-size: 0.88rem;
+  line-height: 1.4;
+  color: #444;
+  background: #fff;
+  transition: border-color 0.18s, background 0.18s, color 0.18s, box-shadow 0.18s;
+  user-select: none;
+}
+.tipo-produto-opcao:hover {
+  border-color: #aaa;
+  background: #f8f8f8;
+}
+.tipo-produto-opcao.selecionado {
+  border-color: #c8720a;
+  background: #fff8f0;
+  color: #7a3f00;
+  box-shadow: 0 0 0 3px #f4c58844;
+  font-weight: 600;
+}
+.tipo-produto-opcao small {
+  display: block;
+  font-weight: 400;
+  font-size: 0.76rem;
+  color: #888;
+  margin-top: 2px;
+}
+.tipo-produto-opcao.selecionado small { color: #b86010; }
+
 /* ── Canvas editável ── */
 .modelos-canvas-editavel {
   cursor: crosshair;

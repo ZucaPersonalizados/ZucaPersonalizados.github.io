@@ -74,6 +74,13 @@ const btnNovoProduto = document.getElementById("btn-novo");
 const btnExcluirProduto = document.getElementById("btn-excluir");
 const inputProdutoId = document.getElementById("id");
 
+// Garantir estado inicial da seção de modelo (por segurança contra cache de HTML antigo)
+{
+  const secao = document.getElementById("secao-modelo");
+  const cb    = document.getElementById("ehModelo");
+  if (secao) secao.style.display = (cb && cb.checked) ? "flex" : "none";
+}
+
 const formCupom = document.getElementById("form-cupom");
 const listaCuponsEl = document.getElementById("lista-cupons-admin");
 

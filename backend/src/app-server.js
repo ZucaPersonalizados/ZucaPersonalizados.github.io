@@ -741,20 +741,22 @@ app.use("/produtos", requireDb, produtosRoutes);
 app.use("/upload", requireDb, uploadRoutes);
 
 if (fs.existsSync(frontendDir)) {
+  const htmlOptions = { headers: { "Cache-Control": "no-cache, no-store, must-revalidate" } };
+
   app.get("/admin", (req, res) => {
-    res.sendFile(path.join(frontendDir, "admin.html"));
+    res.sendFile(path.join(frontendDir, "admin.html"), htmlOptions);
   });
 
   app.get("/checkout", (req, res) => {
-    res.sendFile(path.join(frontendDir, "checkout.html"));
+    res.sendFile(path.join(frontendDir, "checkout.html"), htmlOptions);
   });
 
   app.get("/produto", (req, res) => {
-    res.sendFile(path.join(frontendDir, "produto.html"));
+    res.sendFile(path.join(frontendDir, "produto.html"), htmlOptions);
   });
 
   app.get("/minha-conta", (req, res) => {
-    res.sendFile(path.join(frontendDir, "minha-conta.html"));
+    res.sendFile(path.join(frontendDir, "minha-conta.html"), htmlOptions);
   });
 }
 

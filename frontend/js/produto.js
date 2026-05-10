@@ -1438,6 +1438,8 @@ renderVistosRecentemente();
 
     // 1b. Imagem de fundo do modelo (design do template)
     if (fundoImg) {
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
       ctx.drawImage(fundoImg, 0, 0, LOGICAL_W, LOGICAL_H);
     }
 
@@ -1566,8 +1568,10 @@ renderVistosRecentemente();
   // ─── Drag & Drop no canvas ─────────────────────────────────────────────
   function canvasCoordenadas(e) {
     const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width  / rect.width;
-    const scaleY = canvas.height / rect.height;
+    // Usa LOGICAL_W/H para obter coordenadas no espaço lógico (420×594),
+    // independente do tamanho físico do canvas (1260×1782 com DPI_SCALE=3).
+    const scaleX = LOGICAL_W / rect.width;
+    const scaleY = LOGICAL_H / rect.height;
     const clientX = e.touches ? e.touches[0].clientX : e.clientX;
     const clientY = e.touches ? e.touches[0].clientY : e.clientY;
     return {

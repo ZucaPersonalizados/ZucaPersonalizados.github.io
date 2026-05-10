@@ -375,6 +375,7 @@ function preencherFormularioProduto(produto) {
   document.getElementById("pesoKg").value = Number(produto.pesoKg || 0.3);
   document.getElementById("link").value = produto.link || "";
   document.getElementById("imagens").value = Array.isArray(produto.imagens) ? produto.imagens.join(", ") : "";
+  document.getElementById("imagens")?.dispatchEvent(new Event("input"));
   document.getElementById("descricaoCurta").value = produto.descricaoCurta || "";
   document.getElementById("descricaoLonga").value = produto.descricaoLonga || "";
   const ncmEl = document.getElementById("ncm");
@@ -901,6 +902,54 @@ btnEsqueciSenha?.addEventListener("click", () => {
 document.querySelectorAll('input[name="tipoProduto"]').forEach((radio) => {
   radio.addEventListener("change", () => setTipoProdutoVisual(radio.value));
 });
+
+// Upload de imagem do produto
+(function () {
+  const inputUpload = document.getElementById("upload-imagem-produto");
+  const inputImagens = document.getElementById("imagens");
+  const statusEl = document.getElementById("upload-imagem-status");
+  const previewEl = document.getElementById("upload-imagem-preview");
+
+  function atualizarPreview() {
+    if (!previewEl || !inputImagens) return;
+    const urls = String(inputImagens.value || "").split(",").map((u) => u.trim()).filter(Boolean);
+    previewEl.innerHTML = urls.map((url) => `
+      <div style="position:relative; display:inline-block;">
+        <img src="${escapeHtml(url)}" alt="preview" style="width:72px; height:72px; object-fit:cover; border-radius:6px; border:1px solid #ddd;"
+          onerror="this.style.opacity='0.3';" />
+      </div>`).join("");
+  }
+
+  inputImagens?.addEventListener("input", atualizarPreview);
+
+  inputUpload?.addEventListener("change", async () => {
+    const file = inputUpload.files[0];
+    if (!file) return;
+    statusEl.textContent = "⏳ Enviando...";
+    statusEl.style.color = "#666";
+    try {
+      const formData = new FormData();
+      formData.append("arquivo", file);
+      const resp = await fetch(getApiUrl("/upload"), { method: "POST", body: formData });
+      const payload = await resp.json();
+      if (!resp.ok || !payload.url) throw new Error(payload.erro || "Falha no upload");
+      const atual = String(inputImagens.value || "").trim();
+      inputImagens.value = atual ? atual + ", " + payload.url : payload.url;
+      statusEl.textContent = "✅ Imagem adicionada!";
+      statusEl.style.color = "#1f8f4f";
+      atualizarPreview();
+    } catch (err) {
+      statusEl.textContent = "❌ Erro: " + err.message;
+      statusEl.style.color = "#e74c3c";
+    } finally {
+      inputUpload.value = "";
+    }
+  });
+
+  // Atualizar preview ao carregar produto existente
+  const obs = new MutationObserver(atualizarPreview);
+  if (inputImagens) obs.observe(inputImagens, { attributes: false, childList: false, characterData: true, subtree: true });
+})();
 
 // Inserir template JSON de campos de modelo
 document.getElementById("btn-modelo-template")?.addEventListener("click", () => {

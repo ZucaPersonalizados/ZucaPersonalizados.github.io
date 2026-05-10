@@ -803,10 +803,11 @@ function iniciarMonitoramentoPagamento(idPedido, email = "") {
     const verificacao = await verificarPagamento(idPedido);
     if (verificacao.aprovado) {
       pararMonitoramentoPagamento();
-      setActionFeedback(`Pagamento confirmado para o pedido #${idPedido.slice(0, 8)}.`, "success");
-      if (email) {
-        await listarPedidosPorEmail(email);
-      }
+      showToast(`✅ Pagamento confirmado! Redirecionando para seus pedidos...`, "success", 3000);
+      localStorage.removeItem("zuca_carrinho");
+      setTimeout(() => {
+        window.location.href = `/minha-conta#pedidos`;
+      }, 2000);
       return;
     }
 
@@ -968,7 +969,11 @@ async function tratarRetornoPagamento() {
     localStorage.removeItem("zuca_carrinho");
     descontoAtual = 0;
     renderCarrinho();
-    setActionFeedback(`${msgBase}: pagamento confirmado com sucesso.`, "success");
+    showToast(`✅ Pagamento confirmado! Redirecionando para seus pedidos...`, "success", 3000);
+    setTimeout(() => {
+      window.location.href = `/minha-conta#pedidos`;
+    }, 2000);
+    return;
   } else if (retorno === "success") {
     setActionFeedback(
       verificacao.payload?.message || `${msgBase}: ainda aguardando confirmacao do pagamento.`,
@@ -1062,7 +1067,15 @@ async function finalizarPedido() {
       showToast("Redirecionando para pagamento seguro do Mercado Pago...", "info");
       await iniciarCheckoutCartao(pedidoId, cliente.email);
     } else if (metodo === "boleto") {
-      showToast(`Pedido #${pedidoId.slice(0, 8)} criado. Boleto será enviado por e-mail.`, "success", 8000);
+      showToast(`📄 Pedido #${pedidoId.slice(0, 8)} criado! O boleto será enviado para seu e-mail. Redirecionando...`, "success", 5000);
+      localStorage.removeItem("zuca_carrinho");
+      descontoAtual = 0;
+      cupomAplicado = null;
+      renderCarrinho();
+      setTimeout(() => {
+        window.location.href = `/minha-conta#pedidos`;
+      }, 3000);
+      return;
     }
 
     if (metodo !== "cartao") {

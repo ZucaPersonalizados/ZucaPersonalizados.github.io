@@ -853,10 +853,23 @@ btnEsqueciSenha?.addEventListener("click", () => {
   setLoginStatus("No modo backend-only, redefina a senha do admin via variavel ADMIN_PASSWORD no servidor.", "ok");
 });
 
-// Toggle seção de modelo de receituário
+// Toggle seção de modelo de receituário — mutuamente exclusivo com 'personalizado'
 document.getElementById("ehModelo")?.addEventListener("change", (e) => {
   const secao = document.getElementById("secao-modelo");
   if (secao) secao.style.display = e.target.checked ? "flex" : "none";
+  if (e.target.checked) {
+    const cbPersonalizado = document.getElementById("personalizado");
+    if (cbPersonalizado) cbPersonalizado.checked = false;
+  }
+});
+
+document.getElementById("personalizado")?.addEventListener("change", (e) => {
+  if (e.target.checked) {
+    const cbEhModelo = document.getElementById("ehModelo");
+    const secao = document.getElementById("secao-modelo");
+    if (cbEhModelo) cbEhModelo.checked = false;
+    if (secao) secao.style.display = "none";
+  }
 });
 
 // Inserir template JSON de campos de modelo

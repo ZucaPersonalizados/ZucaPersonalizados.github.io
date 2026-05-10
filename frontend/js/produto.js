@@ -286,7 +286,8 @@ function aplicarFallbackImagem(imgEl) {
 function mostrarBlocoPersonalizacao(personalizado, ehModelo) {
   const bloco = document.getElementById("bloco-personalizacao");
   const blocoModelo = document.getElementById("bloco-modelo");
-  if (bloco) bloco.hidden = !personalizado;
+  // mutuamente exclusivos: ehModelo tem prioridade
+  if (bloco) bloco.hidden = !personalizado || ehModelo;
   if (blocoModelo) blocoModelo.hidden = !ehModelo;
 }
 

@@ -665,15 +665,15 @@
                   <label style="display:block; margin-bottom:8px; font-weight:600;">Tipo do produto</label>
                   <div class="tipo-produto-grupo">
                     <label class="tipo-produto-opcao" id="label-tipo-nenhum">
-                      <input type="radio" name="tipoProduto" id="tipo-nenhum" value="nenhum" checked style="display:none;" />
+                      <input type="radio" name="tipoProduto" id="tipo-nenhum" value="nenhum" checked style="position:absolute;opacity:0;width:0;height:0;pointer-events:none;" />
                       <span>🛍️ Produto simples</span>
                     </label>
                     <label class="tipo-produto-opcao" id="label-tipo-personalizado">
-                      <input type="radio" name="tipoProduto" id="tipo-personalizado" value="personalizado" style="display:none;" />
+                      <input type="radio" name="tipoProduto" id="tipo-personalizado" value="personalizado" style="position:absolute;opacity:0;width:0;height:0;pointer-events:none;" />
                       <span>✏️ Personalizado<br><small>Cliente envia a arte</small></span>
                     </label>
                     <label class="tipo-produto-opcao" id="label-tipo-modelo">
-                      <input type="radio" name="tipoProduto" id="tipo-modelo" value="modelo" style="display:none;" />
+                      <input type="radio" name="tipoProduto" id="tipo-modelo" value="modelo" style="position:absolute;opacity:0;width:0;height:0;pointer-events:none;" />
                       <span>📋 Modelo de receituário<br><small>Template A4</small></span>
                     </label>
                   </div>
@@ -807,6 +807,6 @@
   </div>
 
   <div id="toast-container" class="toast-container" aria-live="polite"></div>
-  <script type="module" src="js/admin.js?v=2"></script>
+  <script type="module" src="js/admin.js?v=3"></script>
 </body>
 </html>

@@ -866,15 +866,9 @@ btnEsqueciSenha?.addEventListener("click", () => {
   setLoginStatus("No modo backend-only, redefina a senha do admin via variavel ADMIN_PASSWORD no servidor.", "ok");
 });
 
-// Radio buttons do tipo de produto
+// Radio buttons do tipo de produto — usa apenas o evento change (nativo e confiável)
 document.querySelectorAll('input[name="tipoProduto"]').forEach((radio) => {
   radio.addEventListener("change", () => setTipoProdutoVisual(radio.value));
-});
-document.querySelectorAll(".tipo-produto-opcao").forEach((label) => {
-  label.addEventListener("click", () => {
-    const radio = label.querySelector("input[type=radio]");
-    if (radio) setTipoProdutoVisual(radio.value);
-  });
 });
 
 // Inserir template JSON de campos de modelo

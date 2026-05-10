@@ -643,6 +643,53 @@
                   <label for="personalizado" style="margin:0;">Produto personalizado?</label>
                 </div>
 
+                <div class="field field-full" style="display:flex; align-items:center; gap:8px;">
+                  <input id="ehModelo" type="checkbox" style="width:auto;" />
+                  <label for="ehModelo" style="margin:0;">É modelo de receituário?</label>
+                </div>
+
+                <!-- Seção de configuração de modelo — visível apenas quando #ehModelo está marcado -->
+                <div id="secao-modelo" class="field field-full" hidden style="border:1.5px solid #c8a020; border-radius:12px; padding:16px 18px; background:#fdfbf3; display:flex; flex-direction:column; gap:14px;">
+                  <strong style="color:#9a7800; font-size:0.95rem;">⚙️ Configuração do Modelo de Receituário</strong>
+
+                  <div class="field">
+                    <label for="modeloNome">Nome do modelo (exibido no seletor)</label>
+                    <input id="modeloNome" type="text" placeholder="ex: Dourado Premium" />
+                  </div>
+
+                  <div>
+                    <label style="display:block; margin-bottom:6px; font-weight:600; font-size:0.88rem;">Zona da Logo no canvas (420×594 px)</label>
+                    <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                      <div style="display:flex; flex-direction:column; gap:3px;">
+                        <label for="logoX" style="font-size:0.8rem; color:#666;">X</label>
+                        <input id="logoX" type="number" min="0" max="420" step="1" placeholder="86" style="width:70px;" />
+                      </div>
+                      <div style="display:flex; flex-direction:column; gap:3px;">
+                        <label for="logoY" style="font-size:0.8rem; color:#666;">Y</label>
+                        <input id="logoY" type="number" min="0" max="594" step="1" placeholder="14" style="width:70px;" />
+                      </div>
+                      <div style="display:flex; flex-direction:column; gap:3px;">
+                        <label for="logoW" style="font-size:0.8rem; color:#666;">Largura</label>
+                        <input id="logoW" type="number" min="1" max="420" step="1" placeholder="100" style="width:70px;" />
+                      </div>
+                      <div style="display:flex; flex-direction:column; gap:3px;">
+                        <label for="logoH" style="font-size:0.8rem; color:#666;">Altura</label>
+                        <input id="logoH" type="number" min="1" max="594" step="1" placeholder="95" style="width:70px;" />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
+                      <label for="modeloCamposJson" style="font-weight:600; font-size:0.88rem;">Campos de texto (JSON)</label>
+                      <button type="button" id="btn-modelo-template" class="btn btn-small btn-secondary" style="font-size:0.78rem;">📋 Inserir template</button>
+                    </div>
+                    <textarea id="modeloCamposJson" rows="14" style="font-family:monospace; font-size:0.8rem; white-space:pre; overflow-x:auto;"
+                      placeholder='{"nome": {"x":210,"y":120,"fontSize":11,"color":"#c8a020","align":"center","maxWidth":290,"fontWeight":"700","fontFamily":"Playfair Display"}}'></textarea>
+                    <span style="font-size:0.76rem; color:#888;">Chaves possíveis por campo: x, y, fontSize, color, align (left/center/right), maxWidth, fontWeight (400/700), fontFamily (Montserrat, Lato, Poppins, Playfair Display, Great Vibes)</span>
+                  </div>
+                </div>
+
                 <div class="field">
                   <label for="ncm">NCM (Nota Fiscal)</label>
                   <input id="ncm" type="text" placeholder="48201010" maxlength="8" pattern="\d{8}"

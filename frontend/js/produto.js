@@ -1131,182 +1131,48 @@ renderVistosRecentemente();
   }, { passive: true });
 })();
 
-/* ========== Arte com IA ========== */
-(function arteIA() {
-  const btnAbrir   = document.getElementById("btn-abrir-arte-ia");
-  const modal      = document.getElementById("modal-arte-ia");
-  const btnFechar  = document.getElementById("btn-fechar-arte-ia");
-  const backdrop   = modal?.querySelector(".arte-modal-backdrop");
-  const btnGerar   = document.getElementById("btn-gerar-arte");
-  const btnNova    = document.getElementById("btn-gerar-nova");
-  const btnBaixar  = document.getElementById("btn-baixar-arte");
-  const btnUsar    = document.getElementById("btn-usar-arte");
-  const loading    = document.getElementById("arte-loading");
-  const resultado  = document.getElementById("arte-resultado");
-  const canvas     = document.getElementById("arte-canvas");
-
-  if (!btnAbrir || !modal) return;
-
-  let ultimaImageUrl = null;
-
-  // Mostrar/ocultar campos de receituário conforme tipo selecionado
-  const selectTipo = document.getElementById("arte-tipo");
-  const secaoReceituario = document.getElementById("arte-campos-receituario");
-  const rowTexto = document.getElementById("arte-row-texto");
-
-  function atualizarCamposTipo() {
-    const isReceituario = selectTipo?.value === "receituario";
-    if (secaoReceituario) secaoReceituario.hidden = !isReceituario;
-    if (rowTexto) rowTexto.hidden = isReceituario;
-  }
-
-  selectTipo?.addEventListener("change", atualizarCamposTipo);
-  // Estado inicial: receituário é padrão (primeira opção)
-  atualizarCamposTipo();
-
-  function abrirModal() {
-    modal.hidden = false;
-    document.body.style.overflow = "hidden";
-    modal.querySelector("#arte-texto")?.focus();
-  }
-
-  function fecharModal() {
-    modal.hidden = true;
-    document.body.style.overflow = "";
-  }
-
-  btnAbrir.addEventListener("click", abrirModal);
-  btnFechar.addEventListener("click", fecharModal);
-  backdrop?.addEventListener("click", fecharModal);
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && !modal.hidden) fecharModal();
-  });
-
-  async function gerarArte() {
-    const tipo = document.getElementById("arte-tipo")?.value || "produto";
-    const estilo = document.getElementById("arte-estilo")?.value || "elegante";
-    const cor = document.getElementById("arte-cor")?.value?.trim() || "dourado";
-
-    // Dados extras para receituário
-    const isReceituario = tipo === "receituario";
-    const payload = { tipo, estilo, corPrincipal: cor };
-
-    if (isReceituario) {
-      payload.receitNome     = document.getElementById("receit-nome")?.value?.trim() || "";
-      payload.receitProfissao = document.getElementById("receit-profissao")?.value?.trim() || "";
-      payload.receitContato  = document.getElementById("receit-contato")?.value?.trim() || "";
-      payload.receitEndereco = document.getElementById("receit-endereco")?.value?.trim() || "";
-    } else {
-      payload.texto = document.getElementById("arte-texto")?.value?.trim() || "";
-    }
-
-    loading.hidden = false;
-    resultado.hidden = true;
-    btnGerar.disabled = true;
-    btnNova.disabled = true;
-
-    try {
-      const resp = await fetch(getApiUrl("/api/gerar-arte"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const data = await resp.json();
-      if (!data.success) throw new Error(data.error || "Erro desconhecido");
-
-      // Suporta tanto URL (DALL-E 3) quanto base64 (gpt-image-1)
-      const imageSrc = data.imageBase64 || data.imageUrl;
-      ultimaImageUrl = imageSrc;
-      await renderizarArteNoCanvas(imageSrc);
-      resultado.hidden = false;
-    } catch (err) {
-      alert("Erro ao gerar arte: " + err.message);
-    } finally {
-      loading.hidden = true;
-      btnGerar.disabled = false;
-      btnNova.disabled = false;
-    }
-  }
-
-  async function renderizarArteNoCanvas(url) {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      img.crossOrigin = "anonymous";
-      img.onload = () => {
-        const ctx = canvas.getContext("2d");
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        // Margem segura: ~20px (representa 1cm em proporção A4 de 420px largura)
-        const margin = Math.round(canvas.width * 0.047);
-        ctx.strokeStyle = "rgba(255,255,255,0.85)";
-        ctx.lineWidth = 1.5;
-        ctx.setLineDash([6, 4]);
-        ctx.strokeRect(margin, margin, canvas.width - margin * 2, canvas.height - margin * 2);
-        ctx.setLineDash([]);
-        resolve();
-      };
-      img.onerror = reject;
-      img.src = url;
-    });
-  }
-
-  function baixarArte() {
-    if (!ultimaImageUrl) return;
-    canvas.toBlob((blob) => {
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "arte-personalizada.png";
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 5000);
-    }, "image/png");
-  }
-
-  function usarArte() {
-    if (!ultimaImageUrl) return;
-    // Cria um arquivo fake a partir do canvas para o input de arquivo
-    canvas.toBlob((blob) => {
-      const file = new File([blob], "arte-ia.png", { type: "image/png" });
-      const dt = new DataTransfer();
-      dt.items.add(file);
-      const input = document.getElementById("arquivo-personalizacao");
-      if (input) {
-        input.files = dt.files;
-        // Dispara change para atualizar status
-        input.dispatchEvent(new Event("change", { bubbles: true }));
-      }
-      fecharModal();
-      showToast?.("Arte adicionada! Clique em 'Adicionar ao carrinho' para continuar.", "success");
-    }, "image/png");
-  }
-
-  btnGerar.addEventListener("click", gerarArte);
-  btnNova.addEventListener("click", gerarArte);
-  btnBaixar.addEventListener("click", baixarArte);
-  btnUsar.addEventListener("click", usarArte);
-})();
-
 /* ========== Gerador de Receituário por Modelos Prontos ========== */
 (async function modelosReceituario() {
-  const btnAbrir  = document.getElementById("btn-abrir-modelos");
-  const modal     = document.getElementById("modal-modelos");
-  const btnFechar = document.getElementById("btn-fechar-modelos");
-  const backdrop  = modal?.querySelector(".arte-modal-backdrop");
-  const etapa1    = document.getElementById("modelos-etapa-1");
-  const etapa2    = document.getElementById("modelos-etapa-2");
-  const galeria   = document.getElementById("modelos-galeria");
-  const btnVoltar = document.getElementById("btn-modelos-voltar");
-  const canvas    = document.getElementById("modelos-canvas");
-  const btnPdf    = document.getElementById("btn-mod-pdf");
-  const btnUsar   = document.getElementById("btn-mod-usar");
-  const semImagem = document.getElementById("modelos-sem-imagem");
+
+  // ─── Mapeamento de fontes disponíveis ──────────────────────────────────
+  // Para o canvas (preview): usa a família CSS do Google Fonts (carregada no <head>)
+  // Para o PDF (pdf-lib): usa os arquivos TTF em /fonts/
+  const FONTES = [
+    { label: "Montserrat",       css: "'Montserrat', sans-serif",       ttfRegular: "fonts/Montserrat-Regular.ttf",     ttfBold: "fonts/Montserrat-Bold.ttf" },
+    { label: "Lato",             css: "'Lato', sans-serif",             ttfRegular: "fonts/Lato-Regular.ttf",           ttfBold: "fonts/Lato-Bold.ttf" },
+    { label: "Poppins",          css: "'Poppins', sans-serif",          ttfRegular: "fonts/Poppins-Regular.ttf",        ttfBold: "fonts/Poppins-Bold.ttf" },
+    { label: "Playfair Display", css: "'Playfair Display', serif",      ttfRegular: "fonts/PlayfairDisplay-Regular.ttf", ttfBold: "fonts/PlayfairDisplay-Bold.ttf" },
+    { label: "Great Vibes",      css: "'Great Vibes', cursive",         ttfRegular: "fonts/GreatVibes-Regular.ttf",     ttfBold: "fonts/GreatVibes-Regular.ttf" },
+  ];
+
+  const btnAbrir     = document.getElementById("btn-abrir-modelos");
+  const modal        = document.getElementById("modal-modelos");
+  const btnFechar    = document.getElementById("btn-fechar-modelos");
+  const backdrop     = modal?.querySelector(".arte-modal-backdrop");
+  const etapa1       = document.getElementById("modelos-etapa-1");
+  const etapa2       = document.getElementById("modelos-etapa-2");
+  const galeria      = document.getElementById("modelos-galeria");
+  const btnVoltar    = document.getElementById("btn-modelos-voltar");
+  const canvas       = document.getElementById("modelos-canvas");
+  const btnPdf       = document.getElementById("btn-mod-pdf");
+  const btnUsar      = document.getElementById("btn-mod-usar");
+  const semImagem    = document.getElementById("modelos-sem-imagem");
+  const camposContainer = document.getElementById("modelos-campos-container");
 
   if (!btnAbrir || !modal || !canvas) return;
 
   const ctx = canvas.getContext("2d");
-  let modeloAtual = null;   // objeto do modelo selecionado
-  let logoDataUrl  = null;  // data URL da logo carregada pelo usuário
-  let templateImg  = null;  // HTMLImageElement do template atual
+
+  // ─── Estado global ─────────────────────────────────────────────────────
+  let modeloAtual   = null;  // objeto do modelo selecionado
+  let logoDataUrl   = null;  // data URL da logo carregada pelo usuário
+  let logoImg       = null;  // HTMLImageElement da logo
+  let templateImg   = null;  // HTMLImageElement do template atual
+  let campos        = [];    // array de objetos de campo editáveis
+  let campoSelecionado = -1; // índice do campo sendo arrastado (-1 = nenhum)
+  let dragOffset    = { x: 0, y: 0 };
+  let isDragging    = false;
+  let modelos       = [...RECEITUARIO_MODELOS]; // começa com fallback estático; substituído pelo fetch
 
   // ─── Abrir / Fechar modal ───────────────────────────────────────────────
   function abrirModal() {
@@ -1329,11 +1195,11 @@ renderVistosRecentemente();
   // ─── Etapa 1: Galeria ──────────────────────────────────────────────────
   function renderizarGaleria() {
     galeria.innerHTML = "";
-    if (!RECEITUARIO_MODELOS.length) {
+    if (!modelos.length) {
       galeria.innerHTML = "<p style='color:#888;text-align:center'>Nenhum modelo disponível no momento.</p>";
       return;
     }
-    RECEITUARIO_MODELOS.forEach((modelo) => {
+    modelos.forEach((modelo) => {
       const card = document.createElement("button");
       card.type = "button";
       card.className = "modelos-card";
@@ -1347,6 +1213,24 @@ renderVistosRecentemente();
       galeria.appendChild(card);
     });
   }
+  // ─── Carregar modelos dinamicamente da API ────────────────────────────
+  try {
+    const resp = await fetch(getApiUrl("/api/produtos"));
+    if (resp.ok) {
+      const data = await resp.json();
+      const lista = (Array.isArray(data) ? data : data.produtos ?? []).filter((p) => p.ehModelo);
+      if (lista.length > 0) {
+        modelos = lista.map((p) => ({
+          id:        p.id,
+          nome:      p.modeloNome || p.nome,
+          thumbnail: Array.isArray(p.imagens) && p.imagens[0] ? p.imagens[0] : (p.modeloConfig?.imagem || ""),
+          imagem:    Array.isArray(p.imagens) && p.imagens[0] ? p.imagens[0] : (p.modeloConfig?.imagem || ""),
+          logoZone:  p.modeloConfig?.logoZone || { x: 0, y: 0, w: 100, h: 100 },
+          campos:    p.modeloConfig?.campos   || {},
+        }));
+      }
+    }
+  } catch { /* ignora falha — usa fallback estático */ }
 
   renderizarGaleria();
 
@@ -1354,22 +1238,48 @@ renderVistosRecentemente();
   async function selecionarModelo(modelo) {
     modeloAtual = modelo;
     templateImg = null;
+    campoSelecionado = -1;
 
-    etapa1.hidden = true;
-    etapa2.hidden = false;
+    // Converter campos do modelo em array de estado editável
+    campos = Object.entries(modelo.campos).map(([key, cfg]) => ({
+      key,
+      label: { nome: "Nome do profissional", especialidade: "Especialidade / Profissão",
+               telefone: "Telefone / WhatsApp", email: "E-mail", endereco: "Endereço / Cidade" }[key] || key,
+      placeholder: { nome: "Ex: Dra. Ana Paula Silva", especialidade: "Ex: Biomédica Esteta · CRBM 1234",
+                     telefone: "Ex: (67) 99999-0000", email: "Ex: contato@clinica.com.br",
+                     endereco: "Ex: Rua das Flores, 100 – Campo Grande/MS" }[key] || "",
+      maxlength: { nome: 80, especialidade: 100, telefone: 20, email: 100, endereco: 120 }[key] || 100,
+      inputType: { email: "email", telefone: "tel" }[key] || "text",
+      text: "",
+      x: cfg.x,
+      y: cfg.y,
+      fontSize: cfg.fontSize,
+      fontFamily: cfg.fontFamily || "Montserrat",
+      color: cfg.color,
+      align: cfg.align || "center",
+      maxWidth: cfg.maxWidth,
+      fontWeight: cfg.fontWeight || "400",
+    }));
 
-    // Destaca card selecionado
     galeria.querySelectorAll(".modelos-card").forEach((c) => {
       c.classList.toggle("modelos-card--ativo", c.dataset.id === modelo.id);
     });
 
-    // Carrega imagem do template
+    etapa1.hidden = true;
+    etapa2.hidden = false;
+
+    // Renderizar cards de campo no formulário
+    renderizarCamposForm();
+
+    // Carregar template
     try {
       templateImg = await carregarImagem(modelo.imagem);
-      semImagem.hidden = true;
+      if (semImagem) semImagem.style.display = "none";
     } catch {
-      semImagem.hidden = false;
-      semImagem.textContent = "⚠️ Imagem do modelo não encontrada. Adicione o arquivo em img/modelos/.";
+      if (semImagem) {
+        semImagem.style.display = "";
+        semImagem.textContent = "⚠️ Imagem do modelo não encontrada. Adicione o arquivo em img/modelos/.";
+      }
       limparCanvas();
       return;
     }
@@ -1380,22 +1290,98 @@ renderVistosRecentemente();
   btnVoltar?.addEventListener("click", () => {
     etapa1.hidden = false;
     etapa2.hidden = true;
+    campoSelecionado = -1;
   });
 
-  // ─── Inputs — atualização ao vivo ──────────────────────────────────────
-  ["mod-nome", "mod-especialidade", "mod-telefone", "mod-email", "mod-endereco"].forEach((id) => {
-    document.getElementById(id)?.addEventListener("input", renderizarPreview);
-  });
+  // ─── Renderizar cards de campo no formulário ───────────────────────────
+  function renderizarCamposForm() {
+    // Remover cards antigos (manter os elementos estáticos logo+acoes)
+    camposContainer.querySelectorAll(".campo-card:not(.campo-card--logo)").forEach((el) => el.remove());
 
+    // Inserir antes do card de logo
+    const logoCard = camposContainer.querySelector(".campo-card--logo");
+
+    campos.forEach((campo, idx) => {
+      const card = document.createElement("div");
+      card.className = "campo-card";
+      card.dataset.idx = idx;
+
+      const fonteOptions = FONTES.map((f) =>
+        `<option value="${f.label}" ${f.label === campo.fontFamily ? "selected" : ""}>${f.label}</option>`
+      ).join("");
+
+      card.innerHTML = `
+        <div class="campo-card-topo">
+          <span class="campo-card-label">${campo.label}</span>
+          <div class="campo-card-badge" id="campo-badge-${idx}"></div>
+        </div>
+        <input
+          class="campo-card-input"
+          type="${campo.inputType}"
+          placeholder="${campo.placeholder}"
+          maxlength="${campo.maxlength}"
+          value="${campo.text}"
+          data-idx="${idx}"
+        >
+        <div class="campo-card-controles">
+          <div class="campo-ctrl-grupo">
+            <label class="campo-ctrl-label">Fonte</label>
+            <select class="campo-card-fonte" data-idx="${idx}">${fonteOptions}</select>
+          </div>
+          <div class="campo-ctrl-grupo">
+            <label class="campo-ctrl-label">X</label>
+            <input class="campo-card-xy" type="number" min="0" max="420" value="${Math.round(campo.x)}" data-axis="x" data-idx="${idx}">
+          </div>
+          <div class="campo-ctrl-grupo">
+            <label class="campo-ctrl-label">Y</label>
+            <input class="campo-card-xy" type="number" min="0" max="594" value="${Math.round(campo.y)}" data-axis="y" data-idx="${idx}">
+          </div>
+        </div>
+      `;
+
+      camposContainer.insertBefore(card, logoCard);
+
+      // Eventos
+      card.querySelector(".campo-card-input").addEventListener("input", (e) => {
+        campos[idx].text = e.target.value;
+        renderizarPreview();
+      });
+
+      card.querySelector(".campo-card-fonte").addEventListener("change", (e) => {
+        campos[idx].fontFamily = e.target.value;
+        renderizarPreview();
+      });
+
+      card.querySelectorAll(".campo-card-xy").forEach((input) => {
+        input.addEventListener("input", (e) => {
+          const axis = e.target.dataset.axis;
+          const val = parseFloat(e.target.value) || 0;
+          campos[idx][axis] = val;
+          renderizarPreview();
+        });
+      });
+    });
+  }
+
+  // ─── Atualizar inputs X/Y após arrastar ────────────────────────────────
+  function sincronizarInputsXY(idx) {
+    const card = camposContainer.querySelector(`.campo-card[data-idx="${idx}"]`);
+    if (!card) return;
+    card.querySelector("[data-axis='x']").value = Math.round(campos[idx].x);
+    card.querySelector("[data-axis='y']").value = Math.round(campos[idx].y);
+  }
+
+  // ─── Logo ───────────────────────────────────────────────────────────────
   document.getElementById("mod-logo")?.addEventListener("change", async (e) => {
     const file = e.target.files?.[0];
-    if (!file) { logoDataUrl = null; renderizarPreview(); return; }
+    if (!file) { logoDataUrl = null; logoImg = null; renderizarPreview(); return; }
     if (file.size > 2 * 1024 * 1024) {
       alert("A logo deve ter no máximo 2 MB.");
       e.target.value = "";
       return;
     }
     logoDataUrl = await lerArquivoComoDataUrl(file);
+    logoImg = await carregarImagem(logoDataUrl);
     renderizarPreview();
   });
 
@@ -1404,57 +1390,53 @@ renderVistosRecentemente();
     if (!modeloAtual || !templateImg) return;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // 1. Template de fundo (já limpo, sem placeholders)
+    // 1. Template de fundo
     ctx.drawImage(templateImg, 0, 0, canvas.width, canvas.height);
 
-    // 2. Logo (se houver)
-    if (logoDataUrl) {
-      const logoImg = new Image();
-      logoImg.onload = () => {
-        const { x, y, w, h } = modeloAtual.logoZone;
-        // Ajusta proporção da logo sem distorcer
-        const scale = Math.min(w / logoImg.width, h / logoImg.height);
-        const lw = logoImg.width * scale;
-        const lh = logoImg.height * scale;
-        const lx = x + (w - lw) / 2;
-        const ly = y + (h - lh) / 2;
-        ctx.drawImage(logoImg, lx, ly, lw, lh);
-        desenharTextos();
-      };
-      logoImg.src = logoDataUrl;
-    } else {
-      desenharTextos();
+    // 2. Logo
+    if (logoImg && modeloAtual.logoZone) {
+      const { x, y, w, h } = modeloAtual.logoZone;
+      const scale = Math.min(w / logoImg.width, h / logoImg.height);
+      const lw = logoImg.width * scale;
+      const lh = logoImg.height * scale;
+      ctx.drawImage(logoImg, x + (w - lw) / 2, y + (h - lh) / 2, lw, lh);
     }
-  }
 
-  function desenharTextos() {
-    if (!modeloAtual) return;
-    const campos = modeloAtual.campos;
-    const valores = {
-      nome:          document.getElementById("mod-nome")?.value?.trim() || "",
-      especialidade: document.getElementById("mod-especialidade")?.value?.trim() || "",
-      telefone:      document.getElementById("mod-telefone")?.value?.trim() || "",
-      email:         document.getElementById("mod-email")?.value?.trim() || "",
-      endereco:      document.getElementById("mod-endereco")?.value?.trim() || "",
-    };
-
-    Object.entries(campos).forEach(([chave, cfg]) => {
-      const texto = valores[chave];
-      if (!texto) return;
-      const peso = cfg.fontWeight || "400";
-      ctx.font = `${peso} ${cfg.fontSize}px 'Mulish', 'Segoe UI', sans-serif`;
-      ctx.fillStyle = cfg.color;
-      ctx.textAlign = cfg.align || "left";
+    // 3. Textos
+    campos.forEach((campo, idx) => {
+      if (!campo.text) return;
+      const fonte = FONTES.find((f) => f.label === campo.fontFamily) || FONTES[0];
+      const peso = campo.fontWeight === "700" ? "bold" : "normal";
+      ctx.font = `${peso} ${campo.fontSize}px ${fonte.css}`;
+      ctx.fillStyle = campo.color;
+      ctx.textAlign = campo.align;
       ctx.textBaseline = "middle";
-      // Trunca o texto se for mais largo que maxWidth
-      let textoFinal = texto;
-      if (ctx.measureText(texto).width > cfg.maxWidth) {
-        while (textoFinal.length > 1 && ctx.measureText(textoFinal + "…").width > cfg.maxWidth) {
+
+      let textoFinal = campo.text;
+      if (ctx.measureText(textoFinal).width > campo.maxWidth) {
+        while (textoFinal.length > 1 && ctx.measureText(textoFinal + "…").width > campo.maxWidth) {
           textoFinal = textoFinal.slice(0, -1);
         }
         textoFinal += "…";
       }
-      ctx.fillText(textoFinal, cfg.x, cfg.y);
+
+      ctx.fillText(textoFinal, campo.x, campo.y);
+
+      // Destaque do campo selecionado
+      if (idx === campoSelecionado) {
+        const w = Math.min(ctx.measureText(textoFinal).width, campo.maxWidth);
+        let rx = campo.x;
+        if (campo.align === "center")     rx -= w / 2;
+        else if (campo.align === "right") rx -= w;
+        const pad = 4;
+        ctx.save();
+        ctx.strokeStyle = "#2563eb";
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([4, 3]);
+        ctx.strokeRect(rx - pad, campo.y - campo.fontSize / 2 - pad, w + pad * 2, campo.fontSize + pad * 2);
+        ctx.setLineDash([]);
+        ctx.restore();
+      }
     });
   }
 
@@ -1470,16 +1452,88 @@ renderVistosRecentemente();
   }
   limparCanvas();
 
-  // ─── Exportar PDF via pdf-lib (texto vetorial) ────────────────────────
+  // ─── Drag & Drop no canvas ─────────────────────────────────────────────
+  function canvasCoordenadas(e) {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width  / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    return {
+      x: (clientX - rect.left) * scaleX,
+      y: (clientY - rect.top)  * scaleY,
+    };
+  }
+
+  function encontrarCampoNoClick(cx, cy) {
+    // Percorre de trás para frente (último campo fica por cima visualmente)
+    for (let i = campos.length - 1; i >= 0; i--) {
+      const c = campos[i];
+      if (!c.text) continue;
+      ctx.font = `${c.fontWeight === "700" ? "bold" : "normal"} ${c.fontSize}px ${(FONTES.find((f) => f.label === c.fontFamily) || FONTES[0]).css}`;
+      const tw = Math.min(ctx.measureText(c.text).width, c.maxWidth);
+      let rx = c.x;
+      if (c.align === "center")     rx -= tw / 2;
+      else if (c.align === "right") rx -= tw;
+      const pad = 8;
+      if (cx >= rx - pad && cx <= rx + tw + pad &&
+          cy >= c.y - c.fontSize / 2 - pad && cy <= c.y + c.fontSize / 2 + pad) {
+        return i;
+      }
+    }
+    return -1;
+  }
+
+  function onMouseDown(e) {
+    if (!campos.length) return;
+    const { x, y } = canvasCoordenadas(e);
+    const idx = encontrarCampoNoClick(x, y);
+    campoSelecionado = idx;
+    if (idx >= 0) {
+      isDragging = true;
+      dragOffset = { x: x - campos[idx].x, y: y - campos[idx].y };
+      canvas.classList.add("modelos-canvas-arrastando");
+      // Destacar card no formulário
+      camposContainer.querySelectorAll(".campo-card[data-idx]").forEach((el) => {
+        el.classList.toggle("campo-card--ativo", parseInt(el.dataset.idx) === idx);
+      });
+    }
+    renderizarPreview();
+    e.preventDefault();
+  }
+
+  function onMouseMove(e) {
+    if (!isDragging || campoSelecionado < 0) return;
+    const { x, y } = canvasCoordenadas(e);
+    campos[campoSelecionado].x = Math.max(0, Math.min(canvas.width,  x - dragOffset.x));
+    campos[campoSelecionado].y = Math.max(0, Math.min(canvas.height, y - dragOffset.y));
+    sincronizarInputsXY(campoSelecionado);
+    renderizarPreview();
+    e.preventDefault();
+  }
+
+  function onMouseUp() {
+    isDragging = false;
+    canvas.classList.remove("modelos-canvas-arrastando");
+  }
+
+  canvas.addEventListener("mousedown",  onMouseDown, { passive: false });
+  canvas.addEventListener("mousemove",  onMouseMove, { passive: false });
+  canvas.addEventListener("mouseup",    onMouseUp);
+  canvas.addEventListener("mouseleave", onMouseUp);
+  canvas.addEventListener("touchstart", onMouseDown, { passive: false });
+  canvas.addEventListener("touchmove",  onMouseMove, { passive: false });
+  canvas.addEventListener("touchend",   onMouseUp);
+
+  // ─── Exportar PDF via pdf-lib (texto vetorial, fontes incorporadas) ────
   btnPdf?.addEventListener("click", async () => {
     if (!modeloAtual || !templateImg) {
       alert("Selecione e preencha um modelo antes de gerar o PDF.");
       return;
     }
-
     const PDFLib = window.PDFLib;
     if (!PDFLib) {
-      alert("Erro: biblioteca de PDF não carregada. Verifique sua conexão e recarregue a página.");
+      alert("Erro: biblioteca de PDF não carregada. Recarregue a página.");
       return;
     }
 
@@ -1487,105 +1541,96 @@ renderVistosRecentemente();
     btnPdf.textContent = "⏳ Gerando…";
 
     try {
-      const { PDFDocument, rgb, StandardFonts } = PDFLib;
+      const { PDFDocument, rgb } = PDFLib;
 
-      // Constantes de conversão: canvas 420×594 → PDF A4 595.28×841.89 pts
+      // A4 em pontos
       const PDF_W = 595.28, PDF_H = 841.89;
-      const PDF_SCALE = PDF_W / 420;
-      const toPdfX = (cx) => cx * PDF_SCALE;
-      const toPdfY = (cy) => PDF_H - cy * PDF_SCALE; // PDF: y=0 na base
+      const SCALE = PDF_W / canvas.width;
+      const toPdfX = (cx) => cx * SCALE;
+      const toPdfY = (cy) => PDF_H - cy * SCALE;
 
-      // 1. Criar documento
       const pdfDoc = await PDFDocument.create();
-      const page = pdfDoc.addPage([PDF_W, PDF_H]);
+      const page   = pdfDoc.addPage([PDF_W, PDF_H]);
 
-      // 2. Template como imagem de fundo (PNG ou JPG)
-      const templateResp = await fetch(modeloAtual.imagem);
-      const templateBytes = await templateResp.arrayBuffer();
-      const templateImage = modeloAtual.imagem.toLowerCase().endsWith(".png")
+      // Template de fundo
+      const templateBytes = await (await fetch(modeloAtual.imagem)).arrayBuffer();
+      const isTemplatePng = modeloAtual.imagem.toLowerCase().endsWith(".png");
+      const templatePdfImg = isTemplatePng
         ? await pdfDoc.embedPng(templateBytes)
         : await pdfDoc.embedJpg(templateBytes);
-      page.drawImage(templateImage, { x: 0, y: 0, width: PDF_W, height: PDF_H });
+      page.drawImage(templatePdfImg, { x: 0, y: 0, width: PDF_W, height: PDF_H });
 
-      // 3. (template já limpo — sem clearZones necessários)
-
-      // 4. Logo do cliente (PNG ou JPG)
-      if (logoDataUrl) {
+      // Logo
+      if (logoDataUrl && modeloAtual.logoZone) {
         const logoBytes = dataUrlParaUint8Array(logoDataUrl);
-        const logoImage = logoDataUrl.startsWith("data:image/png")
-          ? await pdfDoc.embedPng(logoBytes)
-          : await pdfDoc.embedJpg(logoBytes);
+        const logoIspng = logoDataUrl.startsWith("data:image/png");
+        const logoPdfImg = logoIspng ? await pdfDoc.embedPng(logoBytes) : await pdfDoc.embedJpg(logoBytes);
         const { x: lx, y: ly, w: lw, h: lh } = modeloAtual.logoZone;
-        const pdfLW = lw * PDF_SCALE, pdfLH = lh * PDF_SCALE;
-        const s = Math.min(pdfLW / logoImage.width, pdfLH / logoImage.height);
-        const fw = logoImage.width * s, fh = logoImage.height * s;
-        page.drawImage(logoImage, {
+        const pdfLW = lw * SCALE, pdfLH = lh * SCALE;
+        const s = Math.min(pdfLW / logoPdfImg.width, pdfLH / logoPdfImg.height);
+        const fw = logoPdfImg.width * s, fh = logoPdfImg.height * s;
+        page.drawImage(logoPdfImg, {
           x: toPdfX(lx) + (pdfLW - fw) / 2,
           y: toPdfY(ly + lh) + (pdfLH - fh) / 2,
-          width: fw,
-          height: fh,
+          width: fw, height: fh,
         });
       }
 
-      // 5. Fontes padrão PDF (Helvetica — sem necessidade de upload)
-      const fontBold    = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-      const fontRegular = await pdfDoc.embedFont(StandardFonts.Helvetica);
+      // Cache de fontes PDF já carregadas nesta sessão
+      const fontCache = {};
+      async function getPdfFont(fontLabel, bold) {
+        const fonte = FONTES.find((f) => f.label === fontLabel) || FONTES[0];
+        const cacheKey = fontLabel + (bold ? "_bold" : "_reg");
+        if (fontCache[cacheKey]) return fontCache[cacheKey];
+        const ttfUrl  = bold ? fonte.ttfBold : fonte.ttfRegular;
+        const bytes   = await (await fetch(ttfUrl)).arrayBuffer();
+        const embedded = await pdfDoc.embedFont(new Uint8Array(bytes));
+        fontCache[cacheKey] = embedded;
+        return embedded;
+      }
 
-      // 6. Campos de texto (vetoriais, nítidos em qualquer zoom/impressão)
-      const hexParaRgb = (hex) => rgb(
-        parseInt(hex.slice(1, 3), 16) / 255,
-        parseInt(hex.slice(3, 5), 16) / 255,
-        parseInt(hex.slice(5, 7), 16) / 255,
-      );
+      function hexParaRgb(hex) {
+        return rgb(
+          parseInt(hex.slice(1, 3), 16) / 255,
+          parseInt(hex.slice(3, 5), 16) / 255,
+          parseInt(hex.slice(5, 7), 16) / 255,
+        );
+      }
 
-      const valores = {
-        nome:          document.getElementById("mod-nome")?.value?.trim() || "",
-        especialidade: document.getElementById("mod-especialidade")?.value?.trim() || "",
-        telefone:      document.getElementById("mod-telefone")?.value?.trim() || "",
-        email:         document.getElementById("mod-email")?.value?.trim() || "",
-        endereco:      document.getElementById("mod-endereco")?.value?.trim() || "",
-      };
+      for (const campo of campos) {
+        if (!campo.text) continue;
+        const bold    = campo.fontWeight === "700";
+        const font    = await getPdfFont(campo.fontFamily, bold);
+        const fsz     = Math.round(campo.fontSize * SCALE);
+        const maxW    = campo.maxWidth * SCALE;
+        const color   = hexParaRgb(campo.color);
 
-      Object.entries(modeloAtual.campos).forEach(([chave, cfg]) => {
-        const texto = valores[chave];
-        if (!texto) return;
-
-        const font = cfg.fontWeight === "700" ? fontBold : fontRegular;
-        const fontSize = Math.round(cfg.fontSize * PDF_SCALE);
-        const maxWidthPdf = cfg.maxWidth * PDF_SCALE;
-        const color = hexParaRgb(cfg.color);
-
-        // Trunca se necessário
-        let textoFinal = texto;
-        if (font.widthOfTextAtSize(texto, fontSize) > maxWidthPdf) {
-          while (textoFinal.length > 1 && font.widthOfTextAtSize(textoFinal + "…", fontSize) > maxWidthPdf) {
-            textoFinal = textoFinal.slice(0, -1);
+        let texto = campo.text;
+        if (font.widthOfTextAtSize(texto, fsz) > maxW) {
+          while (texto.length > 1 && font.widthOfTextAtSize(texto + "…", fsz) > maxW) {
+            texto = texto.slice(0, -1);
           }
-          textoFinal += "…";
+          texto += "…";
         }
 
-        const textWidth = font.widthOfTextAtSize(textoFinal, fontSize);
-        let drawX = toPdfX(cfg.x);
-        if (cfg.align === "center")      drawX -= textWidth / 2;
-        else if (cfg.align === "right") drawX -= textWidth;
+        const tw = font.widthOfTextAtSize(texto, fsz);
+        let drawX = toPdfX(campo.x);
+        if (campo.align === "center")     drawX -= tw / 2;
+        else if (campo.align === "right") drawX -= tw;
 
-        page.drawText(textoFinal, {
+        page.drawText(texto, {
           x: drawX,
-          y: toPdfY(cfg.y) - fontSize / 2,  // centraliza verticalmente no y do canvas
-          font,
-          size: fontSize,
-          color,
+          y: toPdfY(campo.y) - fsz / 2,
+          font, size: fsz, color,
         });
-      });
+      }
 
-      // 7. Salvar e disparar download
       const pdfBytes = await pdfDoc.save();
       const blob = new Blob([pdfBytes], { type: "application/pdf" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      const nomeProfissional = document.getElementById("mod-nome")?.value?.trim() || "receituario";
-      a.download = `receituario-${nomeProfissional.replace(/\s+/g, "-").toLowerCase()}.pdf`;
+      const url  = URL.createObjectURL(blob);
+      const a    = Object.assign(document.createElement("a"), { href: url });
+      const nome = campos.find((c) => c.key === "nome")?.text?.trim() || "receituario";
+      a.download = `receituario-${nome.replace(/\s+/g, "-").toLowerCase()}.pdf`;
       a.click();
       setTimeout(() => URL.revokeObjectURL(url), 5000);
     } catch (err) {
@@ -1605,7 +1650,7 @@ renderVistosRecentemente();
     }
     canvas.toBlob((blob) => {
       const file = new File([blob], `receituario-${modeloAtual.id}.png`, { type: "image/png" });
-      const dt = new DataTransfer();
+      const dt   = new DataTransfer();
       dt.items.add(file);
       const input = document.getElementById("arquivo-personalizacao");
       if (input) {
@@ -1622,8 +1667,8 @@ renderVistosRecentemente();
     return new Promise((resolve, reject) => {
       const img = new Image();
       img.crossOrigin = "anonymous";
-      img.onload = () => resolve(img);
-      img.onerror = () => reject(new Error(`Falha ao carregar imagem: ${src}`));
+      img.onload  = () => resolve(img);
+      img.onerror = () => reject(new Error(`Falha ao carregar: ${src}`));
       img.src = src;
     });
   }
@@ -1631,7 +1676,7 @@ renderVistosRecentemente();
   function lerArquivoComoDataUrl(file) {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
-      reader.onload = (e) => resolve(e.target.result);
+      reader.onload  = (e) => resolve(e.target.result);
       reader.onerror = () => reject(new Error("Falha ao ler arquivo."));
       reader.readAsDataURL(file);
     });
@@ -1640,7 +1685,7 @@ renderVistosRecentemente();
   function dataUrlParaUint8Array(dataUrl) {
     const base64 = dataUrl.split(",")[1];
     const binary = atob(base64);
-    const bytes = new Uint8Array(binary.length);
+    const bytes  = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
     return bytes;
   }

@@ -31,8 +31,8 @@ const RECEITUARIO_MODELOS = [
 
     campos: {
       /* Nome e especialidade — abaixo da zona da logo */
-      nome:          { x: 210, y: 120, fontSize: 11, color: "#c8a020", align: "center", maxWidth: 290, fontWeight: "700" },
-      especialidade: { x: 210, y: 135, fontSize:  9, color: "#b09020", align: "center", maxWidth: 290, fontWeight: "400" },
+      nome:          { x: 210, y: 120, fontSize: 11, color: "#c8a020", align: "center", maxWidth: 290, fontWeight: "700", fontFamily: "Playfair Display" },
+      especialidade: { x: 210, y: 135, fontSize:  9, color: "#b09020", align: "center", maxWidth: 290, fontWeight: "400", fontFamily: "Montserrat" },
 
       /*
        * Linha de contato — após os ícones WhatsApp (canvas ~x:93-113) e Instagram (canvas ~x:210-229)
@@ -40,14 +40,14 @@ const RECEITUARIO_MODELOS = [
        *   Telefone: canvas x:156, y:504  (centro entre fim do ícone WhatsApp e início do Instagram)
        *   E-mail:   canvas x:280, y:504  (após ícone Instagram)
        */
-      telefone: { x: 156, y: 504, fontSize: 9, color: "#c8a020", align: "center", maxWidth: 115, fontWeight: "400" },
-      email:    { x: 280, y: 504, fontSize: 9, color: "#c8a020", align: "center", maxWidth: 135, fontWeight: "400" },
+      telefone: { x: 156, y: 504, fontSize: 9, color: "#c8a020", align: "center", maxWidth: 115, fontWeight: "400", fontFamily: "Montserrat" },
+      email:    { x: 280, y: 504, fontSize: 9, color: "#c8a020", align: "center", maxWidth: 135, fontWeight: "400", fontFamily: "Montserrat" },
 
       /*
        * Endereço — após ícone Pin (canvas ~x:103-118)
        * Centro da zona: canvas x:225, y:548
        */
-      endereco: { x: 225, y: 548, fontSize: 9, color: "#c8a020", align: "center", maxWidth: 255, fontWeight: "400" },
+      endereco: { x: 225, y: 548, fontSize: 9, color: "#c8a020", align: "center", maxWidth: 255, fontWeight: "400", fontFamily: "Montserrat" },
     },
   },
 ];

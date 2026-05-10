@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Produto • Zuca Personalizados</title>
   <link rel="stylesheet" href="css/style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Great+Vibes&family=Lato:wght@400;700&family=Montserrat:wght@400;700&family=Playfair+Display:wght@400;700&family=Poppins:wght@400;700&display=swap" rel="stylesheet">
   <style>
     /* ========== PÁGINA PRODUTO - MINIMALISTA ========== */
     
@@ -617,38 +620,23 @@
           <div id="modelos-etapa-2" hidden>
             <div class="modelos-etapa2-header">
               <button id="btn-modelos-voltar" class="modelos-btn-voltar" type="button">← Voltar</button>
-              <h2 class="arte-modal-title" style="margin:0">✏️ Preencha os Dados</h2>
+              <h2 class="arte-modal-title" style="margin:0">✏️ Personalize o Modelo</h2>
             </div>
-            <p class="arte-modal-desc">Os dados serão aplicados sobre o modelo selecionado em tempo real.</p>
+            <p class="arte-modal-desc">Preencha os campos e arraste os textos no preview para ajustar a posição.</p>
 
             <div class="modelos-etapa2-layout">
-              <!-- Formulário -->
-              <div class="modelos-form">
-                <div class="arte-form-row">
-                  <label for="mod-nome">Nome do profissional</label>
-                  <input id="mod-nome" type="text" placeholder="Ex: Dra. Ana Paula Silva" maxlength="80">
-                </div>
-                <div class="arte-form-row">
-                  <label for="mod-especialidade">Especialidade / Profissão</label>
-                  <input id="mod-especialidade" type="text" placeholder="Ex: Biomédica Esteta · CRBM 1234" maxlength="100">
-                </div>
-                <div class="arte-form-row">
-                  <label for="mod-telefone">Telefone / WhatsApp</label>
-                  <input id="mod-telefone" type="tel" placeholder="Ex: (67) 99999-0000" maxlength="20">
-                </div>
-                <div class="arte-form-row">
-                  <label for="mod-email">E-mail</label>
-                  <input id="mod-email" type="email" placeholder="Ex: contato@clinica.com.br" maxlength="100">
-                </div>
-                <div class="arte-form-row">
-                  <label for="mod-endereco">Endereço / Cidade</label>
-                  <input id="mod-endereco" type="text" placeholder="Ex: Rua das Flores, 100 – Campo Grande/MS" maxlength="120">
-                </div>
-                <div class="arte-form-row">
-                  <label for="mod-logo">Logo (opcional)</label>
+              <!-- Formulário — campos gerados dinamicamente pelo JS -->
+              <div class="modelos-form" id="modelos-campos-container">
+
+                <!-- Logo — estático -->
+                <div class="campo-card campo-card--logo">
+                  <div class="campo-card-topo">
+                    <span class="campo-card-label">🖼️ Logo (opcional)</span>
+                  </div>
                   <input id="mod-logo" type="file" accept="image/jpeg,image/png,image/webp" class="modelos-logo-input">
-                  <span class="arte-receituario-info">JPG ou PNG, até 2 MB. Será posicionada automaticamente no modelo.</span>
+                  <span class="arte-receituario-info">JPG ou PNG, até 2 MB. Posicionada automaticamente.</span>
                 </div>
+
                 <div class="modelos-acoes">
                   <button id="btn-mod-pdf" class="btn-arte-baixar modelos-btn-pdf" type="button">⬇️ Baixar PDF</button>
                   <button id="btn-mod-usar" class="btn-arte-usar modelos-btn-usar" type="button">✅ Usar como Arte</button>
@@ -658,97 +646,11 @@
               <!-- Preview canvas -->
               <div class="modelos-preview">
                 <div class="arte-preview-wrap">
-                  <canvas id="modelos-canvas" width="420" height="594" class="arte-canvas"></canvas>
+                  <canvas id="modelos-canvas" width="420" height="594" class="arte-canvas modelos-canvas-editavel"></canvas>
                 </div>
-                <p class="arte-safe-info">Preview do receituário em proporção A4.</p>
-                <p id="modelos-sem-imagem" class="arte-receituario-info" style="text-align:center">Selecione um modelo para ver o preview.</p>
+                <p class="arte-safe-info">🖱️ Arraste os textos para reposicioná-los.</p>
+                <p id="modelos-sem-imagem" class="arte-receituario-info" style="text-align:center;display:none">Selecione um modelo para ver o preview.</p>
               </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Modal: Geração de Arte com IA -->
-      <div id="modal-arte-ia" class="arte-modal" role="dialog" aria-modal="true" aria-labelledby="arte-modal-titulo" hidden>
-        <div class="arte-modal-backdrop"></div>
-        <div class="arte-modal-inner">
-          <button class="arte-modal-close" id="btn-fechar-arte-ia" aria-label="Fechar">&times;</button>
-          <h2 id="arte-modal-titulo" class="arte-modal-title">✨ Criar Arte com IA</h2>
-          <p class="arte-modal-desc">Descreva sua arte e a IA gerará uma imagem profissional pronta para impressão em A4.</p>
-
-          <div class="arte-form">
-            <div class="arte-form-row">
-              <label for="arte-tipo">Tipo de produto</label>
-              <select id="arte-tipo">
-                <option value="receituario">Receituário</option>
-                <option value="capa de agenda">Capa de Agenda</option>
-                <option value="banner">Banner</option>
-                <option value="convite">Convite</option>
-                <option value="adesivo">Adesivo</option>
-                <option value="quadro">Quadro</option>
-                <option value="produto personalizado">Produto personalizado</option>
-              </select>
-            </div>
-
-            <!-- Campos específicos para Receituário (exibidos apenas quando tipo = receituário) -->
-            <div id="arte-campos-receituario" class="arte-receituario-section">
-              <p class="arte-receituario-info">📋 Preencha os dados que aparecerão no receituário. Todos os campos são opcionais.</p>
-              <div class="arte-form-row">
-                <label for="receit-nome">Nome do profissional</label>
-                <input id="receit-nome" type="text" placeholder='Ex: Dra. Ana Paula Silva' maxlength="80">
-              </div>
-              <div class="arte-form-row">
-                <label for="receit-profissao">Profissão / Especialidade</label>
-                <input id="receit-profissao" type="text" placeholder='Ex: Biomédica Esteta · CRBM 1234' maxlength="100">
-              </div>
-              <div class="arte-form-row">
-                <label for="receit-contato">Dados de contato</label>
-                <input id="receit-contato" type="text" placeholder='Ex: (48) 99999-0000 · @dra.ana' maxlength="150">
-              </div>
-              <div class="arte-form-row">
-                <label for="receit-endereco">Endereço</label>
-                <input id="receit-endereco" type="text" placeholder='Ex: Rua das Flores, 100 – Florianópolis' maxlength="150">
-              </div>
-            </div>
-
-            <div class="arte-form-row" id="arte-row-texto">
-              <label for="arte-texto">Texto / observação adicional</label>
-              <input id="arte-texto" type="text" placeholder='Ex: "João, 10 anos — Turma do Bem!"' maxlength="120">
-            </div>
-            <div class="arte-form-row">
-              <label for="arte-estilo">Estilo visual</label>
-              <select id="arte-estilo">
-                <option value="elegante e minimalista">Elegante e minimalista</option>
-                <option value="moderno e clean">Moderno e clean</option>
-                <option value="clássico e sofisticado">Clássico e sofisticado</option>
-                <option value="floral e delicado">Floral e delicado</option>
-                <option value="infantil e colorido">Infantil e colorido</option>
-                <option value="tropical e festivo">Tropical e festivo</option>
-                <option value="vintage e retrô">Vintage e retrô</option>
-              </select>
-            </div>
-            <div class="arte-form-row">
-              <label for="arte-cor">Cor principal</label>
-              <input id="arte-cor" type="text" placeholder='Ex: dourado, rose gold, verde sage...' maxlength="60" value="dourado">
-            </div>
-            <button id="btn-gerar-arte" class="btn-arte-gerar" type="button">🎨 Gerar Arte</button>
-          </div>
-
-          <div id="arte-loading" class="arte-loading" hidden>
-            <div class="arte-spinner"></div>
-            <p>Gerando sua arte... isso pode levar até 20 segundos.</p>
-          </div>
-
-          <div id="arte-resultado" class="arte-resultado" hidden>
-            <div class="arte-preview-wrap">
-              <canvas id="arte-canvas" width="420" height="594" class="arte-canvas"></canvas>
-              <div id="arte-safe-zone" class="arte-safe-zone"></div>
-            </div>
-            <p class="arte-safe-info">A área tracejada representa a margem de segurança de 1cm para impressão.</p>
-            <div class="arte-resultado-acoes">
-              <button id="btn-baixar-arte" class="btn-arte-baixar" type="button">⬇️ Baixar Arte (PNG)</button>
-              <button id="btn-usar-arte" class="btn-arte-usar" type="button">✅ Usar esta arte</button>
-              <button id="btn-gerar-nova" class="btn-arte-nova" type="button">🔄 Gerar nova versão</button>
             </div>
           </div>
         </div>

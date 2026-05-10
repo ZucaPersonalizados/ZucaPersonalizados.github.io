@@ -286,6 +286,21 @@ function obterProdutoDoFormulario() {
     descricaoLonga: String(document.getElementById("descricaoLonga")?.value || "").trim(),
     personalizado: !!document.getElementById("personalizado")?.checked,
     ncm: String(document.getElementById("ncm")?.value || "").replace(/\D/g, "").slice(0, 8) || "48201010",
+    ehModelo: !!document.getElementById("ehModelo")?.checked,
+    modeloNome: String(document.getElementById("modeloNome")?.value || "").trim(),
+    modeloConfig: (() => {
+      if (!document.getElementById("ehModelo")?.checked) return undefined;
+      const logoX = Number(document.getElementById("logoX")?.value || 0);
+      const logoY = Number(document.getElementById("logoY")?.value || 0);
+      const logoW = Number(document.getElementById("logoW")?.value || 0);
+      const logoH = Number(document.getElementById("logoH")?.value || 0);
+      const rawJson = String(document.getElementById("modeloCamposJson")?.value || "").trim();
+      let campos = {};
+      if (rawJson) {
+        try { campos = JSON.parse(rawJson); } catch { campos = {}; }
+      }
+      return { logoZone: { x: logoX, y: logoY, w: logoW, h: logoH }, campos };
+    })(),
   };
 }
 
@@ -295,6 +310,8 @@ function limparFormularioProduto() {
   selectedProductId = null;
   if (inputProdutoId) inputProdutoId.disabled = false;
   if (btnExcluirProduto) btnExcluirProduto.style.display = "none";
+  const secaoModeloEl = document.getElementById("secao-modelo");
+  if (secaoModeloEl) secaoModeloEl.hidden = true;
   setProdutoStatus("Pronto para cadastrar.");
 }
 
@@ -318,6 +335,24 @@ function preencherFormularioProduto(produto) {
   document.getElementById("personalizado").checked = !!produto.personalizado;
   const ncmEl = document.getElementById("ncm");
   if (ncmEl) ncmEl.value = produto.ncm || "";
+
+  // Campos de modelo
+  const ehModeloEl = document.getElementById("ehModelo");
+  const secaoModeloEl = document.getElementById("secao-modelo");
+  if (ehModeloEl) ehModeloEl.checked = !!produto.ehModelo;
+  if (secaoModeloEl) secaoModeloEl.hidden = !produto.ehModelo;
+  if (produto.ehModelo && produto.modeloConfig) {
+    const { logoZone, campos } = produto.modeloConfig;
+    if (document.getElementById("modeloNome")) document.getElementById("modeloNome").value = produto.modeloNome || "";
+    if (logoZone) {
+      if (document.getElementById("logoX")) document.getElementById("logoX").value = logoZone.x ?? "";
+      if (document.getElementById("logoY")) document.getElementById("logoY").value = logoZone.y ?? "";
+      if (document.getElementById("logoW")) document.getElementById("logoW").value = logoZone.w ?? "";
+      if (document.getElementById("logoH")) document.getElementById("logoH").value = logoZone.h ?? "";
+    }
+    const jsonEl = document.getElementById("modeloCamposJson");
+    if (jsonEl) jsonEl.value = campos ? JSON.stringify(campos, null, 2) : "";
+  }
 
   selectedProductId = produto.id;
   if (inputProdutoId) inputProdutoId.disabled = true;
@@ -811,6 +846,26 @@ btnEsqueciSenha?.addEventListener("click", () => {
   setLoginStatus("No modo backend-only, redefina a senha do admin via variavel ADMIN_PASSWORD no servidor.", "ok");
 });
 
+// Toggle seção de modelo de receituário
+document.getElementById("ehModelo")?.addEventListener("change", (e) => {
+  const secao = document.getElementById("secao-modelo");
+  if (secao) secao.hidden = !e.target.checked;
+});
+
+// Inserir template JSON de campos de modelo
+document.getElementById("btn-modelo-template")?.addEventListener("click", () => {
+  const jsonEl = document.getElementById("modeloCamposJson");
+  if (!jsonEl) return;
+  const template = {
+    nome:          { x: 210, y: 120, fontSize: 11, color: "#c8a020", align: "center", maxWidth: 290, fontWeight: "700", fontFamily: "Playfair Display" },
+    especialidade: { x: 210, y: 135, fontSize:  9, color: "#b09020", align: "center", maxWidth: 290, fontWeight: "400", fontFamily: "Montserrat" },
+    telefone:      { x: 156, y: 504, fontSize:  9, color: "#c8a020", align: "center", maxWidth: 115, fontWeight: "400", fontFamily: "Montserrat" },
+    email:         { x: 280, y: 504, fontSize:  9, color: "#c8a020", align: "center", maxWidth: 135, fontWeight: "400", fontFamily: "Montserrat" },
+    endereco:      { x: 225, y: 548, fontSize:  9, color: "#c8a020", align: "center", maxWidth: 255, fontWeight: "400", fontFamily: "Montserrat" },
+  };
+  jsonEl.value = JSON.stringify(template, null, 2);
+});
+
 btnLogin?.addEventListener("click", async () => {
   try {
     const email = loginEmail.value.trim();
@@ -859,6 +914,17 @@ formProduto?.addEventListener("submit", async (event) => {
     if (!produto.id || !produto.nome) {
       setProdutoStatus("ID e nome sao obrigatorios.", "error");
       return;
+    }
+
+    // Validar JSON dos campos de modelo
+    if (produto.ehModelo) {
+      const rawJson = String(document.getElementById("modeloCamposJson")?.value || "").trim();
+      if (rawJson) {
+        try { JSON.parse(rawJson); } catch {
+          setProdutoStatus("JSON dos campos do modelo é inválido. Corrija antes de salvar.", "error");
+          return;
+        }
+      }
     }
 
     const isEdicao = !!selectedProductId;

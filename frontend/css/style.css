@@ -3488,7 +3488,7 @@ textarea:focus-visible {
 /* ── Etapa 2: Layout 2 colunas ── */
 .modelos-etapa2-layout {
   display: grid;
-  grid-template-columns: 1fr 240px;
+  grid-template-columns: 1fr 280px;
   gap: 20px;
   align-items: start;
   margin-top: 12px;
@@ -3556,3 +3556,111 @@ textarea:focus-visible {
   display: block;
   box-shadow: 0 4px 20px rgba(0,0,0,0.15);
 }
+
+/* ── Canvas editável ── */
+.modelos-canvas-editavel {
+  cursor: crosshair;
+  touch-action: none;
+}
+.modelos-canvas-arrastando {
+  cursor: grabbing !important;
+}
+
+/* ── Cards de campo ── */
+.campo-card {
+  background: #fff;
+  border: 1.5px solid var(--line, #e0e0e0);
+  border-radius: 12px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.campo-card--ativo {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+.campo-card--logo {
+  background: #faf9f7;
+  border-color: var(--line, #e0e0e0);
+}
+
+.campo-card-topo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.campo-card-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #444;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.campo-card-badge {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ddd;
+  flex-shrink: 0;
+}
+
+.campo-card-input {
+  padding: 8px 10px;
+  border: 1.5px solid var(--line, #ddd);
+  border-radius: 8px;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s;
+  width: 100%;
+  box-sizing: border-box;
+}
+.campo-card-input:focus {
+  border-color: #2563eb;
+}
+
+/* ── Controles de fonte e posição ── */
+.campo-card-controles {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+.campo-ctrl-grupo {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.campo-ctrl-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.campo-card-fonte {
+  padding: 5px 8px;
+  border: 1.5px solid var(--line, #ddd);
+  border-radius: 7px;
+  font-size: 12px;
+  outline: none;
+  background: #fff;
+  cursor: pointer;
+  max-width: 160px;
+  transition: border-color 0.2s;
+}
+.campo-card-fonte:focus { border-color: #2563eb; }
+
+.campo-card-xy {
+  width: 56px;
+  padding: 5px 7px;
+  border: 1.5px solid var(--line, #ddd);
+  border-radius: 7px;
+  font-size: 12px;
+  outline: none;
+  text-align: center;
+  transition: border-color 0.2s;
+}
+.campo-card-xy:focus { border-color: #2563eb; }

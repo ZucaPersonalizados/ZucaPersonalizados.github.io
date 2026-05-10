@@ -4,7 +4,7 @@ import {
   onAuthStateChanged,
   salvarUsuarioNoStorage,
 } from "./firebase-auth.js";
-import RECEITUARIO_MODELOS from "./receituario-modelos.js";
+import RECEITUARIO_MODELOS from "./receituario-modelos.js?v=2";
 
 const API_BASE = (() => {
   const custom = localStorage.getItem("zuca_api_base_url");

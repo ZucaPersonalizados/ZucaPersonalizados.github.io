@@ -422,9 +422,18 @@ function renderProdutos() {
 
   listaProdutosEl.innerHTML = allProducts.map((produto) => {
     const preco = parsePreco(produto.preco);
+    const tipoBadge = produto.ehModelo
+      ? '<span style="background:#f5e9c0;color:#8a6a00;border:1px solid #c8a020;border-radius:4px;padding:1px 7px;font-size:0.75rem;font-weight:600;">📋 Modelo</span>'
+      : produto.personalizado
+        ? '<span style="background:#dbeafe;color:#1e40af;border:1px solid #3b82f6;border-radius:4px;padding:1px 7px;font-size:0.75rem;font-weight:600;">✏️ Personalizado</span>'
+        : '<span style="background:#f3f4f6;color:#6b7280;border:1px solid #d1d5db;border-radius:4px;padding:1px 7px;font-size:0.75rem;font-weight:600;">🛍️ Simples</span>';
+    const semImagem = !produto.imagens || !Array.isArray(produto.imagens) || produto.imagens.length === 0;
+    const avisoImagem = (semImagem && produto.ehModelo)
+      ? '<span style="color:#c0392b;font-size:0.78rem;margin-left:8px;">⚠️ sem imagem (não aparecerá na galeria)</span>'
+      : '';
     return `
       <div class="item-card" data-produto-id="${escapeHtml(produto.id)}">
-        <div class="item-title">${escapeHtml(produto.nome || "Produto")}</div>
+        <div class="item-title" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">${escapeHtml(produto.nome || "Produto")} ${tipoBadge}${avisoImagem}</div>
         <div class="item-meta">ID: ${escapeHtml(produto.id)} | Preco: ${formatarMoeda(preco)} | Estoque: ${Number(produto.estoque || 0)}</div>
         <div class="item-meta">Categoria: ${escapeHtml(produto.categoria || "-")} | Tipo: ${escapeHtml(produto.tipo || "-")}</div>
         <div class="item-meta">Dimensões: ${Number(produto.larguraCm || 15)}x${Number(produto.comprimentoCm || 20)}x${Number(produto.alturaCm || 2)} cm | Peso: ${Number(produto.pesoKg || 0.3)} kg</div>

@@ -1225,9 +1225,14 @@ renderVistosRecentemente();
       card.type = "button";
       card.className = "modelos-card";
       card.dataset.id = modelo.id;
+      const thumbSrc = modelo.thumbnail || "";
       card.innerHTML = `
-        <img src="${modelo.thumbnail}" alt="${modelo.nome}" class="modelos-card-thumb"
-             onerror="this.style.background='#e8e0d8';this.src='data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs='">
+        ${thumbSrc
+          ? `<img src="${thumbSrc}" alt="${modelo.nome}" class="modelos-card-thumb"
+               onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
+             <div class="modelos-card-thumb modelos-card-sem-img" style="display:none;background:#f3f0ea;align-items:center;justify-content:center;color:#aaa;font-size:2rem;">📋</div>`
+          : `<div class="modelos-card-thumb modelos-card-sem-img" style="background:#f3f0ea;display:flex;align-items:center;justify-content:center;color:#aaa;font-size:2rem;">📋</div>`
+        }
         <span class="modelos-card-nome">${modelo.nome}</span>
       `;
       card.addEventListener("click", () => selecionarModelo(modelo));

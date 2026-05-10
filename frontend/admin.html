@@ -232,6 +232,28 @@
     .field { display: grid; gap: 6px; }
     .field-full { grid-column: 1 / -1; }
 
+    /* Seletor visual de tipo de produto */
+    .tipo-produto-grupo { display: flex; gap: 10px; flex-wrap: wrap; }
+    .tipo-produto-opcao {
+      display: flex; align-items: center; justify-content: center;
+      text-align: center; cursor: pointer;
+      border: 2px solid var(--border-color);
+      border-radius: 10px; padding: 10px 16px;
+      min-width: 130px; font-size: 0.88rem; line-height: 1.4;
+      color: var(--text-secondary); background: #fff;
+      transition: border-color 0.18s, background 0.18s, color 0.18s, box-shadow 0.18s;
+      user-select: none;
+    }
+    .tipo-produto-opcao:hover { border-color: #aaa; background: #f8f8f8; }
+    .tipo-produto-opcao.selecionado {
+      border-color: var(--accent);
+      background: #fff8f0; color: #7a3f00;
+      box-shadow: 0 0 0 3px rgba(181,122,74,.18);
+      font-weight: 600;
+    }
+    .tipo-produto-opcao small { display: block; font-weight: 400; font-size: 0.76rem; color: #999; margin-top: 2px; }
+    .tipo-produto-opcao.selecionado small { color: #b86010; }
+
     .field label { font-size: 13px; font-weight: 600; color: var(--text-secondary); }
 
     input, textarea, select {

@@ -1178,7 +1178,17 @@ renderVistosRecentemente();
 
   if (!btnAbrir || !modal || !canvas) return;
 
+  // ─── Alta resolução (DPI scale) ───────────────────────────────────────
+  // Espaço lógico permanece 420×594; o canvas físico é 3× maior para
+  // garantir nitidez em telas Retina e qualidade ao exportar imagem.
+  const DPI_SCALE  = 3;
+  const LOGICAL_W  = 420;
+  const LOGICAL_H  = 594;
+  canvas.width  = LOGICAL_W * DPI_SCALE;  // 1260
+  canvas.height = LOGICAL_H * DPI_SCALE;  // 1782
+
   const ctx = canvas.getContext("2d");
+  ctx.scale(DPI_SCALE, DPI_SCALE);  // todas as coordenadas lógicas continuam em 420×594
 
   // ─── Estado global ─────────────────────────────────────────────────────
   let modeloAtual   = null;  // objeto do modelo selecionado
@@ -1417,18 +1427,18 @@ renderVistosRecentemente();
     renderizarPreview();
   });
 
-  // ─── Renderização no canvas de preview (420×594) ───────────────────────
+  // ─── Renderização no canvas de preview (420×594 lógico) ───────────────────
   function renderizarPreview() {
     if (!modeloAtual) return;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.clearRect(0, 0, LOGICAL_W, LOGICAL_H);
 
     // 1. Fundo branco (base sempre branca para transparências)
     ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillRect(0, 0, LOGICAL_W, LOGICAL_H);
 
     // 1b. Imagem de fundo do modelo (design do template)
     if (fundoImg) {
-      ctx.drawImage(fundoImg, 0, 0, canvas.width, canvas.height);
+      ctx.drawImage(fundoImg, 0, 0, LOGICAL_W, LOGICAL_H);
     }
 
     // 2. Elementos decorativos (faixas, linhas, ícones)
@@ -1516,17 +1526,17 @@ renderVistosRecentemente();
     ctx2d.globalAlpha = el.opacidade ?? 1;
     if (el.tipo === "faixa") {
       ctx2d.fillStyle = el.cor || "#c8a020";
-      ctx2d.fillRect(el.x ?? 0, el.y ?? 0, el.largura ?? canvas.width, el.altura ?? 20);
+      ctx2d.fillRect(el.x ?? 0, el.y ?? 0, el.largura ?? LOGICAL_W, el.altura ?? 20);
     } else if (el.tipo === "linha") {
       ctx2d.strokeStyle = el.cor || "#c8a020";
       ctx2d.lineWidth = el.espessura ?? 1;
       ctx2d.beginPath();
       if ((el.orientacao || "h") === "v") {
         ctx2d.moveTo(el.x ?? 0, el.y ?? 0);
-        ctx2d.lineTo(el.x ?? 0, (el.y ?? 0) + (el.comprimento ?? canvas.height));
+        ctx2d.lineTo(el.x ?? 0, (el.y ?? 0) + (el.comprimento ?? LOGICAL_H));
       } else {
         ctx2d.moveTo(el.x ?? 0, el.y ?? 0);
-        ctx2d.lineTo((el.x ?? 0) + (el.comprimento ?? canvas.width), el.y ?? 0);
+        ctx2d.lineTo((el.x ?? 0) + (el.comprimento ?? LOGICAL_W), el.y ?? 0);
       }
       ctx2d.stroke();
     } else if (el.tipo === "circulo") {
@@ -1542,14 +1552,14 @@ renderVistosRecentemente();
   }
 
   function limparCanvas() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.clearRect(0, 0, LOGICAL_W, LOGICAL_H);
     ctx.fillStyle = "#f5f0ea";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillRect(0, 0, LOGICAL_W, LOGICAL_H);
     ctx.fillStyle = "#bbb";
     ctx.font = "13px sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText("Selecione um modelo para visualizar", canvas.width / 2, canvas.height / 2);
+    ctx.fillText("Selecione um modelo para visualizar", LOGICAL_W / 2, LOGICAL_H / 2);
   }
   limparCanvas();
 
@@ -1725,7 +1735,7 @@ renderVistosRecentemente();
 
       // A4 em pontos
       const PDF_W = 595.28, PDF_H = 841.89;
-      const SCALE = PDF_W / canvas.width;
+      const SCALE = PDF_W / LOGICAL_W;   // usa espaço lógico (420), não canvas.width físico
       const toPdfX = (cx) => cx * SCALE;
       const toPdfY = (cy) => PDF_H - cy * SCALE;
 

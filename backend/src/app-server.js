@@ -1167,6 +1167,10 @@ app.post("/api/admin/produtos", adminAuth, requireDb, async (req, res) => {
       imagens,
       personalizado: !!req.body.personalizado,
       estoque: Number(req.body.estoque || 0),
+      ncm: String(req.body.ncm || "48201010").replace(/\D/g, "").slice(0, 8) || "48201010",
+      ehModelo: !!req.body.ehModelo,
+      modeloNome: String(req.body.modeloNome || ""),
+      modeloConfig: req.body.modeloConfig ?? null,
       atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
       atualizadoPor: req.adminSession.email,
     };
@@ -1212,6 +1216,10 @@ app.put("/api/admin/produtos/:id", adminAuth, requireDb, async (req, res) => {
       imagens,
       personalizado: !!req.body.personalizado,
       estoque: Number(req.body.estoque || 0),
+      ncm: String(req.body.ncm || "48201010").replace(/\D/g, "").slice(0, 8) || "48201010",
+      ehModelo: !!req.body.ehModelo,
+      modeloNome: String(req.body.modeloNome || ""),
+      modeloConfig: req.body.modeloConfig ?? null,
       atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
       atualizadoPor: req.adminSession.email,
     };

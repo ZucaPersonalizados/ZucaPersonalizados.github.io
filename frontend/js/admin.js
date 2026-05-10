@@ -311,7 +311,7 @@ function limparFormularioProduto() {
   if (inputProdutoId) inputProdutoId.disabled = false;
   if (btnExcluirProduto) btnExcluirProduto.style.display = "none";
   const secaoModeloEl = document.getElementById("secao-modelo");
-  if (secaoModeloEl) secaoModeloEl.hidden = true;
+  if (secaoModeloEl) secaoModeloEl.style.display = "none";
   setProdutoStatus("Pronto para cadastrar.");
 }
 
@@ -340,7 +340,7 @@ function preencherFormularioProduto(produto) {
   const ehModeloEl = document.getElementById("ehModelo");
   const secaoModeloEl = document.getElementById("secao-modelo");
   if (ehModeloEl) ehModeloEl.checked = !!produto.ehModelo;
-  if (secaoModeloEl) secaoModeloEl.hidden = !produto.ehModelo;
+  if (secaoModeloEl) secaoModeloEl.style.display = produto.ehModelo ? "flex" : "none";
   if (produto.ehModelo && produto.modeloConfig) {
     const { logoZone, campos } = produto.modeloConfig;
     if (document.getElementById("modeloNome")) document.getElementById("modeloNome").value = produto.modeloNome || "";
@@ -849,7 +849,7 @@ btnEsqueciSenha?.addEventListener("click", () => {
 // Toggle seção de modelo de receituário
 document.getElementById("ehModelo")?.addEventListener("change", (e) => {
   const secao = document.getElementById("secao-modelo");
-  if (secao) secao.hidden = !e.target.checked;
+  if (secao) secao.style.display = e.target.checked ? "flex" : "none";
 });
 
 // Inserir template JSON de campos de modelo

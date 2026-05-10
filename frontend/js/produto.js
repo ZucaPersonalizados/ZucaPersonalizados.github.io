@@ -1170,7 +1170,11 @@ renderVistosRecentemente();
   let templateImg   = null;  // HTMLImageElement do template atual
   let campos        = [];    // array de objetos de campo editáveis
   let campoSelecionado = -1; // índice do campo sendo arrastado (-1 = nenhum)
+  let logoZone      = null;  // cópia editável de modeloAtual.logoZone { x,y,w,h }
+  let logoSelecionada = false;
+  let logoAcao      = null;  // null | 'mover' | 'resize-tl' | 'resize-tr' | 'resize-bl' | 'resize-br'
   let dragOffset    = { x: 0, y: 0 };
+  let dragStart     = { x: 0, y: 0, lx: 0, ly: 0, lw: 0, lh: 0 }; // snapshot no início do resize
   let isDragging    = false;
   let modelos       = [...RECEITUARIO_MODELOS]; // começa com fallback estático; substituído pelo fetch
 
@@ -1239,6 +1243,9 @@ renderVistosRecentemente();
     modeloAtual = modelo;
     templateImg = null;
     campoSelecionado = -1;
+    logoZone = modelo.logoZone ? { ...modelo.logoZone } : null;
+    logoSelecionada = false;
+    logoAcao = null;
 
     // Converter campos do modelo em array de estado editável
     campos = Object.entries(modelo.campos).map(([key, cfg]) => ({
@@ -1394,12 +1401,29 @@ renderVistosRecentemente();
     ctx.drawImage(templateImg, 0, 0, canvas.width, canvas.height);
 
     // 2. Logo
-    if (logoImg && modeloAtual.logoZone) {
-      const { x, y, w, h } = modeloAtual.logoZone;
+    if (logoImg && logoZone) {
+      const { x, y, w, h } = logoZone;
       const scale = Math.min(w / logoImg.width, h / logoImg.height);
       const lw = logoImg.width * scale;
       const lh = logoImg.height * scale;
       ctx.drawImage(logoImg, x + (w - lw) / 2, y + (h - lh) / 2, lw, lh);
+
+      // Moldura + alças de resize quando selecionada
+      if (logoSelecionada) {
+        const ALCA = 8;
+        ctx.save();
+        ctx.strokeStyle = "#2563eb";
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([4, 3]);
+        ctx.strokeRect(x, y, w, h);
+        ctx.setLineDash([]);
+        // 4 alças nos cantos
+        ctx.fillStyle = "#2563eb";
+        [[x, y], [x + w, y], [x, y + h], [x + w, y + h]].forEach(([cx, cy]) => {
+          ctx.fillRect(cx - ALCA / 2, cy - ALCA / 2, ALCA, ALCA);
+        });
+        ctx.restore();
+      }
     }
 
     // 3. Textos
@@ -1484,27 +1508,105 @@ renderVistosRecentemente();
     return -1;
   }
 
+  const ALCA = 8; // tamanho da alça de resize em px
+
+  function detectarAcaoLogo(cx, cy) {
+    if (!logoZone || !logoImg) return null;
+    const { x, y, w, h } = logoZone;
+    // Verificar cantos primeiro (prioridade sobre mover)
+    const cantos = [
+      { nome: "resize-tl", px: x,     py: y     },
+      { nome: "resize-tr", px: x + w, py: y     },
+      { nome: "resize-bl", px: x,     py: y + h },
+      { nome: "resize-br", px: x + w, py: y + h },
+    ];
+    for (const c of cantos) {
+      if (Math.abs(cx - c.px) <= ALCA && Math.abs(cy - c.py) <= ALCA) return c.nome;
+    }
+    // Mover: dentro do retângulo
+    if (cx >= x && cx <= x + w && cy >= y && cy <= y + h) return "mover";
+    return null;
+  }
+
   function onMouseDown(e) {
-    if (!campos.length) return;
     const { x, y } = canvasCoordenadas(e);
+
+    // Verificar logo primeiro (drag/resize)
+    if (logoImg && logoZone) {
+      const acao = logoSelecionada ? detectarAcaoLogo(x, y) : (x >= logoZone.x && x <= logoZone.x + logoZone.w && y >= logoZone.y && y <= logoZone.y + logoZone.h ? "mover" : null);
+      if (acao) {
+        logoSelecionada = true;
+        logoAcao = acao;
+        isDragging = true;
+        campoSelecionado = -1;
+        dragOffset = { x: x - logoZone.x, y: y - logoZone.y };
+        dragStart  = { x, y, lx: logoZone.x, ly: logoZone.y, lw: logoZone.w, lh: logoZone.h };
+        canvas.classList.add("modelos-canvas-arrastando");
+        renderizarPreview();
+        e.preventDefault();
+        return;
+      }
+    }
+
+    // Verificar campos de texto
     const idx = encontrarCampoNoClick(x, y);
     campoSelecionado = idx;
+    logoSelecionada = false;
     if (idx >= 0) {
       isDragging = true;
       dragOffset = { x: x - campos[idx].x, y: y - campos[idx].y };
       canvas.classList.add("modelos-canvas-arrastando");
-      // Destacar card no formulário
       camposContainer.querySelectorAll(".campo-card[data-idx]").forEach((el) => {
         el.classList.toggle("campo-card--ativo", parseInt(el.dataset.idx) === idx);
       });
+    } else {
+      // Clicou em área vazia — deselecionar logo
+      logoSelecionada = false;
     }
     renderizarPreview();
     e.preventDefault();
   }
 
   function onMouseMove(e) {
-    if (!isDragging || campoSelecionado < 0) return;
+    if (!isDragging) return;
     const { x, y } = canvasCoordenadas(e);
+
+    if (logoAcao && logoZone) {
+      const MIN = 20;
+      if (logoAcao === "mover") {
+        logoZone.x = Math.max(0, Math.min(canvas.width  - logoZone.w, x - dragOffset.x));
+        logoZone.y = Math.max(0, Math.min(canvas.height - logoZone.h, y - dragOffset.y));
+      } else {
+        const dx = x - dragStart.x;
+        const dy = y - dragStart.y;
+        if (logoAcao === "resize-br") {
+          logoZone.w = Math.max(MIN, dragStart.lw + dx);
+          logoZone.h = Math.max(MIN, dragStart.lh + dy);
+        } else if (logoAcao === "resize-bl") {
+          const nw = Math.max(MIN, dragStart.lw - dx);
+          logoZone.x = dragStart.lx + (dragStart.lw - nw);
+          logoZone.w = nw;
+          logoZone.h = Math.max(MIN, dragStart.lh + dy);
+        } else if (logoAcao === "resize-tr") {
+          logoZone.w = Math.max(MIN, dragStart.lw + dx);
+          const nh = Math.max(MIN, dragStart.lh - dy);
+          logoZone.y = dragStart.ly + (dragStart.lh - nh);
+          logoZone.h = nh;
+        } else if (logoAcao === "resize-tl") {
+          const nw = Math.max(MIN, dragStart.lw - dx);
+          const nh = Math.max(MIN, dragStart.lh - dy);
+          logoZone.x = dragStart.lx + (dragStart.lw - nw);
+          logoZone.y = dragStart.ly + (dragStart.lh - nh);
+          logoZone.w = nw;
+          logoZone.h = nh;
+        }
+      }
+      renderizarPreview();
+      e.preventDefault();
+      return;
+    }
+
+    if (campoSelecionado < 0) return;
     campos[campoSelecionado].x = Math.max(0, Math.min(canvas.width,  x - dragOffset.x));
     campos[campoSelecionado].y = Math.max(0, Math.min(canvas.height, y - dragOffset.y));
     sincronizarInputsXY(campoSelecionado);
@@ -1514,6 +1616,7 @@ renderVistosRecentemente();
 
   function onMouseUp() {
     isDragging = false;
+    logoAcao = null;
     canvas.classList.remove("modelos-canvas-arrastando");
   }
 
@@ -1561,11 +1664,11 @@ renderVistosRecentemente();
       page.drawImage(templatePdfImg, { x: 0, y: 0, width: PDF_W, height: PDF_H });
 
       // Logo
-      if (logoDataUrl && modeloAtual.logoZone) {
+      if (logoDataUrl && logoZone) {
         const logoBytes = dataUrlParaUint8Array(logoDataUrl);
         const logoIspng = logoDataUrl.startsWith("data:image/png");
         const logoPdfImg = logoIspng ? await pdfDoc.embedPng(logoBytes) : await pdfDoc.embedJpg(logoBytes);
-        const { x: lx, y: ly, w: lw, h: lh } = modeloAtual.logoZone;
+        const { x: lx, y: ly, w: lw, h: lh } = logoZone;
         const pdfLW = lw * SCALE, pdfLH = lh * SCALE;
         const s = Math.min(pdfLW / logoPdfImg.width, pdfLH / logoPdfImg.height);
         const fw = logoPdfImg.width * s, fh = logoPdfImg.height * s;

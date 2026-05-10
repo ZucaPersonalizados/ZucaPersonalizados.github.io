@@ -283,10 +283,11 @@ function aplicarFallbackImagem(imgEl) {
   };
 }
 
-function mostrarBlocoPersonalizacao(personalizado) {
+function mostrarBlocoPersonalizacao(personalizado, ehModelo) {
   const bloco = document.getElementById("bloco-personalizacao");
-  if (!bloco) return;
-  bloco.hidden = !personalizado;
+  const blocoModelo = document.getElementById("bloco-modelo");
+  if (bloco) bloco.hidden = !personalizado;
+  if (blocoModelo) blocoModelo.hidden = !ehModelo;
 }
 
 async function enviarArquivoPersonalizacao(arquivo) {
@@ -600,10 +601,11 @@ async function carregarProduto() {
     const precoBase = produto.preco ?? produto.valor ?? 0;
     const precoCalculado = precoParaNumero(precoBase);
     const personalizado = isProdutoPersonalizado(produto);
+    const ehModelo = !!produto.ehModelo;
     const produtoParaCarrinho = { ...produto, preco: precoCalculado, personalizado };
     document.getElementById("preco").textContent = formatarMoeda(precoCalculado);
     document.getElementById("descricao").textContent = produto.descricaoCurta || "Descrição não disponível";
-    mostrarBlocoPersonalizacao(personalizado);
+    mostrarBlocoPersonalizacao(personalizado, ehModelo);
 
     const estoque = Number(produto.estoque || 0);
     atualizarEstoqueUI(estoque);

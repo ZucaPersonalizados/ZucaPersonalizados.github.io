@@ -707,6 +707,20 @@
                     <input id="modeloNome" type="text" placeholder="ex: Dourado Premium" />
                   </div>
 
+                  <div class="field">
+                    <label for="modeloFundoUrl">Imagem de fundo do receituário</label>
+                    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                      <input id="modeloFundoUrl" type="url" placeholder="https://storage.googleapis.com/..." style="flex:1; min-width:180px;" />
+                      <label class="btn btn-secondary btn-small" style="cursor:pointer; white-space:nowrap;" title="Enviar imagem de fundo para o servidor">
+                        📤 Enviar fundo
+                        <input type="file" id="upload-fundo-modelo" accept="image/jpeg,image/png,image/webp" style="display:none;" />
+                      </label>
+                    </div>
+                    <span style="font-size:0.76rem; color:#6b7280;">Carregue a imagem com o design do modelo (sem textos de exemplo). Será usada como fundo no gerador de receituário.</span>
+                    <div id="upload-fundo-status" style="font-size:0.8rem; margin-top:2px; color:#666;"></div>
+                    <img id="preview-fundo-modelo" src="" alt="preview do fundo" style="display:none; max-width:120px; border-radius:6px; border:1px solid #ddd; margin-top:6px;" />
+                  </div>
+
                   <div>
                     <label style="display:block; margin-bottom:6px; font-weight:600; font-size:0.88rem;">Zona da Logo no canvas (420×594 px)</label>
                     <div style="display:flex; gap:10px; flex-wrap:wrap;">

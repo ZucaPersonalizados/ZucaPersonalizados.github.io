@@ -337,7 +337,8 @@ function obterProdutoDoFormulario() {
       if (rawElementosJson) {
         try { elementos = JSON.parse(rawElementosJson); } catch { elementos = []; }
       }
-      return { logoZone: { x: logoX, y: logoY, w: logoW, h: logoH }, campos, elementos };
+      const fundoUrl = String(document.getElementById("modeloFundoUrl")?.value || "").trim();
+      return { logoZone: { x: logoX, y: logoY, w: logoW, h: logoH }, campos, elementos, fundoUrl };
     })(),
   };
 }
@@ -350,11 +351,13 @@ function limparFormularioProduto() {
   if (btnExcluirProduto) btnExcluirProduto.style.display = "none";
   setTipoProdutoVisual("nenhum");
   // Limpeza explícita dos campos de tipo para garantir estado correto entre edições
-  const camposModelo = ["modeloNome", "logoX", "logoY", "logoW", "logoH", "modeloCamposJson", "modeloElementosJson"];
+  const camposModelo = ["modeloNome", "modeloFundoUrl", "logoX", "logoY", "logoW", "logoH", "modeloCamposJson", "modeloElementosJson"];
   camposModelo.forEach((id) => {
     const el = document.getElementById(id);
     if (el) el.value = "";
   });
+  const prevFundo = document.getElementById("preview-fundo-modelo");
+  if (prevFundo) { prevFundo.src = ""; prevFundo.style.display = "none"; }
   const instrucoesEl = document.getElementById("instrucoesPersonalizacao");
   if (instrucoesEl) instrucoesEl.value = "";
   setProdutoStatus("Pronto para cadastrar.");
@@ -403,6 +406,13 @@ function preencherFormularioProduto(produto) {
     if (elementosEl) {
       const elems = produto.modeloConfig.elementos;
       elementosEl.value = Array.isArray(elems) && elems.length ? JSON.stringify(elems, null, 2) : "";
+    }
+    const fundoUrlEl = document.getElementById("modeloFundoUrl");
+    if (fundoUrlEl) fundoUrlEl.value = produto.modeloConfig.fundoUrl || "";
+    const prevFundo = document.getElementById("preview-fundo-modelo");
+    if (prevFundo && produto.modeloConfig.fundoUrl) {
+      prevFundo.src = produto.modeloConfig.fundoUrl;
+      prevFundo.style.display = "block";
     }
   }
 
@@ -958,6 +968,42 @@ document.querySelectorAll('input[name="tipoProduto"]').forEach((radio) => {
   // Atualizar preview ao carregar produto existente
   const obs = new MutationObserver(atualizarPreview);
   if (inputImagens) obs.observe(inputImagens, { attributes: false, childList: false, characterData: true, subtree: true });
+})();
+
+// Upload de imagem de fundo do modelo
+(function () {
+  const inputFundo = document.getElementById("upload-fundo-modelo");
+  const inputUrl   = document.getElementById("modeloFundoUrl");
+  const statusEl   = document.getElementById("upload-fundo-status");
+  const preview    = document.getElementById("preview-fundo-modelo");
+
+  inputUrl?.addEventListener("input", () => {
+    const url = String(inputUrl.value || "").trim();
+    if (preview) { preview.src = url; preview.style.display = url ? "block" : "none"; }
+  });
+
+  inputFundo?.addEventListener("change", async () => {
+    const file = inputFundo.files[0];
+    if (!file) return;
+    statusEl.textContent = "⏳ Enviando...";
+    statusEl.style.color = "#666";
+    try {
+      const formData = new FormData();
+      formData.append("arquivo", file);
+      const resp = await fetch(getApiUrl("/upload"), { method: "POST", body: formData });
+      const payload = await resp.json();
+      if (!resp.ok || !payload.url) throw new Error(payload.erro || "Falha no upload");
+      if (inputUrl) inputUrl.value = payload.url;
+      if (preview) { preview.src = payload.url; preview.style.display = "block"; }
+      statusEl.textContent = "✅ Fundo enviado!";
+      statusEl.style.color = "#1f8f4f";
+    } catch (err) {
+      statusEl.textContent = "❌ Erro: " + err.message;
+      statusEl.style.color = "#e74c3c";
+    } finally {
+      inputFundo.value = "";
+    }
+  });
 })();
 
 // Inserir template JSON de campos de modelo

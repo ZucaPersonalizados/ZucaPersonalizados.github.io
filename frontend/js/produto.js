@@ -1182,6 +1182,7 @@ renderVistosRecentemente();
 
   // ─── Estado global ─────────────────────────────────────────────────────
   let modeloAtual   = null;  // objeto do modelo selecionado
+  let fundoImg      = null;  // HTMLImageElement do fundo do modelo
   let logoDataUrl   = null;  // data URL da logo carregada pelo usuário
   let logoImg       = null;  // HTMLImageElement da logo
   let campos        = [];    // array de objetos de campo editáveis
@@ -1251,6 +1252,7 @@ renderVistosRecentemente();
           nome:      p.modeloNome || p.nome,
           thumbnail: Array.isArray(p.imagens) && p.imagens[0] ? p.imagens[0] : (p.modeloConfig?.imagem || ""),
           imagem:    Array.isArray(p.imagens) && p.imagens[0] ? p.imagens[0] : (p.modeloConfig?.imagem || ""),
+          fundoUrl:  p.modeloConfig?.fundoUrl  || "",
           logoZone:  p.modeloConfig?.logoZone || { x: 0, y: 0, w: 100, h: 100 },
           campos:    p.modeloConfig?.campos   || {},
           elementos: p.modeloConfig?.elementos || [],
@@ -1269,6 +1271,12 @@ renderVistosRecentemente();
     logoSelecionada = false;
     logoAcao = null;
     elementos = Array.isArray(modelo.elementos) ? modelo.elementos : [];
+
+    // Carregar imagem de fundo do modelo (se houver)
+    fundoImg = null;
+    if (modelo.fundoUrl) {
+      try { fundoImg = await carregarImagem(modelo.fundoUrl); } catch { fundoImg = null; }
+    }
 
     // Converter campos — aceita tanto objeto {nome:{...}} quanto array [{label:"Nome",...}]
     const camposEntries = Array.isArray(modelo.campos)
@@ -1413,9 +1421,14 @@ renderVistosRecentemente();
     if (!modeloAtual) return;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // 1. Fundo branco (modelo definido por JSON, sem imagem de template)
+    // 1. Fundo branco (base sempre branca para transparências)
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // 1b. Imagem de fundo do modelo (design do template)
+    if (fundoImg) {
+      ctx.drawImage(fundoImg, 0, 0, canvas.width, canvas.height);
+    }
 
     // 2. Elementos decorativos (faixas, linhas, ícones)
     elementos.forEach((el) => desenharElemento(ctx, el));
@@ -1718,8 +1731,21 @@ renderVistosRecentemente();
       const pdfDoc = await PDFDocument.create();
       const page   = pdfDoc.addPage([PDF_W, PDF_H]);
 
-      // Fundo branco (modelo definido por JSON)
+      // Fundo branco (base)
       page.drawRectangle({ x: 0, y: 0, width: PDF_W, height: PDF_H, color: rgb(1, 1, 1) });
+
+      // Imagem de fundo do modelo (design do template)
+      if (modeloAtual?.fundoUrl) {
+        try {
+          const fundoResp = await fetch(modeloAtual.fundoUrl);
+          const fundoBuffer = await fundoResp.arrayBuffer();
+          const isFundoPng = modeloAtual.fundoUrl.toLowerCase().includes(".png") || modeloAtual.fundoUrl.toLowerCase().includes("png");
+          const fundoPdfImg = isFundoPng
+            ? await pdfDoc.embedPng(new Uint8Array(fundoBuffer))
+            : await pdfDoc.embedJpg(new Uint8Array(fundoBuffer));
+          page.drawImage(fundoPdfImg, { x: 0, y: 0, width: PDF_W, height: PDF_H });
+        } catch { /* ignora falha — continua sem fundo */ }
+      }
 
       // Elementos decorativos (faixas, linhas, círculos, ícones)
       function hexParaRgbPdf(hex) {

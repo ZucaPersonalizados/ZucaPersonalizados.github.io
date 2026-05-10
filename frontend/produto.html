@@ -592,7 +592,7 @@
 
       <div id="bloco-personalizacao" class="produto-personalizacao" hidden>
         <h3>✏️ Envie sua arte para personalização</h3>
-        <p>Anexe o arquivo com o nome, logo ou referência visual antes de adicionar ao carrinho. Formatos aceitos: PDF, JPG ou PNG.</p>
+        <p id="instrucoes-personalizacao-text">Anexe o arquivo com o nome, logo ou referência visual antes de adicionar ao carrinho. Formatos aceitos: PDF, JPG ou PNG.</p>
         <input id="arquivo-personalizacao" type="file" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png">
         <div id="arquivo-personalizacao-status" class="arquivo-status"></div>
       </div>
@@ -651,7 +651,6 @@
                   <canvas id="modelos-canvas" width="420" height="594" class="arte-canvas modelos-canvas-editavel"></canvas>
                 </div>
                 <p class="arte-safe-info">🖱️ Arraste os textos para reposicioná-los.</p>
-                <p id="modelos-sem-imagem" class="arte-receituario-info" style="text-align:center;display:none">Selecione um modelo para ver o preview.</p>
               </div>
             </div>
           </div>
@@ -754,7 +753,7 @@
   </nav>
 
   <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js" crossorigin="anonymous"></script>
-  <script type="module" src="js/produto.js?v=6"></script>
+  <script type="module" src="js/produto.js?v=7"></script>
 
 </body>
 </html>

@@ -677,9 +677,17 @@
                       <span>📋 Modelo de receituário<br><small>Template A4</small></span>
                     </label>
                   </div>
-                  <!-- inputs ocultos mantidos para compatibilidade com o JS existente -->
-                  <input type="hidden" id="personalizado" />
-                  <input type="hidden" id="ehModelo" />
+                </div>
+
+                <!-- Seção de configuração de personalizado — visível apenas quando tipo-personalizado está selecionado -->
+                <div id="secao-personalizado" class="field field-full" style="display:none; border:1.5px solid #3b82f6; border-radius:12px; padding:16px 18px; background:#f0f6ff; flex-direction:column; gap:14px;">
+                  <strong style="color:#1d4ed8; font-size:0.95rem;">✏️ Configuração do Produto Personalizado</strong>
+                  <p style="margin:0; font-size:0.88rem; color:#374151;">O cliente verá um campo para enviar o arquivo de arte (PDF, JPG ou PNG) na página do produto.</p>
+                  <div class="field">
+                    <label for="instrucoesPersonalizacao">Instruções para o cliente (opcional)</label>
+                    <textarea id="instrucoesPersonalizacao" rows="3" placeholder="Ex: Envie seu logo em alta resolução no formato PDF ou PNG, com fundo transparente..."></textarea>
+                    <span style="font-size:0.76rem; color:#6b7280;">Esse texto será exibido na página do produto, abaixo do campo de envio de arquivo.</span>
+                  </div>
                 </div>
 
                 <!-- Seção de configuração de modelo — visível apenas quando tipo-modelo está selecionado -->
@@ -721,6 +729,21 @@
                     <textarea id="modeloCamposJson" rows="14" style="font-family:monospace; font-size:0.8rem; white-space:pre; overflow-x:auto;"
                       placeholder='{"nome": {"x":210,"y":120,"fontSize":11,"color":"#c8a020","align":"center","maxWidth":290,"fontWeight":"700","fontFamily":"Playfair Display"}}'></textarea>
                     <span style="font-size:0.76rem; color:#888;">Chaves possíveis por campo: x, y, fontSize, color, align (left/center/right), maxWidth, fontWeight (400/700), fontFamily (Montserrat, Lato, Poppins, Playfair Display, Great Vibes)</span>
+                  </div>
+
+                  <div>
+                    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
+                      <label for="modeloElementosJson" style="font-weight:600; font-size:0.88rem;">Elementos decorativos (JSON)</label>
+                      <button type="button" id="btn-modelo-elementos-template" class="btn btn-small btn-secondary" style="font-size:0.78rem;">📋 Inserir exemplo</button>
+                    </div>
+                    <textarea id="modeloElementosJson" rows="8" style="font-family:monospace; font-size:0.8rem; white-space:pre; overflow-x:auto;"
+                      placeholder='[{"tipo":"faixa","x":0,"y":478,"largura":420,"altura":28,"cor":"#c8a020"}]'></textarea>
+                    <span style="font-size:0.76rem; color:#888;">Tipos suportados:<br>
+                      <strong>faixa</strong>: x, y, largura, altura, cor, opacidade &nbsp;·&nbsp;
+                      <strong>linha</strong>: x, y, comprimento, espessura, cor, orientacao (h/v) &nbsp;·&nbsp;
+                      <strong>circulo</strong>: x, y, raio, cor &nbsp;·&nbsp;
+                      <strong>icone</strong>: x, y, tamanho, cor, icone (whatsapp | instagram | email | localizacao | telefone)
+                    </span>
                   </div>
                 </div>
 

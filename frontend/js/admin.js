@@ -94,8 +94,10 @@ function setTipoProdutoVisual(valor) {
   });
   const radio = document.querySelector(`input[name="tipoProduto"][value="${valor}"]`);
   if (radio) radio.checked = true;
-  const secao = document.getElementById("secao-modelo");
-  if (secao) secao.style.display = valor === "modelo" ? "flex" : "none";
+  const secaoPersonalizado = document.getElementById("secao-personalizado");
+  if (secaoPersonalizado) secaoPersonalizado.style.display = valor === "personalizado" ? "flex" : "none";
+  const secaoModelo = document.getElementById("secao-modelo");
+  if (secaoModelo) secaoModelo.style.display = valor === "modelo" ? "flex" : "none";
 }
 
 const formCupom = document.getElementById("form-cupom");
@@ -309,6 +311,9 @@ function obterProdutoDoFormulario() {
     descricaoCurta: String(document.getElementById("descricaoCurta")?.value || "").trim(),
     descricaoLonga: String(document.getElementById("descricaoLonga")?.value || "").trim(),
     personalizado: getTipoProduto() === "personalizado",
+    instrucoesPersonalizacao: getTipoProduto() === "personalizado"
+      ? String(document.getElementById("instrucoesPersonalizacao")?.value || "").trim() || undefined
+      : undefined,
     ncm: String(document.getElementById("ncm")?.value || "").replace(/\D/g, "").slice(0, 8) || "48201010",
     ehModelo: getTipoProduto() === "modelo",
     modeloNome: String(document.getElementById("modeloNome")?.value || "").trim(),
@@ -318,12 +323,21 @@ function obterProdutoDoFormulario() {
       const logoY = Number(document.getElementById("logoY")?.value || 0);
       const logoW = Number(document.getElementById("logoW")?.value || 0);
       const logoH = Number(document.getElementById("logoH")?.value || 0);
+      if (logoX + logoW > 420 || logoY + logoH > 594) {
+        setProdutoStatus("A zona da logo ultrapassa os limites do canvas (420×594 px). Ajuste os valores antes de salvar.", "error");
+        return null;
+      }
       const rawJson = String(document.getElementById("modeloCamposJson")?.value || "").trim();
       let campos = {};
       if (rawJson) {
         try { campos = JSON.parse(rawJson); } catch { campos = {}; }
       }
-      return { logoZone: { x: logoX, y: logoY, w: logoW, h: logoH }, campos };
+      const rawElementosJson = String(document.getElementById("modeloElementosJson")?.value || "").trim();
+      let elementos = [];
+      if (rawElementosJson) {
+        try { elementos = JSON.parse(rawElementosJson); } catch { elementos = []; }
+      }
+      return { logoZone: { x: logoX, y: logoY, w: logoW, h: logoH }, campos, elementos };
     })(),
   };
 }
@@ -335,6 +349,14 @@ function limparFormularioProduto() {
   if (inputProdutoId) inputProdutoId.disabled = false;
   if (btnExcluirProduto) btnExcluirProduto.style.display = "none";
   setTipoProdutoVisual("nenhum");
+  // Limpeza explícita dos campos de tipo para garantir estado correto entre edições
+  const camposModelo = ["modeloNome", "logoX", "logoY", "logoW", "logoH", "modeloCamposJson", "modeloElementosJson"];
+  camposModelo.forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.value = "";
+  });
+  const instrucoesEl = document.getElementById("instrucoesPersonalizacao");
+  if (instrucoesEl) instrucoesEl.value = "";
   setProdutoStatus("Pronto para cadastrar.");
 }
 
@@ -361,6 +383,10 @@ function preencherFormularioProduto(produto) {
   // Tipo do produto (radio buttons)
   const tipo = produto.ehModelo ? "modelo" : (produto.personalizado ? "personalizado" : "nenhum");
   setTipoProdutoVisual(tipo);
+  if (produto.personalizado) {
+    const instrucoesEl = document.getElementById("instrucoesPersonalizacao");
+    if (instrucoesEl) instrucoesEl.value = produto.instrucoesPersonalizacao || "";
+  }
   if (produto.ehModelo && produto.modeloConfig) {
     const { logoZone, campos } = produto.modeloConfig;
     if (document.getElementById("modeloNome")) document.getElementById("modeloNome").value = produto.modeloNome || "";
@@ -372,6 +398,11 @@ function preencherFormularioProduto(produto) {
     }
     const jsonEl = document.getElementById("modeloCamposJson");
     if (jsonEl) jsonEl.value = campos ? JSON.stringify(campos, null, 2) : "";
+    const elementosEl = document.getElementById("modeloElementosJson");
+    if (elementosEl) {
+      const elems = produto.modeloConfig.elementos;
+      elementosEl.value = Array.isArray(elems) && elems.length ? JSON.stringify(elems, null, 2) : "";
+    }
   }
 
   selectedProductId = produto.id;
@@ -885,6 +916,20 @@ document.getElementById("btn-modelo-template")?.addEventListener("click", () => 
   jsonEl.value = JSON.stringify(template, null, 2);
 });
 
+// Inserir exemplo JSON de elementos decorativos
+document.getElementById("btn-modelo-elementos-template")?.addEventListener("click", () => {
+  const el = document.getElementById("modeloElementosJson");
+  if (!el) return;
+  const exemplo = [
+    { tipo: "faixa", x: 0, y: 478, largura: 420, altura: 28, cor: "#c8a020" },
+    { tipo: "icone", icone: "telefone", x: 50,  y: 492, tamanho: 14, cor: "#ffffff" },
+    { tipo: "icone", icone: "email",    x: 175, y: 492, tamanho: 14, cor: "#ffffff" },
+    { tipo: "icone", icone: "localizacao", x: 300, y: 492, tamanho: 14, cor: "#ffffff" },
+    { tipo: "linha", x: 20, y: 540, comprimento: 380, espessura: 0.5, cor: "#c8a020" },
+  ];
+  el.value = JSON.stringify(exemplo, null, 2);
+});
+
 btnLogin?.addEventListener("click", async () => {
   try {
     const email = loginEmail.value.trim();
@@ -934,6 +979,8 @@ formProduto?.addEventListener("submit", async (event) => {
       setProdutoStatus("ID e nome sao obrigatorios.", "error");
       return;
     }
+    // modeloConfig retorna null quando os limites do canvas são inválidos
+    if (produto.ehModelo && produto.modeloConfig === null) return;
 
     // Validar JSON dos campos de modelo
     if (produto.ehModelo) {

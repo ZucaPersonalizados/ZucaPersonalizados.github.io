@@ -276,31 +276,43 @@ async function listarPedidos(email) {
       const codigoRastreio = String(pedido.codigoRastreio || "").trim();
       const transportadora = String(pedido.transportadora || "").trim();
       const trackingUrl = getTrackingUrl(codigoRastreio, transportadora);
+      const emTransito = statusPedido === "enviado" || statusPedido === "entregue";
 
-      const trackingBlock = codigoRastreio ? `
-        <div class="rastreio-block" style="background:#fdf8f3;border:1px solid #eddcc7;border-radius:10px;padding:10px 12px;margin-top:4px;">
-          <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:0.5px;color:#a07040;margin-bottom:6px;">
-            📦 Rastreamento
-            ${transportadora ? `<span style="font-weight:400;color:#888;text-transform:none;"> · ${escapeHtml(transportadora)}</span>` : ""}
+      let trackingBlock = "";
+      if (emTransito && !codigoRastreio) {
+        // Pedido enviado mas código ainda não cadastrado pelo admin
+        trackingBlock = `
+          <div class="rastreio-block" style="background:#fdf8f3;border:1px solid #eddcc7;border-radius:10px;padding:10px 12px;margin-top:4px;">
+            <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:0.5px;color:#a07040;margin-bottom:4px;">📦 Rastreamento</div>
+            <p style="margin:0;font-size:13px;color:#888;">O código de rastreio será disponibilizado em breve. Fique atento ao seu e-mail.</p>
           </div>
-          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-            <code style="font-family:monospace;font-size:13px;font-weight:700;background:#fff;padding:3px 10px;border-radius:6px;border:1px solid #e5ddd4;letter-spacing:1px;">${escapeHtml(codigoRastreio)}</code>
-            <button type="button" class="btn-copiar-rastreio" data-codigo="${escapeHtml(codigoRastreio)}"
-              style="font-size:11px;padding:3px 8px;border:1px solid #ccc;border-radius:6px;background:#fff;cursor:pointer;white-space:nowrap;">
-              📋 Copiar
-            </button>
-            <a href="${trackingUrl}" target="_blank" rel="noopener noreferrer"
-              style="font-size:11px;padding:3px 10px;border:1px solid #ef6f21;border-radius:6px;background:#fff8f4;color:#ef6f21;text-decoration:none;font-weight:700;white-space:nowrap;">
-              🔍 Rastrear
-            </a>
-            <button type="button" class="btn-ver-eventos" data-codigo="${escapeHtml(codigoRastreio)}"
-              style="font-size:11px;padding:3px 8px;border:1px solid #ccc;border-radius:6px;background:#fff;cursor:pointer;white-space:nowrap;">
-              📋 Ver eventos
-            </button>
+        `;
+      } else if (codigoRastreio) {
+        trackingBlock = `
+          <div class="rastreio-block" style="background:#fdf8f3;border:1px solid #eddcc7;border-radius:10px;padding:10px 12px;margin-top:4px;">
+            <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:0.5px;color:#a07040;margin-bottom:6px;">
+              📦 Rastreamento
+              ${transportadora ? `<span style="font-weight:400;color:#888;text-transform:none;"> · ${escapeHtml(transportadora)}</span>` : ""}
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+              <code style="font-family:monospace;font-size:13px;font-weight:700;background:#fff;padding:3px 10px;border-radius:6px;border:1px solid #e5ddd4;letter-spacing:1px;">${escapeHtml(codigoRastreio)}</code>
+              <button type="button" class="btn-copiar-rastreio" data-codigo="${escapeHtml(codigoRastreio)}"
+                style="font-size:11px;padding:3px 8px;border:1px solid #ccc;border-radius:6px;background:#fff;cursor:pointer;white-space:nowrap;">
+                📋 Copiar
+              </button>
+              <a href="${trackingUrl}" target="_blank" rel="noopener noreferrer"
+                style="font-size:11px;padding:3px 10px;border:1px solid #ef6f21;border-radius:6px;background:#fff8f4;color:#ef6f21;text-decoration:none;font-weight:700;white-space:nowrap;">
+                🔍 Rastrear
+              </a>
+              <button type="button" class="btn-recarregar-rastreio" data-codigo="${escapeHtml(codigoRastreio)}"
+                style="font-size:11px;padding:3px 8px;border:1px solid #ccc;border-radius:6px;background:#fff;cursor:pointer;white-space:nowrap;">
+                🔄 Recarregar
+              </button>
+            </div>
+            <div class="rastreio-eventos-container" data-codigo="${escapeHtml(codigoRastreio)}" style="margin-top:8px;"></div>
           </div>
-          <div class="rastreio-eventos-container" data-codigo="${escapeHtml(codigoRastreio)}" style="display:none;"></div>
-        </div>
-      ` : "";
+        `;
+      }
 
       return `
         <article class="pedido-item ${paid ? "is-paid" : "is-pending"}">
@@ -337,20 +349,19 @@ async function listarPedidos(email) {
       });
     });
 
-    list.querySelectorAll(".btn-ver-eventos").forEach((button) => {
+    // Auto-carregar eventos para pedidos com código de rastreio
+    list.querySelectorAll(".rastreio-eventos-container[data-codigo]").forEach(async (container) => {
+      const codigo = container.getAttribute("data-codigo") || "";
+      if (!codigo) return;
+      await carregarEventosRastreio(codigo, container);
+    });
+
+    list.querySelectorAll(".btn-recarregar-rastreio").forEach((button) => {
       button.addEventListener("click", async () => {
         const codigo = button.getAttribute("data-codigo") || "";
         if (!codigo) return;
         const container = button.closest(".rastreio-block")?.querySelector(".rastreio-eventos-container");
         if (!container) return;
-        const aberto = container.style.display !== "none";
-        if (aberto) {
-          container.style.display = "none";
-          button.textContent = "📋 Ver eventos";
-          return;
-        }
-        container.style.display = "";
-        button.textContent = "▲ Ocultar";
         await carregarEventosRastreio(codigo, container);
       });
     });
@@ -635,17 +646,19 @@ async function carregarEventosRastreio(codigo, container) {
     const data = await resp.json();
 
     if (!data.success || !data.events || data.events.length === 0) {
-      container.innerHTML = '<p style="font-size:12px;color:#aaa;margin:6px 0 0;">Nenhum evento encontrado. Use o botão "Rastrear" para verificar no site da transportadora.</p>';
+      container.innerHTML = '<p style="font-size:12px;color:#aaa;margin:6px 0 0;">Nenhuma atualização disponível. Use "🔍 Rastrear" para verificar diretamente no site da transportadora.</p>';
       return;
     }
 
-    const html = data.events.map((ev) => {
+    const html = data.events.map((ev, idx) => {
       const dataFormatada = ev.date ? new Date(ev.date).toLocaleString("pt-BR") : "";
+      const isLatest = idx === 0;
       return `
-        <div style="display:flex;gap:8px;padding:6px 0;border-bottom:1px solid #f0e8df;">
-          <span style="font-size:18px;line-height:1;">📍</span>
+        <div style="display:flex;gap:8px;padding:8px ${isLatest ? "10px" : "0"};border-bottom:1px solid #f0e8df;${isLatest ? "background:#fff8f2;border-radius:8px;border:1px solid #eddcc7;margin-bottom:4px;" : ""}">
+          <span style="font-size:${isLatest ? "20px" : "16px"};line-height:1;">${isLatest ? "📍" : "·"}</span>
           <div>
-            <div style="font-size:12px;font-weight:700;color:#333;">${escapeHtml(ev.description)}</div>
+            ${isLatest ? `<div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.5px;color:#ef6f21;margin-bottom:2px;">Última atualização</div>` : ""}
+            <div style="font-size:${isLatest ? "13px" : "12px"};font-weight:${isLatest ? "800" : "600"};color:${isLatest ? "#222" : "#555"};">${escapeHtml(ev.description)}</div>
             ${ev.location ? `<div style="font-size:11px;color:#888;">${escapeHtml(ev.location)}</div>` : ""}
             ${dataFormatada ? `<div style="font-size:11px;color:#aaa;">${dataFormatada}</div>` : ""}
           </div>
@@ -653,7 +666,7 @@ async function carregarEventosRastreio(codigo, container) {
       `;
     }).join("");
 
-    container.innerHTML = `<div style="margin-top:8px;">${html}</div>`;
+    container.innerHTML = `<div style="margin-top:4px;">${html}</div>`;
   } catch {
     container.innerHTML = '<p style="font-size:12px;color:#aaa;margin:6px 0 0;">Não foi possível carregar os eventos agora.</p>';
   }

@@ -435,6 +435,7 @@ function exibirPedidos() {
         <div class="table-actions">
           <button class="btn btn-small btn-secondary" type="button" onclick="exibirDetalhes('${pedido.id}')">Ver</button>
           <button class="btn btn-small btn-secondary" type="button" onclick="editarStatus('${pedido.id}')">Editar</button>
+          <button class="btn btn-small btn-secondary" type="button" onclick="editarRastreio('${pedido.id}')" title="Código de rastreio">🚚 Rastreio</button>
           <button class="btn btn-small btn-primary" type="button" onclick="baixarAnexosPedido('${pedido.id}')" title="Abrir anexos do pedido">📎 Anexos</button>
         </div>
       </td>
@@ -696,6 +697,78 @@ window.editarStatus = async (pedidoId) => {
       alert("Status atualizado com sucesso");
     } catch (error) {
       alert(`Erro ao atualizar: ${error.message}`);
+    }
+  });
+};
+
+window.editarRastreio = async (pedidoId) => {
+  const pedido = allOrders.find((item) => item.id === pedidoId);
+  if (!pedido) {
+    alert("Pedido nao encontrado");
+    return;
+  }
+
+  modalBody.innerHTML = `
+    <div style="display:grid; gap:16px;">
+      <div style="background:var(--bg-secondary);border-radius:8px;padding:10px 14px;font-size:13px;color:var(--text-secondary);">
+        Pedido <strong>#${escapeHtml(pedido.id.slice(0, 8))}</strong> ·
+        ${escapeHtml(pedido.cliente?.nome || pedido.cliente?.email || "-")} ·
+        <span class="status-pill ${getStatusClass(pedido.statusPedido || pedido.status)}" style="font-size:11px;">${getStatusLabel(pedido.statusPedido || pedido.status)}</span>
+      </div>
+
+      <div>
+        <label style="display:block; margin-bottom:6px; font-size:13px; font-weight:700;">Código de Rastreio</label>
+        <input id="rastreio-codigo" type="text" value="${escapeHtml(pedido.codigoRastreio || "")}"
+          placeholder="Ex: AA123456789BR ou ID Melhor Envio"
+          style="padding:8px 12px; border:1px solid var(--border-color); border-radius:6px; width:100%; box-sizing:border-box; text-transform:uppercase; font-family:monospace; letter-spacing:1px; font-size:14px;" />
+      </div>
+
+      <div>
+        <label style="display:block; margin-bottom:6px; font-size:13px; font-weight:700;">Transportadora</label>
+        <select id="rastreio-transportadora" style="padding:8px 12px; border:1px solid var(--border-color); border-radius:6px; width:100%; box-sizing:border-box;">
+          <option value="">— Selecione —</option>
+          <option value="Correios" ${(pedido.transportadora || "") === "Correios" ? "selected" : ""}>Correios</option>
+          <option value="Jadlog" ${(pedido.transportadora || "") === "Jadlog" ? "selected" : ""}>Jadlog</option>
+          <option value="Total Express" ${(pedido.transportadora || "") === "Total Express" ? "selected" : ""}>Total Express</option>
+          <option value="Azul Cargo" ${(pedido.transportadora || "") === "Azul Cargo" ? "selected" : ""}>Azul Cargo</option>
+          <option value="Loggi" ${(pedido.transportadora || "") === "Loggi" ? "selected" : ""}>Loggi</option>
+          <option value="Melhor Envio" ${(pedido.transportadora || "") === "Melhor Envio" ? "selected" : ""}>Melhor Envio</option>
+          <option value="Outro" ${(pedido.transportadora || "") === "Outro" ? "selected" : ""}>Outro</option>
+        </select>
+      </div>
+
+      <p style="margin:0; font-size:12px; color:var(--text-secondary);">
+        💡 Ao salvar com código preenchido, o status avança para <strong>Enviado</strong> automaticamente e o cliente verá o rastreio em <em>Minha Conta</em>.
+      </p>
+
+      <button id="btn-salvar-rastreio" class="btn btn-primary" style="width:100%;" type="button">💾 Salvar Rastreio</button>
+    </div>
+  `;
+
+  document.getElementById("modal-title").textContent = `🚚 Rastreio · #${pedido.id.slice(0, 8)}`;
+  detailsModal.classList.add("active");
+
+  document.getElementById("btn-salvar-rastreio")?.addEventListener("click", async () => {
+    try {
+      const codigoRastreio = String(document.getElementById("rastreio-codigo")?.value || "").trim().toUpperCase();
+      const transportadora = String(document.getElementById("rastreio-transportadora")?.value || "").trim();
+
+      const resp = await fetchApi(`/api/admin/pedidos/${pedidoId}/rastreio`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ codigoRastreio, transportadora }),
+      });
+      const payload = await resp.json();
+      if (!resp.ok || !payload.success) {
+        throw new Error(payload.error || "Falha ao salvar rastreio");
+      }
+
+      detailsModal.classList.remove("active");
+      await carregarPedidos();
+      alert(`Rastreio salvo! ${codigoRastreio ? `Código: ${codigoRastreio}` : "Código removido."}`);
+    } catch (error) {
+      alert(`Erro: ${error.message}`);
     }
   });
 };

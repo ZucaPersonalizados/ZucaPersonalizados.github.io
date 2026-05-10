@@ -21,6 +21,7 @@ const RECEITUARIO_MODELOS = [
     nome: "Dourado Premium",
     thumbnail: "img/modelos/dourado-limpo.png",
     imagem:    "img/modelos/dourado-limpo.png",
+    fundoUrl:  "img/modelos/dourado-limpo.png",
 
     /*
      * Logo do cliente posicionada sobre o diâmante dourado.

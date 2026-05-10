@@ -4,7 +4,7 @@ import {
   onAuthStateChanged,
   salvarUsuarioNoStorage,
 } from "./firebase-auth.js";
-import RECEITUARIO_MODELOS from "./receituario-modelos.js?v=2";
+import RECEITUARIO_MODELOS from "./receituario-modelos.js?v=3";
 
 const API_BASE = (() => {
   const custom = localStorage.getItem("zuca_api_base_url");
@@ -1252,7 +1252,7 @@ renderVistosRecentemente();
           nome:      p.modeloNome || p.nome,
           thumbnail: Array.isArray(p.imagens) && p.imagens[0] ? p.imagens[0] : (p.modeloConfig?.imagem || ""),
           imagem:    Array.isArray(p.imagens) && p.imagens[0] ? p.imagens[0] : (p.modeloConfig?.imagem || ""),
-          fundoUrl:  p.modeloConfig?.fundoUrl  || "",
+          fundoUrl:  p.modeloConfig?.fundoUrl || (Array.isArray(p.imagens) && p.imagens[0] ? p.imagens[0] : ""),
           logoZone:  p.modeloConfig?.logoZone || { x: 0, y: 0, w: 100, h: 100 },
           campos:    p.modeloConfig?.campos   || {},
           elementos: p.modeloConfig?.elementos || [],
@@ -1272,10 +1272,11 @@ renderVistosRecentemente();
     logoAcao = null;
     elementos = Array.isArray(modelo.elementos) ? modelo.elementos : [];
 
-    // Carregar imagem de fundo do modelo (se houver)
+    // Carregar imagem de fundo do modelo (fundoUrl dedicado ou imagem do produto como fallback)
     fundoImg = null;
-    if (modelo.fundoUrl) {
-      try { fundoImg = await carregarImagem(modelo.fundoUrl); } catch { fundoImg = null; }
+    const bgUrl = modelo.fundoUrl || modelo.imagem || "";
+    if (bgUrl) {
+      try { fundoImg = await carregarImagem(bgUrl); } catch { fundoImg = null; }
     }
 
     // Converter campos — aceita tanto objeto {nome:{...}} quanto array [{label:"Nome",...}]
@@ -1735,11 +1736,12 @@ renderVistosRecentemente();
       page.drawRectangle({ x: 0, y: 0, width: PDF_W, height: PDF_H, color: rgb(1, 1, 1) });
 
       // Imagem de fundo do modelo (design do template)
-      if (modeloAtual?.fundoUrl) {
+      const bgUrlPdf = modeloAtual?.fundoUrl || modeloAtual?.imagem || "";
+      if (bgUrlPdf) {
         try {
-          const fundoResp = await fetch(modeloAtual.fundoUrl);
+          const fundoResp = await fetch(bgUrlPdf);
           const fundoBuffer = await fundoResp.arrayBuffer();
-          const isFundoPng = modeloAtual.fundoUrl.toLowerCase().includes(".png") || modeloAtual.fundoUrl.toLowerCase().includes("png");
+          const isFundoPng = bgUrlPdf.toLowerCase().includes(".png");
           const fundoPdfImg = isFundoPng
             ? await pdfDoc.embedPng(new Uint8Array(fundoBuffer))
             : await pdfDoc.embedJpg(new Uint8Array(fundoBuffer));

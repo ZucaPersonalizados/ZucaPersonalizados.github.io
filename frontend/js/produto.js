@@ -1179,13 +1179,13 @@ renderVistosRecentemente();
   if (!btnAbrir || !modal || !canvas) return;
 
   // ─── Alta resolução (DPI scale) ───────────────────────────────────────
-  // Espaço lógico permanece 420×594; o canvas físico é 3× maior para
+  // Espaço lógico permanece 420×594; o canvas físico é DPI_SCALE× maior para
   // garantir nitidez em telas Retina e qualidade ao exportar imagem.
-  const DPI_SCALE  = 3;
   const LOGICAL_W  = 420;
   const LOGICAL_H  = 594;
-  canvas.width  = LOGICAL_W * DPI_SCALE;  // 1260
-  canvas.height = LOGICAL_H * DPI_SCALE;  // 1782
+  const DPI_SCALE  = Math.max(Math.round(window.devicePixelRatio || 1), 2); // mín. 2×
+  canvas.width  = LOGICAL_W * DPI_SCALE;
+  canvas.height = LOGICAL_H * DPI_SCALE;
 
   const ctx = canvas.getContext("2d");
   ctx.scale(DPI_SCALE, DPI_SCALE);  // todas as coordenadas lógicas continuam em 420×594
@@ -1474,13 +1474,22 @@ renderVistosRecentemente();
 
     // 3. Textos
     campos.forEach((campo, idx) => {
-      if (!campo.text) return;
       const fonte = FONTES.find((f) => f.label === campo.fontFamily) || FONTES[0];
       const peso = campo.fontWeight === "700" ? "bold" : "normal";
       ctx.font = `${peso} ${campo.fontSize}px ${fonte.css}`;
-      ctx.fillStyle = campo.color;
       ctx.textAlign = campo.align;
       ctx.textBaseline = "middle";
+
+      if (!campo.text) {
+        // Placeholder dimmed para mostrar a posição do campo no canvas
+        ctx.globalAlpha = 0.30;
+        ctx.fillStyle = campo.color || "#888888";
+        ctx.fillText(campo.placeholder || campo.label, campo.x, campo.y);
+        ctx.globalAlpha = 1;
+        return;
+      }
+
+      ctx.fillStyle = campo.color;
 
       let textoFinal = campo.text;
       if (ctx.measureText(textoFinal).width > campo.maxWidth) {

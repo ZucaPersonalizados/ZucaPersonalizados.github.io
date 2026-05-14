@@ -742,6 +742,30 @@ async function carregarProduto() {
         return;
       }
 
+      // Produto modelo: envia a arte gerada (se o cliente usou o gerador)
+      if (ehModelo) {
+        const arquivo = inputArquivo?.files?.[0];
+        if (arquivo) {
+          try {
+            if (botao) { botao.disabled = true; botao.textContent = "Enviando arte..."; }
+            const urlArquivo = await enviarArquivoPersonalizacao(arquivo);
+            adicionarAoCarrinhoComEstoque({
+              ...produtoParaCarrinho,
+              arquivoPersonalizacaoUrl: urlArquivo,
+              arquivoPersonalizacaoNome: arquivo.name,
+            }, estoque, quantidade);
+          } catch (error) {
+            showToast(`Erro ao enviar arte: ${error.message}`, "error");
+          } finally {
+            if (botao) { botao.disabled = false; botao.textContent = "🛒 Adicionar ao carrinho"; }
+          }
+          return;
+        }
+        // sem arte gerada: adiciona normalmente
+        adicionarAoCarrinhoComEstoque(produtoParaCarrinho, estoque, quantidade);
+        return;
+      }
+
       adicionarAoCarrinhoComEstoque(produtoParaCarrinho, estoque, quantidade);
     });
 

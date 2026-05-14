@@ -1217,7 +1217,6 @@ renderVistosRecentemente();
 
   // ─── Estado global ─────────────────────────────────────────────────────
   let modeloAtual   = null;  // objeto do modelo selecionado
-  let fundoImg      = null;  // HTMLImageElement do fundo do modelo
   let logoDataUrl   = null;  // data URL da logo carregada pelo usuário
   let logoImg       = null;  // HTMLImageElement da logo
   let campos        = [];    // array de objetos de campo editáveis
@@ -1300,7 +1299,6 @@ renderVistosRecentemente();
           nome:      p.modeloNome || p.nome,
           thumbnail: Array.isArray(p.imagens) && p.imagens[0] ? p.imagens[0] : (p.modeloConfig?.imagem || ""),
           imagem:    Array.isArray(p.imagens) && p.imagens[0] ? p.imagens[0] : (p.modeloConfig?.imagem || ""),
-          fundoUrl:  p.modeloConfig?.fundoUrl || "",
           logoZone:  p.modeloConfig?.logoZone || { x: 0, y: 0, w: 100, h: 100 },
           campos:    p.modeloConfig?.campos   || {},
           elementos: (Array.isArray(p.modeloConfig?.elementos) && p.modeloConfig.elementos.length)
@@ -1327,13 +1325,6 @@ renderVistosRecentemente();
     elementos = (Array.isArray(modelo.elementos) && modelo.elementos.length)
       ? modelo.elementos.map((el) => ({ ...el }))
       : elementosPadraoModelo();
-
-    // Carregar imagem de fundo do modelo (fundoUrl dedicado ou imagem do produto como fallback)
-    fundoImg = null;
-    const bgUrl = modelo.fundoUrl || "";
-    if (bgUrl) {
-      try { fundoImg = await carregarImagem(bgUrl); } catch { fundoImg = null; }
-    }
 
     // Converter campos — aceita tanto objeto {nome:{...}} quanto array [{label:"Nome",...}]
     const camposEntries = Array.isArray(modelo.campos)
@@ -1506,13 +1497,6 @@ renderVistosRecentemente();
     // 1. Fundo branco (base sempre branca para transparências)
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, LOGICAL_W, LOGICAL_H);
-
-    // 1b. Imagem de fundo do modelo (design do template)
-    if (fundoImg) {
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = "high";
-      ctx.drawImage(fundoImg, 0, 0, LOGICAL_W, LOGICAL_H);
-    }
 
     // 2. Elementos decorativos (faixas, linhas, ícones)
     // Ícones condicionais: só aparecem se o campo correspondente estiver preenchido

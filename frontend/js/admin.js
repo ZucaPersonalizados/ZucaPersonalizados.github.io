@@ -1028,6 +1028,8 @@ document.getElementById("btn-modelo-elementos-template")?.addEventListener("clic
   const el = document.getElementById("modeloElementosJson");
   if (!el) return;
   const exemplo = [
+    { tipo: "icone", icone: "folhagem-esquerda", x: 38,  y: 72,  tamanho: 78, cor: "#8b7c3c", editavelPeloCliente: true, labelCliente: "Cor da folhagem esquerda" },
+    { tipo: "icone", icone: "folhagem-direita",  x: 384, y: 521, tamanho: 78, cor: "#8b7c3c", editavelPeloCliente: true, labelCliente: "Cor da folhagem direita" },
     { tipo: "faixa", x: 0, y: 478, largura: 420, altura: 28, cor: "#c8a020", editavelPeloCliente: true, labelCliente: "Cor do destaque" },
     { tipo: "icone", icone: "telefone", x: 50,  y: 492, tamanho: 14, cor: "#ffffff" },
     { tipo: "icone", icone: "email",    x: 175, y: 492, tamanho: 14, cor: "#ffffff" },

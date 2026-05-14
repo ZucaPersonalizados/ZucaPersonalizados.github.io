@@ -3523,7 +3523,6 @@ textarea:focus-visible {
   flex-wrap: wrap;
   margin-top: 6px;
 }
-.modelos-btn-pdf,
 .modelos-btn-usar {
   flex: 1;
   min-width: 120px;
@@ -3535,8 +3534,6 @@ textarea:focus-visible {
   cursor: pointer;
   transition: opacity 0.2s;
 }
-.modelos-btn-pdf:disabled { opacity: 0.55; cursor: not-allowed; }
-.modelos-btn-pdf:hover:not(:disabled),
 .modelos-btn-usar:hover { opacity: 0.88; }
 
 /* ── Preview canvas na etapa 2 ── */

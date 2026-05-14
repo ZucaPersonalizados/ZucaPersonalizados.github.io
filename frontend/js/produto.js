@@ -1197,7 +1197,6 @@ renderVistosRecentemente();
   const galeria      = document.getElementById("modelos-galeria");
   const btnVoltar    = document.getElementById("btn-modelos-voltar");
   const canvas       = document.getElementById("modelos-canvas");
-  const btnPdf       = document.getElementById("btn-mod-pdf");
   const btnUsar      = document.getElementById("btn-mod-usar");
   const camposContainer = document.getElementById("modelos-campos-container");
 
@@ -1232,6 +1231,18 @@ renderVistosRecentemente();
   let dragStart     = { x: 0, y: 0, lx: 0, ly: 0, lw: 0, lh: 0 }; // snapshot no início do resize
   let isDragging    = false;
   let modelos       = [...RECEITUARIO_MODELOS]; // começa com fallback estático; substituído pelo fetch
+
+  function elementosPadraoModelo() {
+    return [
+      { tipo: "icone", icone: "folhagem-esquerda", x: 38,  y: 72,  tamanho: 78, cor: "#8b7c3c", editavelPeloCliente: true, labelCliente: "Cor da folhagem esquerda" },
+      { tipo: "icone", icone: "folhagem-direita",  x: 384, y: 521, tamanho: 78, cor: "#8b7c3c", editavelPeloCliente: true, labelCliente: "Cor da folhagem direita" },
+      { tipo: "faixa", x: 0, y: 478, largura: 420, altura: 28, cor: "#c8a020", editavelPeloCliente: true, labelCliente: "Cor do destaque" },
+      { tipo: "icone", icone: "telefone", x: 50,  y: 492, tamanho: 14, cor: "#ffffff" },
+      { tipo: "icone", icone: "email",    x: 175, y: 492, tamanho: 14, cor: "#ffffff" },
+      { tipo: "icone", icone: "localizacao", x: 300, y: 492, tamanho: 14, cor: "#ffffff" },
+      { tipo: "linha", x: 20, y: 540, comprimento: 380, espessura: 0.5, cor: "#c8a020", editavelPeloCliente: true, labelCliente: "Cor da linha" },
+    ];
+  }
 
   // ─── Abrir / Fechar modal ───────────────────────────────────────────────
   function abrirModal() {
@@ -1292,7 +1303,9 @@ renderVistosRecentemente();
           fundoUrl:  p.modeloConfig?.fundoUrl || (Array.isArray(p.imagens) && p.imagens[0] ? p.imagens[0] : ""),
           logoZone:  p.modeloConfig?.logoZone || { x: 0, y: 0, w: 100, h: 100 },
           campos:    p.modeloConfig?.campos   || {},
-          elementos: p.modeloConfig?.elementos || [],
+          elementos: (Array.isArray(p.modeloConfig?.elementos) && p.modeloConfig.elementos.length)
+            ? p.modeloConfig.elementos
+            : elementosPadraoModelo(),
         }));
       }
     }
@@ -1311,7 +1324,9 @@ renderVistosRecentemente();
     logoZone = modelo.logoZone ? { ...modelo.logoZone } : null;
     logoSelecionada = false;
     logoAcao = null;
-    elementos = Array.isArray(modelo.elementos) ? modelo.elementos : [];
+    elementos = (Array.isArray(modelo.elementos) && modelo.elementos.length)
+      ? modelo.elementos.map((el) => ({ ...el }))
+      : elementosPadraoModelo();
 
     // Carregar imagem de fundo do modelo (fundoUrl dedicado ou imagem do produto como fallback)
     fundoImg = null;
@@ -1814,202 +1829,6 @@ renderVistosRecentemente();
   canvas.addEventListener("touchmove",  onMouseMove, { passive: false });
   canvas.addEventListener("touchend",   onMouseUp);
 
-  // ─── Exportar PDF via pdf-lib (texto vetorial, fontes incorporadas) ────
-  btnPdf?.addEventListener("click", async () => {
-    if (!modeloAtual) {
-      alert("Selecione e preencha um modelo antes de gerar o PDF.");
-      return;
-    }
-    const PDFLib = window.PDFLib;
-    if (!PDFLib) {
-      alert("Erro: biblioteca de PDF não carregada. Recarregue a página.");
-      return;
-    }
-
-    btnPdf.disabled = true;
-    btnPdf.textContent = "⏳ Gerando…";
-
-    try {
-      const { PDFDocument, rgb } = PDFLib;
-
-      // A4 em pontos
-      const PDF_W = 595.28, PDF_H = 841.89;
-      const SCALE = PDF_W / LOGICAL_W;   // usa espaço lógico (420), não canvas.width físico
-      const toPdfX = (cx) => cx * SCALE;
-      const toPdfY = (cy) => PDF_H - cy * SCALE;
-
-      const pdfDoc = await PDFDocument.create();
-      const page   = pdfDoc.addPage([PDF_W, PDF_H]);
-
-      // Fundo branco (base)
-      page.drawRectangle({ x: 0, y: 0, width: PDF_W, height: PDF_H, color: rgb(1, 1, 1) });
-
-      // Imagem de fundo do modelo (design do template)
-      const bgUrlPdf = modeloAtual?.fundoUrl || modeloAtual?.imagem || "";
-      if (bgUrlPdf) {
-        try {
-          const fundoResp = await fetch(bgUrlPdf);
-          const fundoBuffer = await fundoResp.arrayBuffer();
-          const isFundoPng = bgUrlPdf.toLowerCase().includes(".png");
-          const fundoPdfImg = isFundoPng
-            ? await pdfDoc.embedPng(new Uint8Array(fundoBuffer))
-            : await pdfDoc.embedJpg(new Uint8Array(fundoBuffer));
-          page.drawImage(fundoPdfImg, { x: 0, y: 0, width: PDF_W, height: PDF_H });
-        } catch { /* ignora falha — continua sem fundo */ }
-      }
-
-      // Elementos decorativos (faixas, linhas, círculos, ícones)
-      function hexParaRgbPdf(hex) {
-        const h = String(hex || "#000000").replace("#", "");
-        return rgb(parseInt(h.slice(0, 2), 16) / 255, parseInt(h.slice(2, 4), 16) / 255, parseInt(h.slice(4, 6), 16) / 255);
-      }
-      for (const el of elementos) {
-        const op = el.opacidade ?? 1;
-        if (el.tipo === "faixa") {
-          page.drawRectangle({
-            x: toPdfX(el.x ?? 0),
-            y: toPdfY((el.y ?? 0) + (el.altura ?? 20)),
-            width:  (el.largura ?? canvas.width)  * SCALE,
-            height: (el.altura  ?? 20) * SCALE,
-            color: hexParaRgbPdf(el.cor || "#c8a020"), opacity: op,
-          });
-        } else if (el.tipo === "linha") {
-          const vertical = (el.orientacao || "h") === "v";
-          const x1 = toPdfX(el.x ?? 0), y1 = toPdfY(el.y ?? 0);
-          page.drawLine({
-            start: { x: x1, y: y1 },
-            end:   vertical
-              ? { x: x1, y: y1 - (el.comprimento ?? canvas.height) * SCALE }
-              : { x: x1 + (el.comprimento ?? canvas.width) * SCALE, y: y1 },
-            thickness: (el.espessura ?? 1) * SCALE,
-            color: hexParaRgbPdf(el.cor || "#c8a020"), opacity: op,
-          });
-        } else if (el.tipo === "circulo") {
-          const r = (el.raio ?? 10) * SCALE;
-          page.drawEllipse({ x: toPdfX(el.x ?? 0), y: toPdfY(el.y ?? 0), xScale: r, yScale: r, color: hexParaRgbPdf(el.cor || "#c8a020"), opacity: op });
-        } else if (el.tipo === "icone") {
-          const def = ICONE_PATHS[el.icone];
-          if (def) {
-            const t      = el.tamanho ?? 12;
-            const paths  = typeof def === "string" ? [def] : (def.paths ?? []);
-            const vw     = typeof def === "string" ? 24    : (def.vw ?? 24);
-            const vh     = typeof def === "string" ? 24    : (def.vh ?? 24);
-            const drawW  = t;
-            const drawH  = t * (vh / vw);
-            const scale  = (t / vw) * SCALE;
-            for (const d of paths) {
-              page.drawSvgPath(d, {
-                x: toPdfX(el.x - drawW / 2),
-                y: toPdfY(el.y - drawH / 2),
-                scale,
-                color: hexParaRgbPdf(el.cor || "#333"), opacity: op,
-              });
-            }
-          }
-        } else if (el.tipo === "imagem" && el.src) {
-          try {
-            const resp   = await fetch(el.src);
-            const buf    = await resp.arrayBuffer();
-            const isPng  = el.src.toLowerCase().endsWith(".png");
-            const pdfImg = isPng
-              ? await pdfDoc.embedPng(new Uint8Array(buf))
-              : await pdfDoc.embedJpg(new Uint8Array(buf));
-            const ix = el.x ?? 0, iy = el.y ?? 0;
-            const iw = el.largura ?? pdfImg.width;
-            const ih = el.altura  ?? pdfImg.height;
-            page.drawImage(pdfImg, {
-              x:      toPdfX(ix),
-              y:      toPdfY(iy + ih),
-              width:  iw * SCALE,
-              height: ih * SCALE,
-              opacity: op,
-            });
-          } catch { /* ignora se imagem n\u00e3o carrega no PDF */ }
-        }
-      }
-
-      // Logo
-      if (logoDataUrl && logoZone) {
-        const logoBytes = dataUrlParaUint8Array(logoDataUrl);
-        const logoIspng = logoDataUrl.startsWith("data:image/png");
-        const logoPdfImg = logoIspng ? await pdfDoc.embedPng(logoBytes) : await pdfDoc.embedJpg(logoBytes);
-        const { x: lx, y: ly, w: lw, h: lh } = logoZone;
-        const pdfLW = lw * SCALE, pdfLH = lh * SCALE;
-        const s = Math.min(pdfLW / logoPdfImg.width, pdfLH / logoPdfImg.height);
-        const fw = logoPdfImg.width * s, fh = logoPdfImg.height * s;
-        page.drawImage(logoPdfImg, {
-          x: toPdfX(lx) + (pdfLW - fw) / 2,
-          y: toPdfY(ly + lh) + (pdfLH - fh) / 2,
-          width: fw, height: fh,
-        });
-      }
-
-      // Cache de fontes PDF já carregadas nesta sessão
-      const fontCache = {};
-      async function getPdfFont(fontLabel, bold) {
-        const fonte = FONTES.find((f) => f.label === fontLabel) || FONTES[0];
-        const cacheKey = fontLabel + (bold ? "_bold" : "_reg");
-        if (fontCache[cacheKey]) return fontCache[cacheKey];
-        const ttfUrl  = bold ? fonte.ttfBold : fonte.ttfRegular;
-        const bytes   = await (await fetch(ttfUrl)).arrayBuffer();
-        const embedded = await pdfDoc.embedFont(new Uint8Array(bytes));
-        fontCache[cacheKey] = embedded;
-        return embedded;
-      }
-
-      function hexParaRgb(hex) {
-        return rgb(
-          parseInt(hex.slice(1, 3), 16) / 255,
-          parseInt(hex.slice(3, 5), 16) / 255,
-          parseInt(hex.slice(5, 7), 16) / 255,
-        );
-      }
-
-      for (const campo of campos) {
-        if (!campo.text) continue;
-        const bold    = campo.fontWeight === "700";
-        const font    = await getPdfFont(campo.fontFamily, bold);
-        const fsz     = Math.round(campo.fontSize * SCALE);
-        const maxW    = campo.maxWidth * SCALE;
-        const color   = hexParaRgb(campo.color);
-
-        let texto = campo.text;
-        if (font.widthOfTextAtSize(texto, fsz) > maxW) {
-          while (texto.length > 1 && font.widthOfTextAtSize(texto + "…", fsz) > maxW) {
-            texto = texto.slice(0, -1);
-          }
-          texto += "…";
-        }
-
-        const tw = font.widthOfTextAtSize(texto, fsz);
-        let drawX = toPdfX(campo.x);
-        if (campo.align === "center")     drawX -= tw / 2;
-        else if (campo.align === "right") drawX -= tw;
-
-        page.drawText(texto, {
-          x: drawX,
-          y: toPdfY(campo.y) - fsz / 2,
-          font, size: fsz, color,
-        });
-      }
-
-      const pdfBytes = await pdfDoc.save();
-      const blob = new Blob([pdfBytes], { type: "application/pdf" });
-      const url  = URL.createObjectURL(blob);
-      const a    = Object.assign(document.createElement("a"), { href: url });
-      const nome = campos.find((c) => c.key === "nome")?.text?.trim() || "receituario";
-      a.download = `receituario-${nome.replace(/\s+/g, "-").toLowerCase()}.pdf`;
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 5000);
-    } catch (err) {
-      alert("Erro ao gerar PDF: " + err.message);
-      console.error(err);
-    } finally {
-      btnPdf.disabled = false;
-      btnPdf.textContent = "⬇️ Baixar PDF";
-    }
-  });
-
   // ─── Usar como Arte ────────────────────────────────────────────────────
   btnUsar?.addEventListener("click", () => {
     if (!modeloAtual) {
@@ -2048,13 +1867,5 @@ renderVistosRecentemente();
       reader.onerror = () => reject(new Error("Falha ao ler arquivo."));
       reader.readAsDataURL(file);
     });
-  }
-
-  function dataUrlParaUint8Array(dataUrl) {
-    const base64 = dataUrl.split(",")[1];
-    const binary = atob(base64);
-    const bytes  = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-    return bytes;
   }
 })();

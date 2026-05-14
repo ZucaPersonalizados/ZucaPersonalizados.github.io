@@ -1178,17 +1178,18 @@ renderVistosRecentemente();
 
   if (!btnAbrir || !modal || !canvas) return;
 
-  // ─── Alta resolução (DPI scale) ───────────────────────────────────────
-  // Espaço lógico permanece 420×594; o canvas físico é DPI_SCALE× maior para
-  // garantir nitidez em telas Retina e qualidade ao exportar imagem.
+  // ─── Alta resolução — canvas físico 1414×2000 px ─────────────────────
+  // Espaço lógico permanece 420×594 (todas as coordenadas dos campos ficam
+  // inalteradas). O ctx.scale abaixo faz o mapeamento automaticamente.
   const LOGICAL_W  = 420;
   const LOGICAL_H  = 594;
-  const DPI_SCALE  = Math.max(Math.round(window.devicePixelRatio || 1), 2); // mín. 2×
-  canvas.width  = LOGICAL_W * DPI_SCALE;
-  canvas.height = LOGICAL_H * DPI_SCALE;
+  const PHYS_W     = 1414;   // largura física do canvas em pixels
+  const PHYS_H     = 2000;   // altura física do canvas em pixels
+  canvas.width  = PHYS_W;
+  canvas.height = PHYS_H;
 
   const ctx = canvas.getContext("2d");
-  ctx.scale(DPI_SCALE, DPI_SCALE);  // todas as coordenadas lógicas continuam em 420×594
+  ctx.scale(PHYS_W / LOGICAL_W, PHYS_H / LOGICAL_H);  // ~3.367× — lógico 420×594
 
   // ─── Estado global ─────────────────────────────────────────────────────
   let modeloAtual   = null;  // objeto do modelo selecionado

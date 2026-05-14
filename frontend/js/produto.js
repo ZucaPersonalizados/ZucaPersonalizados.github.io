@@ -1222,6 +1222,7 @@ renderVistosRecentemente();
   let logoImg       = null;  // HTMLImageElement da logo
   let campos        = [];    // array de objetos de campo editáveis
   let elementos     = [];    // array de elementos decorativos (faixas, linhas, ícones)
+  const imagemCache = new Map(); // src → HTMLImageElement (imagens já carregadas)
   let campoSelecionado = -1; // índice do campo sendo arrastado (-1 = nenhum)
   let logoZone      = null;  // cópia editável de modeloAtual.logoZone { x,y,w,h }
   let logoSelecionada = false;
@@ -1355,9 +1356,23 @@ renderVistosRecentemente();
     etapa1.hidden = true;
     etapa2.hidden = false;
 
+    // Pré-carregar imagens dos elementos antes de renderizar
+    await precarregarImagensElementos(elementos);
+
     // Renderizar cards de campo no formulário
     renderizarCamposForm();
     renderizarPreview();
+  }
+
+  async function precarregarImagensElementos(els) {
+    const pendentes = els
+      .filter((el) => el.tipo === "imagem" && el.src && !imagemCache.has(el.src))
+      .map((el) =>
+        carregarImagem(el.src)
+          .then((img) => imagemCache.set(el.src, img))
+          .catch(() => { /* ignora erro de carregamento */ })
+      );
+    await Promise.all(pendentes);
   }
 
   btnVoltar?.addEventListener("click", () => {
@@ -1642,6 +1657,18 @@ renderVistosRecentemente();
     } else if (el.tipo === "icone") {
       ctx2d.globalAlpha = 1; // reset para garantir cor correta do ícone
       desenharIconeCanvas(ctx2d, el.icone, el.x ?? 0, el.y ?? 0, el.tamanho ?? 12, el.cor || "#333");
+    } else if (el.tipo === "imagem") {
+      const img = imagemCache.get(el.src);
+      if (img) {
+        const x = el.x ?? 0, y = el.y ?? 0;
+        const w = el.largura ?? img.naturalWidth;
+        const h = el.altura  ?? img.naturalHeight;
+        ctx2d.translate(x + w / 2, y + h / 2);
+        if (el.rotacao) ctx2d.rotate((el.rotacao * Math.PI) / 180);
+        if (el.espelhar === "h") ctx2d.scale(-1, 1);
+        else if (el.espelhar === "v") ctx2d.scale(1, -1);
+        ctx2d.drawImage(img, -w / 2, -h / 2, w, h);
+      }
     }
     ctx2d.restore();
   }
@@ -1897,6 +1924,25 @@ renderVistosRecentemente();
               color: hexParaRgbPdf(el.cor || "#333"), opacity: op,
             });
           }
+        } else if (el.tipo === "imagem" && el.src) {
+          try {
+            const resp   = await fetch(el.src);
+            const buf    = await resp.arrayBuffer();
+            const isPng  = el.src.toLowerCase().endsWith(".png");
+            const pdfImg = isPng
+              ? await pdfDoc.embedPng(new Uint8Array(buf))
+              : await pdfDoc.embedJpg(new Uint8Array(buf));
+            const ix = el.x ?? 0, iy = el.y ?? 0;
+            const iw = el.largura ?? pdfImg.width;
+            const ih = el.altura  ?? pdfImg.height;
+            page.drawImage(pdfImg, {
+              x:      toPdfX(ix),
+              y:      toPdfY(iy + ih),
+              width:  iw * SCALE,
+              height: ih * SCALE,
+              opacity: op,
+            });
+          } catch { /* ignora se imagem n\u00e3o carrega no PDF */ }
         }
       }
 

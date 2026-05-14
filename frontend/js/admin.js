@@ -1088,7 +1088,7 @@ document.getElementById("btn-admin-preview-modelo")?.addEventListener("click", a
     }
   }
 
-  elementos.forEach((el) => {
+  for (const el of elementos) {
     ctx.save();
     ctx.globalAlpha = el.opacidade ?? 1;
     if (el.tipo === "faixa") {
@@ -1123,9 +1123,24 @@ document.getElementById("btn-admin-preview-modelo")?.addEventListener("click", a
         ctx.fill(new Path2D(pathData));
         ctx.restore();
       }
+    } else if (el.tipo === "imagem" && el.src) {
+      try {
+        const img = await new Promise((res, rej) => {
+          const i = new Image(); i.crossOrigin = "anonymous";
+          i.onload = () => res(i); i.onerror = rej; i.src = el.src;
+        });
+        const x = el.x ?? 0, y = el.y ?? 0;
+        const w = el.largura ?? img.naturalWidth;
+        const h = el.altura  ?? img.naturalHeight;
+        ctx.translate(x + w / 2, y + h / 2);
+        if (el.rotacao) ctx.rotate((el.rotacao * Math.PI) / 180);
+        if (el.espelhar === "h") ctx.scale(-1, 1);
+        else if (el.espelhar === "v") ctx.scale(1, -1);
+        ctx.drawImage(img, -w / 2, -h / 2, w, h);
+      } catch { /* ignora imagem que n\u00e3o carrega */ }
     }
     ctx.restore();
-  });
+  }
 
   // 3. Posições dos campos como texto dimmed
   const rawCampos = String(document.getElementById("modeloCamposJson")?.value || "").trim();

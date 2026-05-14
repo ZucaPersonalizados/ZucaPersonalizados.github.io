@@ -1172,11 +1172,17 @@ renderVistosRecentemente();
   // Para o canvas (preview): usa a família CSS do Google Fonts (carregada no <head>)
   // Para o PDF (pdf-lib): usa os arquivos TTF em /fonts/
   const FONTES = [
-    { label: "Montserrat",       css: "'Montserrat', sans-serif",       ttfRegular: "fonts/Montserrat-Regular.ttf",     ttfBold: "fonts/Montserrat-Bold.ttf" },
-    { label: "Lato",             css: "'Lato', sans-serif",             ttfRegular: "fonts/Lato-Regular.ttf",           ttfBold: "fonts/Lato-Bold.ttf" },
-    { label: "Poppins",          css: "'Poppins', sans-serif",          ttfRegular: "fonts/Poppins-Regular.ttf",        ttfBold: "fonts/Poppins-Bold.ttf" },
-    { label: "Playfair Display", css: "'Playfair Display', serif",      ttfRegular: "fonts/PlayfairDisplay-Regular.ttf", ttfBold: "fonts/PlayfairDisplay-Bold.ttf" },
-    { label: "Great Vibes",      css: "'Great Vibes', cursive",         ttfRegular: "fonts/GreatVibes-Regular.ttf",     ttfBold: "fonts/GreatVibes-Regular.ttf" },
+    { label: "Montserrat",          css: "'Montserrat', sans-serif",          ttfRegular: "fonts/Montserrat-Regular.ttf",          ttfBold: "fonts/Montserrat-Bold.ttf" },
+    { label: "Raleway",             css: "'Raleway', sans-serif",             ttfRegular: "fonts/Raleway-Regular.ttf",             ttfBold: "fonts/Raleway-Bold.ttf" },
+    { label: "Lato",                css: "'Lato', sans-serif",                ttfRegular: "fonts/Lato-Regular.ttf",                ttfBold: "fonts/Lato-Bold.ttf" },
+    { label: "Poppins",             css: "'Poppins', sans-serif",             ttfRegular: "fonts/Poppins-Regular.ttf",             ttfBold: "fonts/Poppins-Bold.ttf" },
+    { label: "Nunito",              css: "'Nunito', sans-serif",              ttfRegular: "fonts/Nunito-Regular.ttf",              ttfBold: "fonts/Nunito-Bold.ttf" },
+    { label: "Josefin Sans",        css: "'Josefin Sans', sans-serif",        ttfRegular: "fonts/JosefinSans-Regular.ttf",         ttfBold: "fonts/JosefinSans-Bold.ttf" },
+    { label: "Playfair Display",    css: "'Playfair Display', serif",         ttfRegular: "fonts/PlayfairDisplay-Regular.ttf",     ttfBold: "fonts/PlayfairDisplay-Bold.ttf" },
+    { label: "Cormorant Garamond",  css: "'Cormorant Garamond', serif",       ttfRegular: "fonts/CormorantGaramond-Regular.ttf",   ttfBold: "fonts/CormorantGaramond-Bold.ttf" },
+    { label: "Cinzel",              css: "'Cinzel', serif",                   ttfRegular: "fonts/Cinzel-Regular.ttf",              ttfBold: "fonts/Cinzel-Bold.ttf" },
+    { label: "Great Vibes",         css: "'Great Vibes', cursive",            ttfRegular: "fonts/GreatVibes-Regular.ttf",          ttfBold: "fonts/GreatVibes-Regular.ttf" },
+    { label: "Dancing Script",      css: "'Dancing Script', cursive",         ttfRegular: "fonts/DancingScript-Regular.ttf",       ttfBold: "fonts/DancingScript-Bold.ttf" },
   ];
 
   // Paths SVG 24×24 para ícones decorativos (MIT/Apache 2.0)
@@ -1389,10 +1395,6 @@ renderVistosRecentemente();
       card.className = "campo-card";
       card.dataset.idx = idx;
 
-      const fonteOptions = FONTES.map((f) =>
-        `<option value="${f.label}" ${f.label === campo.fontFamily ? "selected" : ""}>${f.label}</option>`
-      ).join("");
-
       card.innerHTML = `
         <div class="campo-card-topo">
           <span class="campo-card-label">${campo.label}</span>
@@ -1406,20 +1408,6 @@ renderVistosRecentemente();
           value="${campo.text}"
           data-idx="${idx}"
         >
-        <div class="campo-card-controles">
-          <div class="campo-ctrl-grupo">
-            <label class="campo-ctrl-label">Fonte</label>
-            <select class="campo-card-fonte" data-idx="${idx}">${fonteOptions}</select>
-          </div>
-          <div class="campo-ctrl-grupo">
-            <label class="campo-ctrl-label">X</label>
-            <input class="campo-card-xy" type="number" min="0" max="420" value="${Math.round(campo.x)}" data-axis="x" data-idx="${idx}">
-          </div>
-          <div class="campo-ctrl-grupo">
-            <label class="campo-ctrl-label">Y</label>
-            <input class="campo-card-xy" type="number" min="0" max="594" value="${Math.round(campo.y)}" data-axis="y" data-idx="${idx}">
-          </div>
-        </div>
       `;
 
       camposContainer.insertBefore(card, logoCard);
@@ -1428,20 +1416,6 @@ renderVistosRecentemente();
       card.querySelector(".campo-card-input").addEventListener("input", (e) => {
         campos[idx].text = e.target.value;
         renderizarPreview();
-      });
-
-      card.querySelector(".campo-card-fonte").addEventListener("change", (e) => {
-        campos[idx].fontFamily = e.target.value;
-        renderizarPreview();
-      });
-
-      card.querySelectorAll(".campo-card-xy").forEach((input) => {
-        input.addEventListener("input", (e) => {
-          const axis = e.target.dataset.axis;
-          const val = parseFloat(e.target.value) || 0;
-          campos[idx][axis] = val;
-          renderizarPreview();
-        });
       });
     });
 

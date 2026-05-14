@@ -1434,6 +1434,47 @@ renderVistosRecentemente();
         });
       });
     });
+
+    // ── Cores de elementos editáveis pelo cliente ─────────────────────────
+    const elementosEditaveis = elementos
+      .map((el, elIdx) => ({ el, elIdx }))
+      .filter(({ el }) => el.editavelPeloCliente);
+
+    if (elementosEditaveis.length > 0) {
+      const coresCard = document.createElement("div");
+      coresCard.className = "campo-card campo-card--cores";
+      coresCard.innerHTML = `
+        <div class="campo-card-topo">
+          <span class="campo-card-label">🎨 Personalizar cores</span>
+        </div>
+        <div class="cores-pickers"></div>
+      `;
+      const pickerWrap = coresCard.querySelector(".cores-pickers");
+
+      elementosEditaveis.forEach(({ el, elIdx }) => {
+        const defaultLabel =
+          el.tipo === "faixa"   ? "Cor da faixa"   :
+          el.tipo === "linha"   ? "Cor da linha"   :
+          el.tipo === "circulo" ? "Cor do círculo" :
+          el.tipo === "icone"   ? "Cor do ícone"   : "Cor do elemento";
+        const label = el.labelCliente || defaultLabel;
+
+        const item = document.createElement("div");
+        item.className = "cor-picker-item";
+        item.innerHTML = `
+          <label class="cor-picker-label">${label}</label>
+          <input type="color" class="cor-picker-input" value="${el.cor || "#c8a020"}">
+        `;
+        pickerWrap.appendChild(item);
+
+        item.querySelector(".cor-picker-input").addEventListener("input", (e) => {
+          elementos[elIdx].cor = e.target.value;
+          renderizarPreview();
+        });
+      });
+
+      camposContainer.insertBefore(coresCard, logoCard);
+    }
   }
 
   // ─── Atualizar inputs X/Y após arrastar ────────────────────────────────

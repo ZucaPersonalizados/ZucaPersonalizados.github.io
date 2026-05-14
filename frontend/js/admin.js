@@ -1026,11 +1026,11 @@ document.getElementById("btn-modelo-elementos-template")?.addEventListener("clic
   const el = document.getElementById("modeloElementosJson");
   if (!el) return;
   const exemplo = [
-    { tipo: "faixa", x: 0, y: 478, largura: 420, altura: 28, cor: "#c8a020" },
+    { tipo: "faixa", x: 0, y: 478, largura: 420, altura: 28, cor: "#c8a020", editavelPeloCliente: true, labelCliente: "Cor do destaque" },
     { tipo: "icone", icone: "telefone", x: 50,  y: 492, tamanho: 14, cor: "#ffffff" },
     { tipo: "icone", icone: "email",    x: 175, y: 492, tamanho: 14, cor: "#ffffff" },
     { tipo: "icone", icone: "localizacao", x: 300, y: 492, tamanho: 14, cor: "#ffffff" },
-    { tipo: "linha", x: 20, y: 540, comprimento: 380, espessura: 0.5, cor: "#c8a020" },
+    { tipo: "linha", x: 20, y: 540, comprimento: 380, espessura: 0.5, cor: "#c8a020", editavelPeloCliente: true, labelCliente: "Cor da linha" },
   ];
   el.value = JSON.stringify(exemplo, null, 2);
 });

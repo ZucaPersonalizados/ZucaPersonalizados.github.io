@@ -3707,3 +3707,40 @@ textarea:focus-visible {
   transition: border-color 0.2s;
 }
 .campo-card-xy:focus { border-color: #2563eb; }
+
+/* ── Paleta de cores editável pelo cliente ── */
+.campo-card--cores {
+  background: #fdf8f2;
+  border-color: #e8d5a3;
+}
+.cores-pickers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  padding-top: 2px;
+}
+.cor-picker-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+}
+.cor-picker-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  text-align: center;
+}
+.cor-picker-input {
+  width: 44px;
+  height: 36px;
+  border: 2px solid #ddd;
+  border-radius: 8px;
+  cursor: pointer;
+  padding: 2px;
+  background: #fff;
+  transition: border-color 0.2s;
+}
+.cor-picker-input:hover { border-color: #c8a020; }

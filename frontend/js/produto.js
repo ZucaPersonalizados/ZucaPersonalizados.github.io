@@ -1274,7 +1274,11 @@ renderVistosRecentemente();
 
   renderizarGaleria();
 
-  // ─── Etapa 2: Seleção de modelo ────────────────────────────────────────
+  // Aguardar carregamento das fontes antes de qualquer render no canvas
+  // (evita race condition: canvas renderiza antes das Google Fonts chegarem)
+  document.fonts.ready.then(() => limparCanvas());
+
+  // ─── Etapa 2: Seleção de modelo ─────────────────────────────────
   async function selecionarModelo(modelo) {
     modeloAtual = modelo;
     campoSelecionado = -1;
@@ -1296,16 +1300,18 @@ renderVistosRecentemente();
       : Object.entries(modelo.campos || {});
 
     const LABELS = { nome: "Nome do profissional", especialidade: "Especialidade / Profissão",
-                     telefone: "Telefone / WhatsApp", email: "E-mail", endereco: "Endereço / Cidade" };
+                     telefone: "Telefone / WhatsApp", email: "E-mail", endereco: "Endereço / Cidade",
+                     instagram: "Instagram" };
     const PLACEHOLDERS = { nome: "Ex: Dra. Ana Paula Silva", especialidade: "Ex: Biomédica Esteta · CRBM 1234",
                            telefone: "Ex: (67) 99999-0000", email: "Ex: contato@clinica.com.br",
-                           endereco: "Ex: Rua das Flores, 100 – Campo Grande/MS" };
+                           endereco: "Ex: Rua das Flores, 100 – Campo Grande/MS",
+                           instagram: "Ex: @clinicaanapaulaesteta" };
 
     campos = camposEntries.map(([key, cfg]) => ({
       key,
       label: cfg.label || LABELS[key] || cfg.nome || key,
       placeholder: cfg.placeholder || PLACEHOLDERS[key] || "",
-      maxlength: { nome: 80, especialidade: 100, telefone: 20, email: 100, endereco: 120 }[key] || 100,
+      maxlength: { nome: 80, especialidade: 100, telefone: 20, email: 100, endereco: 120, instagram: 60 }[key] || 100,
       inputType: { email: "email", telefone: "tel" }[key] || "text",
       text: "",
       x: cfg.x ?? 0,

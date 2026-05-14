@@ -8,8 +8,8 @@
  * 2. Coloque em frontend/img/modelos/
  * 3. Adicione um objeto no array abaixo
  *
- * Coordenadas referem-se ao canvas de PREVIEW (420×594px).
- * Para converter de imagem 1409×2000px: cx = px_orig × 420/1409,  cy = py_orig × 594/2000
+ * Coordenadas referem-se ao espaço lógico 420×594px (canvas físico 1414×2000).
+ * Para converter de imagem 1414×2000px: cx = px_orig × 420/1414,  cy = py_orig × 594/2000
  *
  * logoZone — retângulo onde a logo do cliente será posicionada { x, y, w, h }
  * campos   — posição de cada campo de texto { x, y, fontSize, color, align, maxWidth, fontWeight }
@@ -48,7 +48,13 @@ const RECEITUARIO_MODELOS = [
        * Endereço — após ícone Pin (canvas ~x:103-118)
        * Centro da zona: canvas x:225, y:548
        */
-      endereco: { x: 225, y: 548, fontSize: 9, color: "#c8a020", align: "center", maxWidth: 255, fontWeight: "400", fontFamily: "Montserrat" },
+      endereco:  { x: 225, y: 548, fontSize: 9, color: "#c8a020", align: "center", maxWidth: 255, fontWeight: "400", fontFamily: "Montserrat" },
+
+      /*
+       * Instagram — linha abaixo do endereço, próximo ao rodapé
+       * Centro estimado: canvas x:210, y:573
+       */
+      instagram: { x: 210, y: 573, fontSize: 9, color: "#c8a020", align: "center", maxWidth: 255, fontWeight: "400", fontFamily: "Montserrat" },
     },
   },
 ];

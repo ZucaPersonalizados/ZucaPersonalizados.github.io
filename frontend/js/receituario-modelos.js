@@ -3,10 +3,8 @@
  * Configuração dos modelos de receituário disponíveis para o gerador.
  *
  * Como adicionar um novo modelo:
- * 1. Gere a versão "limpa" (sem texto placeholder) via o script Python
- *    ou exporte diretamente do software de design sem os textos de exemplo.
- * 2. Coloque em frontend/img/modelos/
- * 3. Adicione um objeto no array abaixo
+ * 1. Adicione um objeto no array abaixo com id, nome, logoZone e campos.
+ * 2. O fundo é sempre branco — use elementos SVG (tipo: "icone") para ornamentos.
  *
  * Coordenadas referem-se ao espaço lógico 420×594px (canvas físico 1414×2000).
  * Para converter de imagem 1414×2000px: cx = px_orig × 420/1414,  cy = py_orig × 594/2000
@@ -19,9 +17,6 @@ const RECEITUARIO_MODELOS = [
   {
     id: "dourado",
     nome: "Dourado Premium",
-    thumbnail: "img/modelos/dourado-limpo.png",
-    imagem:    "img/modelos/dourado-limpo.png",
-    fundoUrl:  "img/modelos/dourado-limpo.png",
 
     /*
      * Logo do cliente posicionada sobre o diâmante dourado.

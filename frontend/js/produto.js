@@ -1300,7 +1300,7 @@ renderVistosRecentemente();
           nome:      p.modeloNome || p.nome,
           thumbnail: Array.isArray(p.imagens) && p.imagens[0] ? p.imagens[0] : (p.modeloConfig?.imagem || ""),
           imagem:    Array.isArray(p.imagens) && p.imagens[0] ? p.imagens[0] : (p.modeloConfig?.imagem || ""),
-          fundoUrl:  p.modeloConfig?.fundoUrl || (Array.isArray(p.imagens) && p.imagens[0] ? p.imagens[0] : ""),
+          fundoUrl:  p.modeloConfig?.fundoUrl || "",
           logoZone:  p.modeloConfig?.logoZone || { x: 0, y: 0, w: 100, h: 100 },
           campos:    p.modeloConfig?.campos   || {},
           elementos: (Array.isArray(p.modeloConfig?.elementos) && p.modeloConfig.elementos.length)
@@ -1330,7 +1330,7 @@ renderVistosRecentemente();
 
     // Carregar imagem de fundo do modelo (fundoUrl dedicado ou imagem do produto como fallback)
     fundoImg = null;
-    const bgUrl = modelo.fundoUrl || modelo.imagem || "";
+    const bgUrl = modelo.fundoUrl || "";
     if (bgUrl) {
       try { fundoImg = await carregarImagem(bgUrl); } catch { fundoImg = null; }
     }

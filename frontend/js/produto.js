@@ -1451,7 +1451,19 @@ renderVistosRecentemente();
     }
 
     // 2. Elementos decorativos (faixas, linhas, ícones)
-    elementos.forEach((el) => desenharElemento(ctx, el));
+    // Ícones condicionais: só aparecem se o campo correspondente estiver preenchido
+    const ICONE_CONDICIONAL = { localizacao: "endereco", instagram: "instagram",
+                                whatsapp: "telefone", email: "email", telefone: "telefone" };
+    elementos.forEach((el) => {
+      if (el.tipo === "icone") {
+        const campoKey = ICONE_CONDICIONAL[el.icone];
+        if (campoKey) {
+          const campo = campos.find((c) => c.key === campoKey);
+          if (!campo || !campo.text.trim()) return; // campo vazio → não desenhar ícone
+        }
+      }
+      desenharElemento(ctx, el);
+    });
 
     // 3. Logo
     if (logoImg && logoZone) {

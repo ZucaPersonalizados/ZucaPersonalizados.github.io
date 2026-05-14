@@ -767,6 +767,17 @@
                       <strong>icone</strong>: x, y, tamanho, cor, icone (whatsapp | instagram | email | localizacao | telefone)
                     </span>
                   </div>
+
+                  <!-- Pré-visualização do modelo -->
+                  <div>
+                    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
+                      <label style="font-weight:600; font-size:0.88rem;">Pré-visualização do modelo</label>
+                      <button type="button" id="btn-admin-preview-modelo" class="btn btn-small btn-secondary" style="font-size:0.78rem;">👁 Renderizar preview</button>
+                    </div>
+                    <canvas id="admin-modelo-canvas" width="420" height="594"
+                      style="max-width:240px; width:100%; height:auto; border-radius:8px; border:1.5px solid #ddd; display:none; background:#f9f9f9;"></canvas>
+                    <span id="admin-preview-msg" style="font-size:0.8rem; color:#666; display:block; margin-top:4px;"></span>
+                  </div>
                 </div>
 
                 <div class="field">

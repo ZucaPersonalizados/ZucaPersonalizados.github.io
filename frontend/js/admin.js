@@ -1016,6 +1016,7 @@ document.getElementById("btn-modelo-template")?.addEventListener("click", () => 
     telefone:      { x: 156, y: 504, fontSize:  9, color: "#c8a020", align: "center", maxWidth: 115, fontWeight: "400", fontFamily: "Montserrat" },
     email:         { x: 280, y: 504, fontSize:  9, color: "#c8a020", align: "center", maxWidth: 135, fontWeight: "400", fontFamily: "Montserrat" },
     endereco:      { x: 225, y: 548, fontSize:  9, color: "#c8a020", align: "center", maxWidth: 255, fontWeight: "400", fontFamily: "Montserrat" },
+    instagram:     { x: 210, y: 573, fontSize:  9, color: "#c8a020", align: "center", maxWidth: 255, fontWeight: "400", fontFamily: "Montserrat" },
   };
   jsonEl.value = JSON.stringify(template, null, 2);
 });
@@ -1032,6 +1033,138 @@ document.getElementById("btn-modelo-elementos-template")?.addEventListener("clic
     { tipo: "linha", x: 20, y: 540, comprimento: 380, espessura: 0.5, cor: "#c8a020" },
   ];
   el.value = JSON.stringify(exemplo, null, 2);
+});
+
+// ─── Paths SVG dos ícones (mesmos de produto.js) ──────────────────────────────
+const ICONE_PATHS_ADMIN = {
+  whatsapp:    "M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z",
+  instagram:   "M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z",
+  email:       "M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z",
+  localizacao: "M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z",
+  telefone:    "M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z",
+};
+
+// ─── Pré-visualização do modelo no admin ──────────────────────────────────────
+document.getElementById("btn-admin-preview-modelo")?.addEventListener("click", async () => {
+  const canvas = document.getElementById("admin-modelo-canvas");
+  const msg    = document.getElementById("admin-preview-msg");
+  if (!canvas) return;
+
+  const W = 420, H = 594;
+  const ctx = canvas.getContext("2d");
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, W, H);
+  canvas.style.display = "block";
+  msg.textContent = "Carregando...";
+
+  // 1. Imagem de fundo
+  const fundoUrl = String(document.getElementById("modeloFundoUrl")?.value || "").trim();
+  if (fundoUrl) {
+    try {
+      const img = await new Promise((res, rej) => {
+        const i = new Image();
+        i.crossOrigin = "anonymous";
+        i.onload = () => res(i);
+        i.onerror = rej;
+        i.src = fundoUrl;
+      });
+      ctx.drawImage(img, 0, 0, W, H);
+    } catch {
+      msg.textContent = "⚠️ Não foi possível carregar a imagem de fundo.";
+    }
+  }
+
+  // 2. Elementos decorativos
+  const rawElem = String(document.getElementById("modeloElementosJson")?.value || "").trim();
+  let elementos = [];
+  if (rawElem) {
+    try {
+      const parsed = JSON.parse(rawElem);
+      elementos = Array.isArray(parsed) ? parsed : [];
+    } catch {
+      msg.textContent = "⚠️ JSON de elementos inválido — corrija os colchetes [ ].";
+      return;
+    }
+  }
+
+  elementos.forEach((el) => {
+    ctx.save();
+    ctx.globalAlpha = el.opacidade ?? 1;
+    if (el.tipo === "faixa") {
+      ctx.fillStyle = el.cor || "#c8a020";
+      ctx.fillRect(el.x ?? 0, el.y ?? 0, el.largura ?? W, el.altura ?? 20);
+    } else if (el.tipo === "linha") {
+      ctx.strokeStyle = el.cor || "#c8a020";
+      ctx.lineWidth = el.espessura ?? 1;
+      ctx.beginPath();
+      if ((el.orientacao || "h") === "v") {
+        ctx.moveTo(el.x ?? 0, el.y ?? 0);
+        ctx.lineTo(el.x ?? 0, (el.y ?? 0) + (el.comprimento ?? H));
+      } else {
+        ctx.moveTo(el.x ?? 0, el.y ?? 0);
+        ctx.lineTo((el.x ?? 0) + (el.comprimento ?? W), el.y ?? 0);
+      }
+      ctx.stroke();
+    } else if (el.tipo === "circulo") {
+      ctx.fillStyle = el.cor || "#c8a020";
+      ctx.beginPath();
+      ctx.arc(el.x ?? 0, el.y ?? 0, el.raio ?? 10, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (el.tipo === "icone") {
+      const pathData = ICONE_PATHS_ADMIN[el.icone];
+      if (pathData) {
+        const s = (el.tamanho ?? 12) / 24;
+        ctx.save();
+        ctx.globalAlpha = 1;
+        ctx.translate((el.x ?? 0) - (el.tamanho ?? 12) / 2, (el.y ?? 0) - (el.tamanho ?? 12) / 2);
+        ctx.scale(s, s);
+        ctx.fillStyle = el.cor || "#333";
+        ctx.fill(new Path2D(pathData));
+        ctx.restore();
+      }
+    }
+    ctx.restore();
+  });
+
+  // 3. Posições dos campos como texto dimmed
+  const rawCampos = String(document.getElementById("modeloCamposJson")?.value || "").trim();
+  if (rawCampos) {
+    try {
+      const campos = JSON.parse(rawCampos);
+      Object.entries(campos).forEach(([key, cfg]) => {
+        if (cfg.x == null || cfg.y == null) return;
+        ctx.save();
+        ctx.globalAlpha = 0.35;
+        ctx.font = `${cfg.fontWeight === "700" ? "bold" : "normal"} ${cfg.fontSize || 10}px ${cfg.fontFamily || "sans-serif"}`;
+        ctx.fillStyle = cfg.color || "#888";
+        ctx.textAlign = cfg.align || "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(`[${key}]`, cfg.x, cfg.y);
+        ctx.restore();
+      });
+    } catch { /* ignora erro no preview */ }
+  }
+
+  // 4. Logo zone como retângulo tracejado azul
+  const logoX = Number(document.getElementById("logoX")?.value || 0);
+  const logoY = Number(document.getElementById("logoY")?.value || 0);
+  const logoW = Number(document.getElementById("logoW")?.value || 0);
+  const logoH = Number(document.getElementById("logoH")?.value || 0);
+  if (logoW > 0 && logoH > 0) {
+    ctx.save();
+    ctx.strokeStyle = "#2563eb";
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([5, 4]);
+    ctx.globalAlpha = 0.7;
+    ctx.strokeRect(logoX, logoY, logoW, logoH);
+    ctx.globalAlpha = 0.12;
+    ctx.fillStyle = "#2563eb";
+    ctx.fillRect(logoX, logoY, logoW, logoH);
+    ctx.restore();
+  }
+
+  msg.textContent = `✅ ${elementos.length} elemento(s) — canvas 420×594 lógico`;
 });
 
 btnLogin?.addEventListener("click", async () => {
@@ -1092,6 +1225,20 @@ formProduto?.addEventListener("submit", async (event) => {
       if (rawJson) {
         try { JSON.parse(rawJson); } catch {
           setProdutoStatus("JSON dos campos do modelo é inválido. Corrija antes de salvar.", "error");
+          return;
+        }
+      }
+      // Validar JSON dos elementos decorativos
+      const rawElemJson = String(document.getElementById("modeloElementosJson")?.value || "").trim();
+      if (rawElemJson) {
+        try {
+          const parsed = JSON.parse(rawElemJson);
+          if (!Array.isArray(parsed)) {
+            setProdutoStatus("Elementos decorativos: deve ser um array JSON (começa com [ e termina com ]).", "error");
+            return;
+          }
+        } catch {
+          setProdutoStatus("JSON dos elementos decorativos é inválido. Verifique se o array está envolvido em [ ].", "error");
           return;
         }
       }

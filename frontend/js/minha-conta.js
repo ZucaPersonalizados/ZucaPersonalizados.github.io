@@ -223,7 +223,10 @@ async function pagarAgora(idPedido, email, metodo) {
   }
 
   if (payload.action === "pix") {
-    setStatus("PIX atualizado. Abra o checkout para copiar o codigo e concluir.", "success");
+    showToast("PIX gerado! Redirecionando para o checkout...", "success");
+    setTimeout(() => {
+      window.location.href = `/checkout?pedido=${encodeURIComponent(idPedido)}`;
+    }, 1200);
     return;
   }
 }
@@ -512,8 +515,7 @@ el("btn-login-outlook")?.addEventListener("click", () => executarLogin(loginComM
 el("btn-sair-conta")?.addEventListener("click", async () => {
   try { await sairDoFirebase(); } catch (_) {}
   limparStorageUsuario();
-  showToast("Você saiu da sua conta.", "success");
-  window.location.reload();
+  window.location.href = "/";
 });
 
 // Sincroniza UI com estado Firebase ao carregar a página

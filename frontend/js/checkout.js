@@ -813,6 +813,11 @@ function iniciarMonitoramentoPagamento(idPedido, email = "") {
 
     if (tentativas >= 24) {
       pararMonitoramentoPagamento();
+      showToast(
+        "Não conseguimos confirmar o pagamento automaticamente. Verifique seu app bancário ou entre em contato conosco.",
+        "warning",
+        8000
+      );
     }
   }, 10000);
 }

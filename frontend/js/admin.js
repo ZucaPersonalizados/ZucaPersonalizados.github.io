@@ -339,8 +339,13 @@ function obterProdutoDoFormulario() {
       if (rawElementosJson) {
         try { elementos = JSON.parse(rawElementosJson); } catch { elementos = []; }
       }
-      const fundoUrl = String(document.getElementById("modeloFundoUrl")?.value || "").trim();
-      return { logoZone: { x: logoX, y: logoY, w: logoW, h: logoH }, campos, elementos, fundoUrl };
+      const fundoUrl  = String(document.getElementById("modeloFundoUrl")?.value || "").trim();
+      const svgUrl    = String(document.getElementById("modeloSvgUrl")?.value  || "").trim();
+      if (!svgUrl) {
+        setProdutoStatus("O SVG do modelo é obrigatório. Envie o arquivo antes de salvar.", "error");
+        return null;
+      }
+      return { logoZone: { x: logoX, y: logoY, w: logoW, h: logoH }, campos, elementos, fundoUrl, svgTemplate: svgUrl };
     })(),
   };
 }
@@ -353,13 +358,17 @@ function limparFormularioProduto() {
   if (btnExcluirProduto) btnExcluirProduto.style.display = "none";
   setTipoProdutoVisual("nenhum");
   // Limpeza explícita dos campos de tipo para garantir estado correto entre edições
-  const camposModelo = ["modeloNome", "modeloFundoUrl", "logoX", "logoY", "logoW", "logoH", "modeloCamposJson", "modeloElementosJson"];
+  const camposModelo = ["modeloNome", "modeloSvgUrl", "modeloFundoUrl", "logoX", "logoY", "logoW", "logoH", "modeloCamposJson", "modeloElementosJson"];
   camposModelo.forEach((id) => {
     const el = document.getElementById(id);
     if (el) el.value = "";
   });
   const prevFundo = document.getElementById("preview-fundo-modelo");
   if (prevFundo) { prevFundo.src = ""; prevFundo.style.display = "none"; }
+  const prevSvg = document.getElementById("preview-svg-modelo");
+  if (prevSvg) { prevSvg.src = ""; prevSvg.style.display = "none"; }
+  const svgStatus = document.getElementById("upload-svg-status");
+  if (svgStatus) svgStatus.textContent = "";
   const instrucoesEl = document.getElementById("instrucoesPersonalizacao");
   if (instrucoesEl) instrucoesEl.value = "";
   setProdutoStatus("Pronto para cadastrar.");
@@ -415,6 +424,13 @@ function preencherFormularioProduto(produto) {
     if (prevFundo && produto.modeloConfig.fundoUrl) {
       prevFundo.src = produto.modeloConfig.fundoUrl;
       prevFundo.style.display = "block";
+    }
+    const svgUrlEl = document.getElementById("modeloSvgUrl");
+    if (svgUrlEl) svgUrlEl.value = produto.modeloConfig.svgTemplate || "";
+    const prevSvg = document.getElementById("preview-svg-modelo");
+    if (prevSvg && produto.modeloConfig.svgTemplate) {
+      prevSvg.src = produto.modeloConfig.svgTemplate;
+      prevSvg.style.display = "block";
     }
   }
 
@@ -972,6 +988,47 @@ document.querySelectorAll('input[name="tipoProduto"]').forEach((radio) => {
   if (inputImagens) obs.observe(inputImagens, { attributes: false, childList: false, characterData: true, subtree: true });
 })();
 
+// Upload do SVG do modelo (obrigatório quando ehModelo=true)
+(function () {
+  const inputSvg  = document.getElementById("upload-svg-modelo");
+  const inputUrl  = document.getElementById("modeloSvgUrl");
+  const statusEl  = document.getElementById("upload-svg-status");
+  const preview   = document.getElementById("preview-svg-modelo");
+
+  inputUrl?.addEventListener("input", () => {
+    const url = String(inputUrl.value || "").trim();
+    if (preview) { preview.src = url; preview.style.display = url ? "block" : "none"; }
+  });
+
+  inputSvg?.addEventListener("change", async () => {
+    const file = inputSvg.files[0];
+    if (!file) return;
+    if (!file.type.includes("svg") && !file.name.toLowerCase().endsWith(".svg")) {
+      statusEl.textContent = "❌ Selecione um arquivo .svg válido.";
+      statusEl.style.color = "#e74c3c";
+      return;
+    }
+    statusEl.textContent = "⏳ Enviando...";
+    statusEl.style.color = "#666";
+    try {
+      const formData = new FormData();
+      formData.append("arquivo", file);
+      const resp = await fetch(getApiUrl("/upload"), { method: "POST", body: formData });
+      const payload = await resp.json();
+      if (!resp.ok || !payload.url) throw new Error(payload.erro || "Falha no upload");
+      if (inputUrl) inputUrl.value = payload.url;
+      if (preview) { preview.src = payload.url; preview.style.display = "block"; }
+      statusEl.textContent = "✅ SVG enviado!";
+      statusEl.style.color = "#1f8f4f";
+    } catch (err) {
+      statusEl.textContent = "❌ Erro: " + err.message;
+      statusEl.style.color = "#e74c3c";
+    } finally {
+      inputSvg.value = "";
+    }
+  });
+})();
+
 // Upload de imagem de fundo do modelo
 (function () {
   const inputFundo = document.getElementById("upload-fundo-modelo");
@@ -1056,20 +1113,22 @@ document.getElementById("btn-admin-preview-modelo")?.addEventListener("click", a
   canvas.style.display = "block";
   msg.textContent = "Carregando...";
 
-  // 1. Imagem de fundo
+  // 1. Fundo: SVG tem prioridade; fallback para imagem JPG/PNG
+  const svgUrl   = String(document.getElementById("modeloSvgUrl")?.value  || "").trim();
   const fundoUrl = String(document.getElementById("modeloFundoUrl")?.value || "").trim();
-  if (fundoUrl) {
+  const bgUrl    = svgUrl || fundoUrl;
+  if (bgUrl) {
     try {
       const img = await new Promise((res, rej) => {
         const i = new Image();
         i.crossOrigin = "anonymous";
         i.onload = () => res(i);
         i.onerror = rej;
-        i.src = fundoUrl;
+        i.src = bgUrl;
       });
       ctx.drawImage(img, 0, 0, W, H);
     } catch {
-      msg.textContent = "⚠️ Não foi possível carregar a imagem de fundo.";
+      msg.textContent = "⚠️ Não foi possível carregar o fundo/SVG.";
     }
   }
 

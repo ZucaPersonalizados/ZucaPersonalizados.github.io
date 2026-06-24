@@ -1231,6 +1231,126 @@ renderVistosRecentemente();
   let isDragging    = false;
   let modelos       = [...RECEITUARIO_MODELOS]; // começa com fallback estático; substituído pelo fetch
 
+  // ─── Estado SVG (modelos com svgTemplate) ─────────────────────────────
+  let svgImageAtual   = null;   // HTMLImageElement do SVG com cores atuais (cache síncrono para render)
+  let svgRenderizando = false;  // lock anti-concorrência
+  let svgPendente     = false;  // mudança ocorreu durante rebuild → refazer ao terminar
+  const svgTextCache  = new Map(); // url → texto bruto do SVG (evita múltiplos fetches)
+
+  // ─── Utilitários de cor HSL ─────────────────────────────────────────────
+  function hexParaHsl(hex) {
+    const r = parseInt(hex.slice(1, 3), 16) / 255;
+    const g = parseInt(hex.slice(3, 5), 16) / 255;
+    const b = parseInt(hex.slice(5, 7), 16) / 255;
+    const max = Math.max(r, g, b), min = Math.min(r, g, b);
+    let h = 0, s = 0;
+    const l = (max + min) / 2;
+    if (max !== min) {
+      const d = max - min;
+      s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+      switch (max) {
+        case r: h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break;
+        case g: h = ((b - r) / d + 2) / 6; break;
+        case b: h = ((r - g) / d + 4) / 6; break;
+      }
+    }
+    return [h, s, l];
+  }
+
+  function hslParaHex(h, s, l) {
+    let r, g, b;
+    if (s === 0) {
+      r = g = b = l;
+    } else {
+      const hue2rgb = (p, q, t) => {
+        if (t < 0) t += 1;
+        if (t > 1) t -= 1;
+        if (t < 1 / 6) return p + (q - p) * 6 * t;
+        if (t < 1 / 2) return q;
+        if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+        return p;
+      };
+      const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+      const p = 2 * l - q;
+      r = hue2rgb(p, q, h + 1 / 3);
+      g = hue2rgb(p, q, h);
+      b = hue2rgb(p, q, h - 1 / 3);
+    }
+    return "#" + [r, g, b].map((v) => Math.round(v * 255).toString(16).padStart(2, "0")).join("");
+  }
+
+  // Deriva uma cor ajustando a luminosidade em HSL. deltaL > 0 = mais claro, < 0 = mais escuro.
+  function corDerivada(hexBase, deltaL) {
+    const [h, s, l] = hexParaHsl(hexBase);
+    return hslParaHex(h, s, Math.max(0, Math.min(1, l + deltaL)));
+  }
+
+  // ─── Motor SVG: troca de cores e rebuild ───────────────────────────────
+
+  // Substitui os hexes originais de coresEditaveis pelo valor atual no texto SVG.
+  // Entradas com derivaDe são calculadas automaticamente via corDerivada().
+  function swapCoresSvg(svgText, coresEditaveis) {
+    // 1. Resolver todos os valores (incluindo derivados)
+    const mapa = {};
+    coresEditaveis.forEach((c) => {
+      if (!c.derivaDe) mapa[c.id] = c.valor || c.hexOriginal;
+    });
+    coresEditaveis.forEach((c) => {
+      if (c.derivaDe) {
+        const base = mapa[c.derivaDe];
+        mapa[c.id] = base ? corDerivada(base, c.ajuste?.luminosidade ?? 0) : (c.valor || c.hexOriginal);
+      }
+    });
+
+    // 2. Substituir no texto SVG (case-insensitive — cobre fill, stroke, stop-color, style)
+    let resultado = svgText;
+    coresEditaveis.forEach((c) => {
+      const original = c.hexOriginal;
+      const novo     = mapa[c.id];
+      if (!original || !novo || original.toLowerCase() === novo.toLowerCase()) return;
+      const re = new RegExp(original.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
+      resultado = resultado.replace(re, novo);
+    });
+
+    return resultado;
+  }
+
+  // Faz fetch (com cache), aplica swap de cores (se houver), cria Blob URL e carrega HTMLImageElement.
+  // Salva em svgImageAtual e dispara renderizarPreview(). Lock anti-concorrência via svgRenderizando.
+  async function reconstruirSvgImagem() {
+    if (!modeloAtual?.svgTemplate) return;
+    if (svgRenderizando) { svgPendente = true; return; }
+    svgRenderizando = true;
+    svgPendente = false;
+
+    try {
+      const url = modeloAtual.svgTemplate;
+      if (!svgTextCache.has(url)) {
+        const resp = await fetch(url);
+        if (!resp.ok) throw new Error(`SVG não encontrado: ${url}`);
+        svgTextCache.set(url, await resp.text());
+      }
+
+      const svgOriginal = svgTextCache.get(url);
+      const svgProcessado = Array.isArray(modeloAtual.coresEditaveis) && modeloAtual.coresEditaveis.length
+        ? swapCoresSvg(svgOriginal, modeloAtual.coresEditaveis)
+        : svgOriginal;
+      const blob = new Blob([svgProcessado], { type: "image/svg+xml;charset=utf-8" });
+      const blobUrl = URL.createObjectURL(blob);
+      try {
+        svgImageAtual = await carregarImagem(blobUrl);
+      } finally {
+        URL.revokeObjectURL(blobUrl);
+      }
+      renderizarPreview();
+    } catch (err) {
+      console.warn("[receituário SVG] Falha ao reconstruir imagem:", err);
+    } finally {
+      svgRenderizando = false;
+      if (svgPendente) reconstruirSvgImagem();
+    }
+  }
+
   function elementosPadraoModelo() {
     return [
       { tipo: "icone", icone: "folhagem-esquerda", x: 38,  y: 72,  tamanho: 78, cor: "#8b7c3c", editavelPeloCliente: true, labelCliente: "Cor da folhagem esquerda" },
@@ -1244,14 +1364,30 @@ renderVistosRecentemente();
   }
 
   // ─── Abrir / Fechar modal ───────────────────────────────────────────────
-  function abrirModal() {
+  async function abrirModal() {
     modal.hidden = false;
     document.body.style.overflow = "hidden";
+
+    // Cada produto tem exatamente um modelo com o mesmo ID — ir direto para o editor
+    const produtoId = new URLSearchParams(window.location.search).get("id");
+    const modeloDoProduto = modelos.find((m) => m.id === produtoId) || modelos[0];
+    if (modeloDoProduto) {
+      await selecionarModelo(modeloDoProduto);
+    } else {
+      // Sem modelos disponíveis ainda: exibir galeria como fallback
+      etapa1.hidden = false;
+      etapa2.hidden = true;
+    }
   }
 
   function fecharModal() {
     modal.hidden = true;
     document.body.style.overflow = "";
+    etapa2.hidden = true;
+    etapa1.hidden = false;
+    campoSelecionado = -1;
+    logoSelecionada = false;
+    logoAcao = null;
   }
 
   btnAbrir.addEventListener("click", abrirModal);
@@ -1294,17 +1430,24 @@ renderVistosRecentemente();
       const data = await resp.json();
       const lista = (Array.isArray(data) ? data : data.produtos ?? []).filter((p) => p.ehModelo);
       if (lista.length > 0) {
-        modelos = lista.map((p) => ({
-          id:        p.id,
-          nome:      p.modeloNome || p.nome,
-          thumbnail: Array.isArray(p.imagens) && p.imagens[0] ? p.imagens[0] : (p.modeloConfig?.imagem || ""),
-          imagem:    Array.isArray(p.imagens) && p.imagens[0] ? p.imagens[0] : (p.modeloConfig?.imagem || ""),
-          logoZone:  p.modeloConfig?.logoZone || { x: 0, y: 0, w: 100, h: 100 },
-          campos:    p.modeloConfig?.campos   || {},
-          elementos: (Array.isArray(p.modeloConfig?.elementos) && p.modeloConfig.elementos.length)
+        const modelosApi = lista.map((p) => ({
+          id:             p.id,
+          nome:           p.modeloNome || p.nome,
+          thumbnail:      Array.isArray(p.imagens) && p.imagens[0] ? p.imagens[0] : (p.modeloConfig?.imagem || p.modeloConfig?.svgTemplate || ""),
+          imagem:         Array.isArray(p.imagens) && p.imagens[0] ? p.imagens[0] : (p.modeloConfig?.imagem || p.modeloConfig?.svgTemplate || ""),
+          logoZone:       p.modeloConfig?.logoZone  || { x: 0, y: 0, w: 100, h: 100 },
+          campos:         p.modeloConfig?.campos    || {},
+          elementos:      (Array.isArray(p.modeloConfig?.elementos) && p.modeloConfig.elementos.length)
             ? p.modeloConfig.elementos
             : elementosPadraoModelo(),
+          svgTemplate:    p.modeloConfig?.svgTemplate    || null,
+          coresEditaveis: Array.isArray(p.modeloConfig?.coresEditaveis)
+            ? p.modeloConfig.coresEditaveis
+            : null,
         }));
+        // Mesclar: modelos da API primeiro + estáticos que não tenham o mesmo id
+        const idsApi = new Set(modelosApi.map((m) => m.id));
+        modelos = [...modelosApi, ...RECEITUARIO_MODELOS.filter((m) => !idsApi.has(m.id))];
       }
     }
   } catch { /* ignora falha — usa fallback estático */ }
@@ -1353,12 +1496,9 @@ renderVistosRecentemente();
       color: cfg.color || "#333333",
       align: cfg.align || "center",
       maxWidth: cfg.maxWidth ?? 200,
-      fontWeight: cfg.fontWeight || "400",
+      fontWeight:  cfg.fontWeight  || "400",
+      derivaCorDe: cfg.derivaCorDe || null,
     }));
-
-    galeria.querySelectorAll(".modelos-card").forEach((c) => {
-      c.classList.toggle("modelos-card--ativo", c.dataset.id === modelo.id);
-    });
 
     etapa1.hidden = true;
     etapa2.hidden = false;
@@ -1366,9 +1506,19 @@ renderVistosRecentemente();
     // Pré-carregar imagens dos elementos antes de renderizar
     await precarregarImagensElementos(elementos);
 
+    // Resetar estado SVG e cores ao trocar de modelo
+    svgImageAtual = null;
+    if (Array.isArray(modelo.coresEditaveis)) {
+      modelo.coresEditaveis.forEach((c) => { c.valor = c.hexOriginal; });
+    }
+
     // Renderizar cards de campo no formulário
     renderizarCamposForm();
-    renderizarPreview();
+
+    renderizarPreview(); // placeholder imediato enquanto o SVG carrega (se houver)
+    if (modelo.svgTemplate) {
+      reconstruirSvgImagem(); // async — atualiza o preview ao terminar
+    }
   }
 
   async function precarregarImagensElementos(els) {
@@ -1382,11 +1532,8 @@ renderVistosRecentemente();
     await Promise.all(pendentes);
   }
 
-  btnVoltar?.addEventListener("click", () => {
-    etapa1.hidden = false;
-    etapa2.hidden = true;
-    campoSelecionado = -1;
-  });
+  // Sem galeria — botão Voltar fecha o modal diretamente
+  btnVoltar?.addEventListener("click", fecharModal);
 
   // ─── Renderizar cards de campo no formulário ───────────────────────────
   function renderizarCamposForm() {
@@ -1465,22 +1612,52 @@ renderVistosRecentemente();
 
       camposContainer.insertBefore(coresCard, logoCard);
     }
+
+    // ── Cores editáveis do SVG template (gradiente do Canva) ─────────────
+    if (modeloAtual?.svgTemplate && Array.isArray(modeloAtual.coresEditaveis)) {
+      const coresVisiveis = modeloAtual.coresEditaveis.filter((c) => !c.derivaDe);
+      if (coresVisiveis.length > 0) {
+        const coresSvgCard = document.createElement("div");
+        coresSvgCard.className = "campo-card campo-card--cores";
+        coresSvgCard.innerHTML = `
+          <div class="campo-card-topo">
+            <span class="campo-card-label">🎨 Personalizar cores do modelo</span>
+          </div>
+          <div class="cores-pickers cores-pickers--svg"></div>
+        `;
+        const pickerWrap = coresSvgCard.querySelector(".cores-pickers--svg");
+
+        coresVisiveis.forEach((cor) => {
+          const item = document.createElement("div");
+          item.className = "cor-picker-item";
+          item.innerHTML = `
+            <label class="cor-picker-label">${cor.label}</label>
+            <input type="color" class="cor-picker-input" value="${cor.valor || cor.hexOriginal}">
+          `;
+          pickerWrap.appendChild(item);
+
+          item.querySelector(".cor-picker-input").addEventListener("input", (e) => {
+            cor.valor = e.target.value;
+            reconstruirSvgImagem();
+          });
+        });
+
+        camposContainer.insertBefore(coresSvgCard, logoCard);
+      }
+    }
   }
 
   // ─── Atualizar inputs X/Y após arrastar ────────────────────────────────
-  function sincronizarInputsXY(idx) {
-    const card = camposContainer.querySelector(`.campo-card[data-idx="${idx}"]`);
-    if (!card) return;
-    card.querySelector("[data-axis='x']").value = Math.round(campos[idx].x);
-    card.querySelector("[data-axis='y']").value = Math.round(campos[idx].y);
-  }
+  // Nota: os cards do formulário não possuem inputs X/Y na UI atual;
+  // a função é mantida como no-op para evitar erros se for chamada.
+  function sincronizarInputsXY(_idx) { /* no-op */ }
 
   // ─── Logo ───────────────────────────────────────────────────────────────
   document.getElementById("mod-logo")?.addEventListener("change", async (e) => {
     const file = e.target.files?.[0];
     if (!file) { logoDataUrl = null; logoImg = null; renderizarPreview(); return; }
     if (file.size > 2 * 1024 * 1024) {
-      alert("A logo deve ter no máximo 2 MB.");
+      showToast("A logo deve ter no máximo 2 MB.", "error");
       e.target.value = "";
       return;
     }
@@ -1497,6 +1674,12 @@ renderVistosRecentemente();
     // 1. Fundo branco (base sempre branca para transparências)
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, LOGICAL_W, LOGICAL_H);
+
+    // 1b. SVG do template (fundo decorativo do Canva, com cores editáveis aplicadas)
+    if (modeloAtual.svgTemplate) {
+      if (svgImageAtual) ctx.drawImage(svgImageAtual, 0, 0, LOGICAL_W, LOGICAL_H);
+      // svgImageAtual === null enquanto carrega → mantém fundo branco como placeholder
+    }
 
     // 2. Elementos decorativos (faixas, linhas, ícones)
     // Ícones condicionais: só aparecem se o campo correspondente estiver preenchido
@@ -1556,7 +1739,13 @@ renderVistosRecentemente();
         return;
       }
 
-      ctx.fillStyle = campo.color;
+      // Cor do texto: resolve derivaCorDe se definido no modelo SVG
+      let textoCor = campo.color;
+      if (campo.derivaCorDe && modeloAtual.coresEditaveis) {
+        const corRef = modeloAtual.coresEditaveis.find((c) => c.id === campo.derivaCorDe);
+        if (corRef) textoCor = corRef.valor || corRef.hexOriginal;
+      }
+      ctx.fillStyle = textoCor;
 
       let textoFinal = campo.text;
       if (ctx.measureText(textoFinal).width > campo.maxWidth) {
@@ -1678,9 +1867,14 @@ renderVistosRecentemente();
     // Percorre de trás para frente (último campo fica por cima visualmente)
     for (let i = campos.length - 1; i >= 0; i--) {
       const c = campos[i];
-      if (!c.text) continue;
-      ctx.font = `${c.fontWeight === "700" ? "bold" : "normal"} ${c.fontSize}px ${(FONTES.find((f) => f.label === c.fontFamily) || FONTES[0]).css}`;
-      const tw = Math.min(ctx.measureText(c.text).width, c.maxWidth);
+      let tw;
+      if (c.text) {
+        ctx.font = `${c.fontWeight === "700" ? "bold" : "normal"} ${c.fontSize}px ${(FONTES.find((f) => f.label === c.fontFamily) || FONTES[0]).css}`;
+        tw = Math.min(ctx.measureText(c.text).width, c.maxWidth);
+      } else {
+        // Campo vazio: usa bounding box fixo para permitir reposicionamento
+        tw = Math.min(c.maxWidth, 120);
+      }
       let rx = c.x;
       if (c.align === "center")     rx -= tw / 2;
       else if (c.align === "right") rx -= tw;
@@ -1759,8 +1953,8 @@ renderVistosRecentemente();
     if (logoAcao && logoZone) {
       const MIN = 20;
       if (logoAcao === "mover") {
-        logoZone.x = Math.max(0, Math.min(canvas.width  - logoZone.w, x - dragOffset.x));
-        logoZone.y = Math.max(0, Math.min(canvas.height - logoZone.h, y - dragOffset.y));
+        logoZone.x = Math.max(0, Math.min(LOGICAL_W - logoZone.w, x - dragOffset.x));
+        logoZone.y = Math.max(0, Math.min(LOGICAL_H - logoZone.h, y - dragOffset.y));
       } else {
         const dx = x - dragStart.x;
         const dy = y - dragStart.y;
@@ -1792,8 +1986,8 @@ renderVistosRecentemente();
     }
 
     if (campoSelecionado < 0) return;
-    campos[campoSelecionado].x = Math.max(0, Math.min(canvas.width,  x - dragOffset.x));
-    campos[campoSelecionado].y = Math.max(0, Math.min(canvas.height, y - dragOffset.y));
+    campos[campoSelecionado].x = Math.max(0, Math.min(LOGICAL_W, x - dragOffset.x));
+    campos[campoSelecionado].y = Math.max(0, Math.min(LOGICAL_H, y - dragOffset.y));
     sincronizarInputsXY(campoSelecionado);
     renderizarPreview();
     e.preventDefault();

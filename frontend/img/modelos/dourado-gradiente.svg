@@ -1,0 +1,101 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 594" width="420" height="594">
+  <defs>
+    <linearGradient id="g-header" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%"   stop-color="#e8c040"/>
+      <stop offset="50%"  stop-color="#c8a020"/>
+      <stop offset="100%" stop-color="#8b6010"/>
+    </linearGradient>
+    <linearGradient id="g-footer" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%"   stop-color="#8b6010"/>
+      <stop offset="45%"  stop-color="#c8a020"/>
+      <stop offset="100%" stop-color="#e8c040"/>
+    </linearGradient>
+    <linearGradient id="g-line" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%"   stop-color="#e8c040" stop-opacity="0"/>
+      <stop offset="25%"  stop-color="#c8a020"/>
+      <stop offset="75%"  stop-color="#c8a020"/>
+      <stop offset="100%" stop-color="#e8c040" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="g-subfooter" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#fdf6e3"/>
+      <stop offset="100%" stop-color="#faf0d0"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Fundo branco -->
+  <rect width="420" height="594" fill="#ffffff"/>
+
+  <!-- Cabeçalho com gradiente dourado (y:0–105) -->
+  <rect x="0" y="0" width="420" height="105" fill="url(#g-header)"/>
+
+  <!-- Corte diagonal suave no canto inferior esquerdo do cabeçalho -->
+  <polygon points="0,95 55,105 0,105" fill="#8b6010" opacity="0.25"/>
+  <!-- Corte diagonal no canto inferior direito -->
+  <polygon points="420,95 365,105 420,105" fill="#8b6010" opacity="0.25"/>
+
+  <!-- Área circular para logo (x:160, y:15, w:100, h:80 → centro 210,55 r≈42) -->
+  <circle cx="210" cy="55" r="44" fill="rgba(255,255,255,0.96)" stroke="#e8c040" stroke-width="1.8"/>
+  <circle cx="210" cy="55" r="40" fill="none" stroke="#c8a020" stroke-width="0.6" stroke-dasharray="4 3" opacity="0.6"/>
+
+  <!-- Folhagem decorativa superior esquerda (#8b7c3c) -->
+  <g fill="#8b7c3c" opacity="0.75" transform="translate(18,8)">
+    <ellipse cx="14" cy="26" rx="6" ry="16" transform="rotate(-22,14,26)"/>
+    <ellipse cx="26" cy="18" rx="5" ry="13" transform="rotate(8,26,18)"/>
+    <ellipse cx="6"  cy="14" rx="4" ry="11" transform="rotate(-38,6,14)"/>
+    <ellipse cx="32" cy="32" rx="4" ry="10" transform="rotate(28,32,32)"/>
+  </g>
+  <!-- Folhagem decorativa superior direita (#8b7c3c) -->
+  <g fill="#8b7c3c" opacity="0.75" transform="translate(362,8)">
+    <ellipse cx="12" cy="26" rx="6" ry="16" transform="rotate(22,12,26)"/>
+    <ellipse cx="0"  cy="18" rx="5" ry="13" transform="rotate(-8,0,18)"/>
+    <ellipse cx="24" cy="14" rx="4" ry="11" transform="rotate(38,24,14)"/>
+    <ellipse cx="-6" cy="32" rx="4" ry="10" transform="rotate(-28,-6,32)"/>
+  </g>
+
+  <!-- Linha separadora abaixo do cabeçalho -->
+  <rect x="0" y="104" width="420" height="1.5" fill="url(#g-line)"/>
+
+  <!-- Linhas de escrita no corpo (y:155–470) -->
+  <line x1="20" y1="168" x2="400" y2="168" stroke="#c8a020" stroke-width="0.35" opacity="0.28"/>
+  <line x1="20" y1="211" x2="400" y2="211" stroke="#c8a020" stroke-width="0.35" opacity="0.28"/>
+  <line x1="20" y1="254" x2="400" y2="254" stroke="#c8a020" stroke-width="0.35" opacity="0.28"/>
+  <line x1="20" y1="297" x2="400" y2="297" stroke="#c8a020" stroke-width="0.35" opacity="0.28"/>
+  <line x1="20" y1="340" x2="400" y2="340" stroke="#c8a020" stroke-width="0.35" opacity="0.28"/>
+  <line x1="20" y1="383" x2="400" y2="383" stroke="#c8a020" stroke-width="0.35" opacity="0.28"/>
+  <line x1="20" y1="426" x2="400" y2="426" stroke="#c8a020" stroke-width="0.35" opacity="0.28"/>
+  <line x1="20" y1="469" x2="400" y2="469" stroke="#c8a020" stroke-width="0.35" opacity="0.28"/>
+
+  <!-- Linha divisória central com gradiente (#c8a020) -->
+  <rect x="20" y="164" width="380" height="0.9" fill="url(#g-line)" opacity="0.6"/>
+
+  <!-- Faixa de rodapé (y:478–506) -->
+  <rect x="0" y="478" width="420" height="28" fill="url(#g-footer)"/>
+
+  <!-- Folhagem decorativa inferior esquerda (#8b7c3c) -->
+  <g fill="#8b7c3c" opacity="0.55" transform="translate(0,445)">
+    <ellipse cx="16" cy="28" rx="7" ry="19" transform="rotate(-18,16,28)"/>
+    <ellipse cx="30" cy="20" rx="6" ry="15" transform="rotate(12,30,20)"/>
+    <ellipse cx="6"  cy="12" rx="5" ry="13" transform="rotate(-32,6,12)"/>
+    <ellipse cx="38" cy="34" rx="4" ry="10" transform="rotate(22,38,34)"/>
+  </g>
+  <!-- Folhagem decorativa inferior direita (#8b7c3c) -->
+  <g fill="#8b7c3c" opacity="0.55" transform="translate(368,445)">
+    <ellipse cx="10" cy="28" rx="7" ry="19" transform="rotate(18,10,28)"/>
+    <ellipse cx="-4" cy="20" rx="6" ry="15" transform="rotate(-12,-4,20)"/>
+    <ellipse cx="22" cy="12" rx="5" ry="13" transform="rotate(32,22,12)"/>
+    <ellipse cx="-8" cy="34" rx="4" ry="10" transform="rotate(-22,-8,34)"/>
+  </g>
+
+  <!-- Sub-rodapé (y:506–594) -->
+  <rect x="0" y="506" width="420" height="88" fill="url(#g-subfooter)"/>
+  <rect x="0" y="506" width="420" height="0.8" fill="#c8a020" opacity="0.35"/>
+
+  <!-- Ornamento de canto inferior esquerdo (#8b7c3c) -->
+  <g fill="none" stroke="#8b7c3c" stroke-width="1.2" opacity="0.4">
+    <path d="M 2,590 Q 18,572 36,582 Q 20,594 4,594"/>
+  </g>
+  <!-- Ornamento de canto inferior direito (#8b7c3c) -->
+  <g fill="none" stroke="#8b7c3c" stroke-width="1.2" opacity="0.4">
+    <path d="M 418,590 Q 402,572 384,582 Q 400,594 416,594"/>
+  </g>
+</svg>

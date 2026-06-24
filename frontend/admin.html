@@ -707,8 +707,25 @@
                     <input id="modeloNome" type="text" placeholder="ex: Dourado Premium" />
                   </div>
 
+                  <!-- SVG do modelo — obrigatório -->
+                  <div class="field" style="border:2px dashed #c8a020; border-radius:8px; padding:14px 16px; background:#fff8e1;">
+                    <label for="modeloSvgUrl" style="font-weight:700; color:#9a7800;">
+                      🖼️ Arquivo SVG do modelo <span style="color:#e53935;">*</span> <small style="font-weight:400; color:#888;">(obrigatório)</small>
+                    </label>
+                    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:6px;">
+                      <input id="modeloSvgUrl" type="url" placeholder="https://storage.googleapis.com/..." style="flex:1; min-width:180px;" />
+                      <label class="btn btn-secondary btn-small" style="cursor:pointer; white-space:nowrap;" title="Enviar arquivo SVG para o servidor">
+                        📤 Enviar SVG
+                        <input type="file" id="upload-svg-modelo" accept="image/svg+xml,.svg" style="display:none;" />
+                      </label>
+                    </div>
+                    <span style="font-size:0.76rem; color:#6b7280; margin-top:4px; display:block;">O SVG deve conter o layout completo do receituário. Textos com <code>data-campo="nome"</code> viram campos editáveis pelo cliente.</span>
+                    <div id="upload-svg-status" style="font-size:0.8rem; margin-top:4px; color:#666;"></div>
+                    <img id="preview-svg-modelo" src="" alt="preview do SVG" style="display:none; max-width:140px; border-radius:6px; border:1px solid #ddd; margin-top:6px;" />
+                  </div>
+
                   <div class="field">
-                    <label for="modeloFundoUrl">Imagem de fundo do receituário</label>
+                    <label for="modeloFundoUrl">Imagem de fundo alternativa (opcional)</label>
                     <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
                       <input id="modeloFundoUrl" type="url" placeholder="https://storage.googleapis.com/..." style="flex:1; min-width:180px;" />
                       <label class="btn btn-secondary btn-small" style="cursor:pointer; white-space:nowrap;" title="Enviar imagem de fundo para o servidor">
@@ -716,7 +733,7 @@
                         <input type="file" id="upload-fundo-modelo" accept="image/jpeg,image/png,image/webp" style="display:none;" />
                       </label>
                     </div>
-                    <span style="font-size:0.76rem; color:#6b7280;">Carregue a imagem com o design do modelo (sem textos de exemplo). Será usada como fundo no gerador de receituário.</span>
+                    <span style="font-size:0.76rem; color:#6b7280;">Imagem JPG/PNG usada como fallback se o SVG não for suportado.</span>
                     <div id="upload-fundo-status" style="font-size:0.8rem; margin-top:2px; color:#666;"></div>
                     <img id="preview-fundo-modelo" src="" alt="preview do fundo" style="display:none; max-width:120px; border-radius:6px; border:1px solid #ddd; margin-top:6px;" />
                   </div>

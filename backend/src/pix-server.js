@@ -30,8 +30,8 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 const PORT = process.env.PORT || 3000;
-const mpAccessToken = process.env.MP_ACCESS_TOKEN || "TEST-1234567890";
-const mpPublicKey = process.env.MP_PUBLIC_KEY || "APP_USER_ID1234567890";
+const mpAccessToken = process.env.MP_ACCESS_TOKEN || "";
+const mpPublicKey = process.env.MP_PUBLIC_KEY || "";
 
 // ==================== HEALTH CHECK ====================
 app.get("/health", (req, res) => {

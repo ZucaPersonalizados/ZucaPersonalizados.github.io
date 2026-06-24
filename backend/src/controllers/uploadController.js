@@ -1,4 +1,5 @@
 import { bucket } from "../firebase.js";
+import path from "path";
 
 export const uploadArquivo = async (req, res) => {
   try {
@@ -6,7 +7,15 @@ export const uploadArquivo = async (req, res) => {
       return res.status(400).json({ erro: "Nenhum arquivo enviado" });
     }
 
-    const nome = Date.now() + "-" + req.file.originalname;
+    if (!bucket) {
+      return res.status(503).json({ erro: "Storage nao configurado no servidor" });
+    }
+
+    const nomeOriginal = path
+      .basename(req.file.originalname)
+      .replace(/[^a-zA-Z0-9._-]/g, "_")
+      .slice(0, 100) || "arquivo";
+    const nome = Date.now() + "-" + nomeOriginal;
 
     const file = bucket.file(nome);
 

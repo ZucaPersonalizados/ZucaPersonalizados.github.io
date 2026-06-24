@@ -2,7 +2,7 @@
   "name": "backend-zuca",
   "version": "1.0.0",
   "type": "module",
-  "main": "index.js",
+  "main": "src/app-server.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "node src/app-server.js",

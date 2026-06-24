@@ -102,6 +102,10 @@ export function buildNfePayload(pedido, produtosMap = {}) {
     const ncm = String(produtoData.ncm || item.ncm || "48201010").replace(/\D/g, "").slice(0, 8);
     const preco = Number(item.preco || 0);
     const qtd = Number(item.quantidade || 1);
+
+    if (preco <= 0) throw new Error(`Item ${idx + 1} ("${String(item.nome || "").slice(0, 40)}"): preço deve ser maior que zero`);
+    if (qtd <= 0 || !Number.isFinite(qtd)) throw new Error(`Item ${idx + 1} ("${String(item.nome || "").slice(0, 40)}"): quantidade inválida`);
+
     const valorTotal = Number((preco * qtd).toFixed(2));
 
     return {
@@ -143,6 +147,12 @@ export function buildNfePayload(pedido, produtosMap = {}) {
   const valorFrete = Number((frete.valor || 0).toFixed(2));
   const desconto = Number((pedido.desconto || 0).toFixed(2));
   const totalNota = Number((subtotal - desconto + valorFrete).toFixed(2));
+
+  if (totalNota <= 0) throw new Error(`Valor total da NF-e inválido: R$ ${totalNota.toFixed(2)}`);
+
+  if (!emitente.cnpj || emitente.cnpj.length !== 14) {
+    throw new Error("EMPRESA_CNPJ não configurado ou inválido (deve ter 14 dígitos)");
+  }
 
   const payload = {
     natureza_operacao: "Venda de Mercadoria",

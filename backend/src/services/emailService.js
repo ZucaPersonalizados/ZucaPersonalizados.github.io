@@ -5,6 +5,16 @@
 
 import nodemailer from "nodemailer";
 
+/** Escapa caracteres especiais HTML para evitar HTML injection no corpo do e-mail. */
+function escapeHtml(str) {
+  return String(str || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#x27;");
+}
+
 function getTransporter() {
   const host = String(process.env.SMTP_HOST || "smtp.gmail.com").trim();
   const port = Number(process.env.SMTP_PORT || 587);
@@ -49,7 +59,7 @@ export async function sendNotaFiscalEmail({ pedido, danfePdfBuffer, chaveAcesso,
 
   if (!to) throw new Error("E-mail do cliente não preenchido no pedido");
 
-  const nomeCliente = String(pedido?.cliente?.nome || "Cliente").trim();
+  const nomeCliente = escapeHtml(String(pedido?.cliente?.nome || "Cliente").trim());
   const itens = Array.isArray(pedido?.itens) ? pedido.itens : [];
   const dataEmissao = formatDate(new Date().toISOString());
   const chaveFormatada = String(chaveAcesso || "").replace(/(\d{4})/g, "$1 ").trim();
@@ -60,8 +70,8 @@ export async function sendNotaFiscalEmail({ pedido, danfePdfBuffer, chaveAcesso,
     .map(
       (item) => `
       <tr>
-        <td style="padding:8px 12px;border-bottom:1px solid #f0f0f0;">${item.nome || "Produto"}</td>
-        <td style="padding:8px 12px;border-bottom:1px solid #f0f0f0;text-align:center;">${item.quantidade || 1}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #f0f0f0;">${escapeHtml(item.nome || "Produto")}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #f0f0f0;text-align:center;">${Number(item.quantidade || 1)}</td>
         <td style="padding:8px 12px;border-bottom:1px solid #f0f0f0;text-align:right;">${formatCurrency(item.preco)}</td>
         <td style="padding:8px 12px;border-bottom:1px solid #f0f0f0;text-align:right;">${formatCurrency((item.preco || 0) * (item.quantidade || 1))}</td>
       </tr>`
@@ -135,7 +145,7 @@ export async function sendNotaFiscalEmail({ pedido, danfePdfBuffer, chaveAcesso,
             <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:32px;">
               ${pedido.frete?.valor ? `
               <tr>
-                <td style="font-size:13px;color:#6b7280;padding:3px 0;">Frete (${pedido.frete.servico || ""})</td>
+                <td style="font-size:13px;color:#6b7280;padding:3px 0;">Frete (${escapeHtml(pedido.frete.servico || "")})</td>
                 <td style="font-size:13px;color:#374151;text-align:right;padding:3px 0;">${formatCurrency(pedido.frete.valor)}</td>
               </tr>` : ""}
               ${pedido.desconto > 0 ? `

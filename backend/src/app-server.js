@@ -2045,7 +2045,7 @@ app.post("/api/admin/pedidos/:id/nota-fiscal", adminAuth, requireDb, async (req,
     });
   } catch (error) {
     console.error("[NF-e] Erro inesperado:", error);
-    return res.status(500).json({ success: false, error: error.message });
+    return res.status(500).json({ success: false, error: "Erro interno ao processar a NF-e. Verifique os logs do servidor." });
   }
 });
 
@@ -2064,7 +2064,8 @@ app.get("/api/admin/pedidos/:id/nota-fiscal", adminAuth, requireDb, async (req, 
     const { notaFiscal } = pedidoSnap.data();
     return res.json({ success: true, notaFiscal: notaFiscal || null });
   } catch (error) {
-    return res.status(500).json({ success: false, error: error.message });
+    console.error("[NF-e consulta]", error);
+    return res.status(500).json({ success: false, error: "Erro ao consultar NF-e." });
   }
 });
 
@@ -2101,11 +2102,12 @@ app.post("/api/admin/pedidos/:id/nota-fiscal/reenviar-email", adminAuth, require
 
     return res.json({ success: true, message: "E-mail reenviado com sucesso" });
   } catch (error) {
-    return res.status(500).json({ success: false, error: error.message });
+    console.error("[NF-e reenvio]", error);
+    return res.status(500).json({ success: false, error: "Erro ao reenviar e-mail. Verifique os logs do servidor." });
   }
 });
 
-// ───────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
 // IA: Geração de Arte (OpenAI → Pollinations.ai fallback gratuito)
 // ───────────────────────────────────────────────────────────────────────────
 

@@ -704,38 +704,37 @@
 
                   <div class="field">
                     <label for="modeloNome">Nome do modelo (exibido no seletor)</label>
-                    <input id="modeloNome" type="text" placeholder="ex: Dourado Premium" />
+                    <input id="modeloNome" type="text" placeholder="ex: Receituário Clássico" />
                   </div>
 
-                  <!-- SVG do modelo — obrigatório -->
+                  <!-- SVG: cole o texto aqui para visualizar e posicionar os campos -->
                   <div class="field" style="border:2px dashed #c8a020; border-radius:8px; padding:14px 16px; background:#fff8e1;">
-                    <label for="modeloSvgUrl" style="font-weight:700; color:#9a7800;">
-                      🖼️ Arquivo SVG do modelo <span style="color:#e53935;">*</span> <small style="font-weight:400; color:#888;">(obrigatório)</small>
+                    <label style="font-weight:700; color:#9a7800; display:block; margin-bottom:4px;">
+                      🖼️ SVG do modelo <span style="color:#e53935;">*</span>
                     </label>
-                    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:6px;">
-                      <input id="modeloSvgUrl" type="url" placeholder="https://storage.googleapis.com/..." style="flex:1; min-width:180px;" />
+                    <p style="font-size:0.82rem; color:#6b7280; margin-bottom:10px; line-height:1.5;">
+                      Cole o conteúdo XML do arquivo SVG abaixo. O canvas ao lado renderizará o SVG e mostrará
+                      <strong>marcadores coloridos</strong> para cada campo (nome, especialidade, etc.).
+                      Arraste os marcadores para posicioná-los sobre o SVG. As coordenadas serão salvas automaticamente.
+                    </p>
+                    <textarea id="modeloSvgTexto" rows="6"
+                      style="font-family:monospace; font-size:0.75rem; white-space:pre; overflow-x:auto; background:#fff; border:1px solid #ddd; resize:vertical;"
+                      placeholder="&lt;svg xmlns=&quot;http://www.w3.org/2000/svg&quot; viewBox=&quot;0 0 595.5 842&quot;&gt;...&lt;/svg&gt;"></textarea>
+
+                    <!-- Caminho relativo salvo no banco — preenchido automaticamente quando usa o SVG padrão -->
+                    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:8px;">
+                      <input id="modeloSvgUrl" type="text" placeholder="img/modelos/receituario-modelo.svg"
+                        style="flex:1; min-width:180px; font-family:monospace; font-size:0.82rem;"
+                        title="Caminho relativo do SVG servido pelo servidor. Deixe em branco para usar o SVG colado acima direto no banco." />
+                      <button type="button" id="btn-usar-svg-padrao" class="btn btn-secondary btn-small" style="white-space:nowrap;" title="Usar o SVG padrão já incluído no site">
+                        📌 Usar SVG padrão
+                      </button>
                       <label class="btn btn-secondary btn-small" style="cursor:pointer; white-space:nowrap;" title="Enviar arquivo SVG para o servidor">
                         📤 Enviar SVG
                         <input type="file" id="upload-svg-modelo" accept="image/svg+xml,.svg" style="display:none;" />
                       </label>
                     </div>
-                    <span style="font-size:0.76rem; color:#6b7280; margin-top:4px; display:block;">O SVG deve conter o layout completo do receituário. Textos com <code>data-campo="nome"</code> viram campos editáveis pelo cliente.</span>
                     <div id="upload-svg-status" style="font-size:0.8rem; margin-top:4px; color:#666;"></div>
-                    <img id="preview-svg-modelo" src="" alt="preview do SVG" style="display:none; max-width:140px; border-radius:6px; border:1px solid #ddd; margin-top:6px;" />
-                  </div>
-
-                  <div class="field">
-                    <label for="modeloFundoUrl">Imagem de fundo alternativa (opcional)</label>
-                    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-                      <input id="modeloFundoUrl" type="url" placeholder="https://storage.googleapis.com/..." style="flex:1; min-width:180px;" />
-                      <label class="btn btn-secondary btn-small" style="cursor:pointer; white-space:nowrap;" title="Enviar imagem de fundo para o servidor">
-                        📤 Enviar fundo
-                        <input type="file" id="upload-fundo-modelo" accept="image/jpeg,image/png,image/webp" style="display:none;" />
-                      </label>
-                    </div>
-                    <span style="font-size:0.76rem; color:#6b7280;">Imagem JPG/PNG usada como fallback se o SVG não for suportado.</span>
-                    <div id="upload-fundo-status" style="font-size:0.8rem; margin-top:2px; color:#666;"></div>
-                    <img id="preview-fundo-modelo" src="" alt="preview do fundo" style="display:none; max-width:120px; border-radius:6px; border:1px solid #ddd; margin-top:6px;" />
                   </div>
 
                   <div>
@@ -758,45 +757,49 @@
                         <input id="logoH" type="number" min="1" max="594" step="1" placeholder="95" style="width:70px;" />
                       </div>
                     </div>
+                    <span style="font-size:0.76rem; color:#888; margin-top:4px; display:block;">A zona da logo também pode ser arrastada diretamente no canvas.</span>
                   </div>
 
-                  <div>
-                    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
-                      <label for="modeloCamposJson" style="font-weight:600; font-size:0.88rem;">Campos de texto (JSON)</label>
-                      <button type="button" id="btn-modelo-template" class="btn btn-small btn-secondary" style="font-size:0.78rem;">📋 Inserir template</button>
+                  <!-- Canvas interativo + campos -->
+                  <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; align-items:start;">
+                    <!-- Canvas -->
+                    <div>
+                      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
+                        <label style="font-weight:600; font-size:0.88rem;">Canvas interativo (arraste os marcadores)</label>
+                        <button type="button" id="btn-admin-preview-modelo" class="btn btn-small btn-secondary" style="font-size:0.78rem;">▶ Renderizar</button>
+                      </div>
+                      <canvas id="admin-modelo-canvas" width="420" height="594"
+                        style="width:100%; max-width:360px; height:auto; border-radius:8px; border:1.5px solid #c8a020; display:none; background:#f9f9f9; cursor:crosshair;"></canvas>
+                      <span id="admin-preview-msg" style="font-size:0.8rem; color:#666; display:block; margin-top:4px;"></span>
+                      <div id="admin-campo-ativo-info" style="display:none; margin-top:6px; font-size:0.8rem; background:#fff3cd; border:1px solid #f0c040; border-radius:6px; padding:6px 10px; color:#856404;">
+                        Arrastando: <strong id="admin-campo-ativo-nome"></strong>
+                        &nbsp;·&nbsp; x: <strong id="admin-campo-ativo-x"></strong>
+                        &nbsp;·&nbsp; y: <strong id="admin-campo-ativo-y"></strong>
+                      </div>
                     </div>
-                    <textarea id="modeloCamposJson" rows="14" style="font-family:monospace; font-size:0.8rem; white-space:pre; overflow-x:auto;"
-                      placeholder='{"nome": {"x":210,"y":120,"fontSize":11,"color":"#c8a020","align":"center","maxWidth":290,"fontWeight":"700","fontFamily":"Playfair Display"}}'></textarea>
-                    <span style="font-size:0.76rem; color:#888;">Chaves possíveis por campo: x, y, fontSize, color, align (left/center/right), maxWidth, fontWeight (400/700), fontFamily (Montserrat, Lato, Poppins, Playfair Display, Great Vibes)</span>
-                  </div>
 
-                  <div>
-                    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
-                      <label for="modeloElementosJson" style="font-weight:600; font-size:0.88rem;">Elementos decorativos (JSON)</label>
-                      <button type="button" id="btn-modelo-elementos-template" class="btn btn-small btn-secondary" style="font-size:0.78rem;">📋 Inserir exemplo</button>
-                    </div>
-                    <textarea id="modeloElementosJson" rows="8" style="font-family:monospace; font-size:0.8rem; white-space:pre; overflow-x:auto;"
-                      placeholder='[{"tipo":"faixa","x":0,"y":478,"largura":420,"altura":28,"cor":"#c8a020"}]'></textarea>
-                    <span style="font-size:0.76rem; color:#888;">Tipos suportados:<br>
-                      <strong>faixa</strong>: x, y, largura, altura, cor, opacidade &nbsp;·&nbsp;
-                      <strong>linha</strong>: x, y, comprimento, espessura, cor, orientacao (h/v) &nbsp;·&nbsp;
-                      <strong>circulo</strong>: x, y, raio, cor &nbsp;·&nbsp;
-                      <strong>icone</strong>: x, y, tamanho, cor, icone (whatsapp | instagram | email | localizacao | telefone)<br>
-                      <strong>imagem</strong>: src ("/img/elementos/folhagem.png"), x, y, largura, altura, opacidade, rotacao (graus), espelhar ("h" ou "v")<br>
-                      <strong>editavelPeloCliente: true</strong> — exibe um color picker para o cliente alterar a cor &nbsp;·&nbsp;
-                      <strong>labelCliente: "texto"</strong> — rótulo exibido no picker (ex: "Cor do destaque")
-                    </span>
-                  </div>
+                    <!-- Campos JSON — atualizado automaticamente pelo canvas -->
+                    <div style="display:flex; flex-direction:column; gap:10px;">
+                      <div>
+                        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
+                          <label for="modeloCamposJson" style="font-weight:600; font-size:0.88rem;">Campos de texto (JSON)</label>
+                          <button type="button" id="btn-modelo-template" class="btn btn-small btn-secondary" style="font-size:0.78rem;">📋 Template clássico</button>
+                        </div>
+                        <textarea id="modeloCamposJson" rows="18" style="font-family:monospace; font-size:0.75rem; white-space:pre; overflow-x:auto;"
+                          placeholder='{"nome":{"x":210,"y":120,...}}'></textarea>
+                        <span style="font-size:0.76rem; color:#888;">Editável manualmente ou via arraste no canvas.</span>
+                      </div>
 
-                  <!-- Pré-visualização do modelo -->
-                  <div>
-                    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
-                      <label style="font-weight:600; font-size:0.88rem;">Pré-visualização do modelo</label>
-                      <button type="button" id="btn-admin-preview-modelo" class="btn btn-small btn-secondary" style="font-size:0.78rem;">👁 Renderizar preview</button>
+                      <div>
+                        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
+                          <label for="modeloElementosJson" style="font-weight:600; font-size:0.88rem;">Elementos decorativos (JSON)</label>
+                          <button type="button" id="btn-modelo-elementos-template" class="btn btn-small btn-secondary" style="font-size:0.78rem;">📋 Inserir exemplo</button>
+                        </div>
+                        <textarea id="modeloElementosJson" rows="4" style="font-family:monospace; font-size:0.75rem; white-space:pre; overflow-x:auto;"
+                          placeholder="[]"></textarea>
+                        <span style="font-size:0.76rem; color:#888;">Deixe <code>[]</code> se o SVG já contém toda a decoração.</span>
+                      </div>
                     </div>
-                    <canvas id="admin-modelo-canvas" width="420" height="594"
-                      style="max-width:240px; width:100%; height:auto; border-radius:8px; border:1.5px solid #ddd; display:none; background:#f9f9f9;"></canvas>
-                    <span id="admin-preview-msg" style="font-size:0.8rem; color:#666; display:block; margin-top:4px;"></span>
                   </div>
                 </div>
 

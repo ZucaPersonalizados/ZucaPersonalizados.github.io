@@ -339,13 +339,12 @@ function obterProdutoDoFormulario() {
       if (rawElementosJson) {
         try { elementos = JSON.parse(rawElementosJson); } catch { elementos = []; }
       }
-      const fundoUrl  = String(document.getElementById("modeloFundoUrl")?.value || "").trim();
-      const svgUrl    = String(document.getElementById("modeloSvgUrl")?.value  || "").trim();
+      const svgUrl = String(document.getElementById("modeloSvgUrl")?.value || "").trim();
       if (!svgUrl) {
-        setProdutoStatus("O SVG do modelo é obrigatório. Envie o arquivo antes de salvar.", "error");
+        setProdutoStatus("Preencha o caminho do SVG (ex: img/modelos/receituario-modelo.svg) antes de salvar.", "error");
         return null;
       }
-      return { logoZone: { x: logoX, y: logoY, w: logoW, h: logoH }, campos, elementos, fundoUrl, svgTemplate: svgUrl };
+      return { logoZone: { x: logoX, y: logoY, w: logoW, h: logoH }, campos, elementos, svgTemplate: svgUrl };
     })(),
   };
 }
@@ -358,17 +357,17 @@ function limparFormularioProduto() {
   if (btnExcluirProduto) btnExcluirProduto.style.display = "none";
   setTipoProdutoVisual("nenhum");
   // Limpeza explícita dos campos de tipo para garantir estado correto entre edições
-  const camposModelo = ["modeloNome", "modeloSvgUrl", "modeloFundoUrl", "logoX", "logoY", "logoW", "logoH", "modeloCamposJson", "modeloElementosJson"];
+  const camposModelo = ["modeloNome", "modeloSvgUrl", "modeloSvgTexto", "logoX", "logoY", "logoW", "logoH", "modeloCamposJson", "modeloElementosJson"];
   camposModelo.forEach((id) => {
     const el = document.getElementById(id);
     if (el) el.value = "";
   });
-  const prevFundo = document.getElementById("preview-fundo-modelo");
-  if (prevFundo) { prevFundo.src = ""; prevFundo.style.display = "none"; }
-  const prevSvg = document.getElementById("preview-svg-modelo");
-  if (prevSvg) { prevSvg.src = ""; prevSvg.style.display = "none"; }
   const svgStatus = document.getElementById("upload-svg-status");
   if (svgStatus) svgStatus.textContent = "";
+  const adminCanvas = document.getElementById("admin-modelo-canvas");
+  if (adminCanvas) adminCanvas.style.display = "none";
+  const adminMsg = document.getElementById("admin-preview-msg");
+  if (adminMsg) adminMsg.textContent = "";
   const instrucoesEl = document.getElementById("instrucoesPersonalizacao");
   if (instrucoesEl) instrucoesEl.value = "";
   setProdutoStatus("Pronto para cadastrar.");
@@ -427,11 +426,6 @@ function preencherFormularioProduto(produto) {
     }
     const svgUrlEl = document.getElementById("modeloSvgUrl");
     if (svgUrlEl) svgUrlEl.value = produto.modeloConfig.svgTemplate || "";
-    const prevSvg = document.getElementById("preview-svg-modelo");
-    if (prevSvg && produto.modeloConfig.svgTemplate) {
-      prevSvg.src = produto.modeloConfig.svgTemplate;
-      prevSvg.style.display = "block";
-    }
   }
 
   selectedProductId = produto.id;
@@ -988,28 +982,41 @@ document.querySelectorAll('input[name="tipoProduto"]').forEach((radio) => {
   if (inputImagens) obs.observe(inputImagens, { attributes: false, childList: false, characterData: true, subtree: true });
 })();
 
-// Upload do SVG do modelo (obrigatório quando ehModelo=true)
+// Upload do SVG do modelo via arquivo (preenche textarea e URL)
 (function () {
   const inputSvg  = document.getElementById("upload-svg-modelo");
   const inputUrl  = document.getElementById("modeloSvgUrl");
+  const textoEl   = document.getElementById("modeloSvgTexto");
   const statusEl  = document.getElementById("upload-svg-status");
-  const preview   = document.getElementById("preview-svg-modelo");
 
-  inputUrl?.addEventListener("input", () => {
-    const url = String(inputUrl.value || "").trim();
-    if (preview) { preview.src = url; preview.style.display = url ? "block" : "none"; }
+  // Botão "Usar SVG padrão" — preenche URL com o caminho local
+  document.getElementById("btn-usar-svg-padrao")?.addEventListener("click", async () => {
+    const path = "img/modelos/receituario-modelo.svg";
+    if (inputUrl) inputUrl.value = path;
+    if (statusEl) { statusEl.textContent = "⏳ Carregando SVG padrão..."; statusEl.style.color = "#666"; }
+    try {
+      const resp = await fetch(path);
+      if (!resp.ok) throw new Error("SVG não encontrado em " + path);
+      const texto = await resp.text();
+      if (textoEl) textoEl.value = texto;
+      if (statusEl) { statusEl.textContent = "✅ SVG padrão carregado. Clique em ▶ Renderizar para visualizar."; statusEl.style.color = "#1f8f4f"; }
+    } catch (err) {
+      if (statusEl) { statusEl.textContent = "⚠️ " + err.message; statusEl.style.color = "#e67e22"; }
+    }
   });
 
   inputSvg?.addEventListener("change", async () => {
     const file = inputSvg.files[0];
     if (!file) return;
     if (!file.type.includes("svg") && !file.name.toLowerCase().endsWith(".svg")) {
-      statusEl.textContent = "❌ Selecione um arquivo .svg válido.";
-      statusEl.style.color = "#e74c3c";
+      if (statusEl) { statusEl.textContent = "❌ Selecione um arquivo .svg válido."; statusEl.style.color = "#e74c3c"; }
       return;
     }
-    statusEl.textContent = "⏳ Enviando...";
-    statusEl.style.color = "#666";
+    // Ler conteúdo do arquivo local e colocar no textarea
+    const texto = await file.text();
+    if (textoEl) textoEl.value = texto;
+    // Tentar upload para o servidor
+    if (statusEl) { statusEl.textContent = "⏳ Enviando..."; statusEl.style.color = "#666"; }
     try {
       const formData = new FormData();
       formData.append("arquivo", file);
@@ -1017,65 +1024,26 @@ document.querySelectorAll('input[name="tipoProduto"]').forEach((radio) => {
       const payload = await resp.json();
       if (!resp.ok || !payload.url) throw new Error(payload.erro || "Falha no upload");
       if (inputUrl) inputUrl.value = payload.url;
-      if (preview) { preview.src = payload.url; preview.style.display = "block"; }
-      statusEl.textContent = "✅ SVG enviado!";
-      statusEl.style.color = "#1f8f4f";
+      if (statusEl) { statusEl.textContent = "✅ SVG enviado e carregado no textarea!"; statusEl.style.color = "#1f8f4f"; }
     } catch (err) {
-      statusEl.textContent = "❌ Erro: " + err.message;
-      statusEl.style.color = "#e74c3c";
+      if (statusEl) { statusEl.textContent = "⚠️ SVG carregado localmente. Upload falhou: " + err.message; statusEl.style.color = "#e67e22"; }
     } finally {
       inputSvg.value = "";
     }
   });
 })();
 
-// Upload de imagem de fundo do modelo
-(function () {
-  const inputFundo = document.getElementById("upload-fundo-modelo");
-  const inputUrl   = document.getElementById("modeloFundoUrl");
-  const statusEl   = document.getElementById("upload-fundo-status");
-  const preview    = document.getElementById("preview-fundo-modelo");
-
-  inputUrl?.addEventListener("input", () => {
-    const url = String(inputUrl.value || "").trim();
-    if (preview) { preview.src = url; preview.style.display = url ? "block" : "none"; }
-  });
-
-  inputFundo?.addEventListener("change", async () => {
-    const file = inputFundo.files[0];
-    if (!file) return;
-    statusEl.textContent = "⏳ Enviando...";
-    statusEl.style.color = "#666";
-    try {
-      const formData = new FormData();
-      formData.append("arquivo", file);
-      const resp = await fetch(getApiUrl("/upload"), { method: "POST", body: formData });
-      const payload = await resp.json();
-      if (!resp.ok || !payload.url) throw new Error(payload.erro || "Falha no upload");
-      if (inputUrl) inputUrl.value = payload.url;
-      if (preview) { preview.src = payload.url; preview.style.display = "block"; }
-      statusEl.textContent = "✅ Fundo enviado!";
-      statusEl.style.color = "#1f8f4f";
-    } catch (err) {
-      statusEl.textContent = "❌ Erro: " + err.message;
-      statusEl.style.color = "#e74c3c";
-    } finally {
-      inputFundo.value = "";
-    }
-  });
-})();
-
-// Inserir template JSON de campos de modelo
+// Inserir template JSON de campos de modelo (posições para o SVG clássico teal)
 document.getElementById("btn-modelo-template")?.addEventListener("click", () => {
   const jsonEl = document.getElementById("modeloCamposJson");
   if (!jsonEl) return;
   const template = {
-    nome:          { x: 210, y: 120, fontSize: 11, color: "#c8a020", align: "center", maxWidth: 290, fontWeight: "700", fontFamily: "Playfair Display" },
-    especialidade: { x: 210, y: 135, fontSize:  9, color: "#b09020", align: "center", maxWidth: 290, fontWeight: "400", fontFamily: "Montserrat" },
-    telefone:      { x: 156, y: 504, fontSize:  9, color: "#c8a020", align: "center", maxWidth: 115, fontWeight: "400", fontFamily: "Montserrat" },
-    email:         { x: 280, y: 504, fontSize:  9, color: "#c8a020", align: "center", maxWidth: 135, fontWeight: "400", fontFamily: "Montserrat" },
-    endereco:      { x: 225, y: 548, fontSize:  9, color: "#c8a020", align: "center", maxWidth: 255, fontWeight: "400", fontFamily: "Montserrat" },
-    instagram:     { x: 210, y: 573, fontSize:  9, color: "#c8a020", align: "center", maxWidth: 255, fontWeight: "400", fontFamily: "Montserrat" },
+    nome:          { x: 210, y: 120, fontSize: 11, color: "#395b64", align: "center", maxWidth: 250, fontWeight: "700", fontFamily: "Playfair Display" },
+    especialidade: { x: 210, y: 136, fontSize:  9, color: "#5e8a90", align: "center", maxWidth: 250, fontWeight: "400", fontFamily: "Montserrat" },
+    endereco:      { x: 159, y: 566, fontSize:  8.5, color: "#ffffff", align: "center", maxWidth: 235, fontWeight: "400", fontFamily: "Montserrat" },
+    telefone:      { x: 357, y: 566, fontSize:  8.5, color: "#ffffff", align: "center", maxWidth: 115, fontWeight: "400", fontFamily: "Montserrat" },
+    email:         { x: 159, y: 580, fontSize:  8,   color: "#ffffff", align: "center", maxWidth: 235, fontWeight: "400", fontFamily: "Montserrat" },
+    instagram:     { x: 357, y: 580, fontSize:  8,   color: "#ffffff", align: "center", maxWidth: 115, fontWeight: "400", fontFamily: "Montserrat" },
   };
   jsonEl.value = JSON.stringify(template, null, 2);
 });
@@ -1084,166 +1052,325 @@ document.getElementById("btn-modelo-template")?.addEventListener("click", () => 
 document.getElementById("btn-modelo-elementos-template")?.addEventListener("click", () => {
   const el = document.getElementById("modeloElementosJson");
   if (!el) return;
-  const exemplo = [
-    { tipo: "icone", icone: "folhagem-esquerda", x: 38,  y: 72,  tamanho: 78, cor: "#8b7c3c", editavelPeloCliente: true, labelCliente: "Cor da folhagem esquerda" },
-    { tipo: "icone", icone: "folhagem-direita",  x: 384, y: 521, tamanho: 78, cor: "#8b7c3c", editavelPeloCliente: true, labelCliente: "Cor da folhagem direita" },
-    { tipo: "faixa", x: 0, y: 478, largura: 420, altura: 28, cor: "#c8a020", editavelPeloCliente: true, labelCliente: "Cor do destaque" },
-    { tipo: "icone", icone: "telefone", x: 50,  y: 492, tamanho: 14, cor: "#ffffff" },
-    { tipo: "icone", icone: "email",    x: 175, y: 492, tamanho: 14, cor: "#ffffff" },
-    { tipo: "icone", icone: "localizacao", x: 300, y: 492, tamanho: 14, cor: "#ffffff" },
-    { tipo: "linha", x: 20, y: 540, comprimento: 380, espessura: 0.5, cor: "#c8a020", editavelPeloCliente: true, labelCliente: "Cor da linha" },
-  ];
-  el.value = JSON.stringify(exemplo, null, 2);
+  el.value = "[]";
 });
 
-// ─── Paths SVG dos ícones (mesmos de produto.js) ──────────────────────────────
-// ICONE_PATHS_ADMIN importado de icones-paths.js (topo do arquivo)
-
-// ─── Pré-visualização do modelo no admin ──────────────────────────────────────
-document.getElementById("btn-admin-preview-modelo")?.addEventListener("click", async () => {
-  const canvas = document.getElementById("admin-modelo-canvas");
-  const msg    = document.getElementById("admin-preview-msg");
+// ─── Canvas interativo de preview do modelo ───────────────────────────────────
+// Permite arrastar marcadores de campo sobre o SVG para posicioná-los visualmente.
+(function adminPreviewCanvas() {
+  const canvas  = document.getElementById("admin-modelo-canvas");
+  const msg     = document.getElementById("admin-preview-msg");
+  const infoBox = document.getElementById("admin-campo-ativo-info");
+  const infoNome= document.getElementById("admin-campo-ativo-nome");
+  const infoX   = document.getElementById("admin-campo-ativo-x");
+  const infoY   = document.getElementById("admin-campo-ativo-y");
   if (!canvas) return;
 
   const W = 420, H = 594;
   const ctx = canvas.getContext("2d");
-  ctx.clearRect(0, 0, W, H);
-  ctx.fillStyle = "#ffffff";
-  ctx.fillRect(0, 0, W, H);
-  canvas.style.display = "block";
-  msg.textContent = "Carregando...";
 
-  // 1. Fundo: SVG tem prioridade; fallback para imagem JPG/PNG
-  const svgUrl   = String(document.getElementById("modeloSvgUrl")?.value  || "").trim();
-  const fundoUrl = String(document.getElementById("modeloFundoUrl")?.value || "").trim();
-  const bgUrl    = svgUrl || fundoUrl;
-  if (bgUrl) {
-    try {
-      const img = await new Promise((res, rej) => {
-        const i = new Image();
-        i.crossOrigin = "anonymous";
-        i.onload = () => res(i);
-        i.onerror = rej;
-        i.src = bgUrl;
-      });
-      ctx.drawImage(img, 0, 0, W, H);
-    } catch {
-      msg.textContent = "⚠️ Não foi possível carregar o fundo/SVG.";
+  // ── Cores dos marcadores por campo ──
+  const MARKER_COLORS = {
+    nome:          "#1a73e8",
+    especialidade: "#7b1fa2",
+    endereco:      "#e65100",
+    telefone:      "#2e7d32",
+    email:         "#c62828",
+    instagram:     "#ad1457",
+    logo:          "#0288d1",
+  };
+  const MARKER_H   = 14;  // altura do marcador (px lógico)
+  const MARKER_W   = 80;  // largura fixa do marcador
+
+  // Estado do canvas
+  let svgImg        = null;  // HTMLImageElement do SVG renderizado
+  let camposPos     = {};    // { nome: {x,y,...}, especialidade: {x,y,...}, ... }
+  let logoZonePos   = null;  // { x, y, w, h }
+  let dragging      = null;  // null | "nome" | "especialidade" | ... | "logo"
+  let dragOffset    = { dx: 0, dy: 0 };
+
+  // ── Conversão de coordenadas display → lógico ──
+  function displayToLogical(ex, ey) {
+    const rect  = canvas.getBoundingClientRect();
+    const scaleX = W / rect.width;
+    const scaleY = H / rect.height;
+    return { lx: (ex - rect.left) * scaleX, ly: (ey - rect.top) * scaleY };
+  }
+
+  // ── Ler posições atuais do JSON textarea e dos inputs de logo ──
+  function lerCamposDoForm() {
+    const rawJson = String(document.getElementById("modeloCamposJson")?.value || "").trim();
+    let campos = {};
+    if (rawJson) { try { campos = JSON.parse(rawJson); } catch { campos = {}; } }
+    camposPos = {};
+    // Campos padrão com defaults
+    const defaults = {
+      nome:          { x: 210, y: 80,  fontSize: 11, color: "#395b64", align: "center", maxWidth: 250, fontWeight: "700", fontFamily: "Playfair Display" },
+      especialidade: { x: 210, y: 96,  fontSize:  9, color: "#5e8a90", align: "center", maxWidth: 250, fontWeight: "400", fontFamily: "Montserrat" },
+      endereco:      { x: 159, y: 566, fontSize:  8.5, color: "#ffffff", align: "center", maxWidth: 235, fontWeight: "400", fontFamily: "Montserrat" },
+      telefone:      { x: 357, y: 566, fontSize:  8.5, color: "#ffffff", align: "center", maxWidth: 115, fontWeight: "400", fontFamily: "Montserrat" },
+      email:         { x: 159, y: 580, fontSize:  8,   color: "#ffffff", align: "center", maxWidth: 235, fontWeight: "400", fontFamily: "Montserrat" },
+      instagram:     { x: 357, y: 580, fontSize:  8,   color: "#ffffff", align: "center", maxWidth: 115, fontWeight: "400", fontFamily: "Montserrat" },
+    };
+    Object.entries(defaults).forEach(([key, def]) => {
+      camposPos[key] = Object.assign({}, def, campos[key] || {});
+    });
+    // Logo zone
+    const lx = Number(document.getElementById("logoX")?.value || 86);
+    const ly = Number(document.getElementById("logoY")?.value || 14);
+    const lw = Number(document.getElementById("logoW")?.value || 100);
+    const lh = Number(document.getElementById("logoH")?.value || 95);
+    logoZonePos = { x: lx, y: ly, w: lw, h: lh };
+  }
+
+  // ── Salvar posições de volta para os inputs ──
+  function salvarCamposNoForm() {
+    const jsonEl = document.getElementById("modeloCamposJson");
+    if (jsonEl) {
+      const output = {};
+      Object.entries(camposPos).forEach(([k, v]) => { output[k] = { ...v, x: Math.round(v.x), y: Math.round(v.y) }; });
+      jsonEl.value = JSON.stringify(output, null, 2);
+    }
+    if (logoZonePos) {
+      const set = (id, val) => { const el = document.getElementById(id); if (el) el.value = Math.round(val); };
+      set("logoX", logoZonePos.x); set("logoY", logoZonePos.y);
+      set("logoW", logoZonePos.w); set("logoH", logoZonePos.h);
     }
   }
 
-  // 2. Elementos decorativos
-  const rawElem = String(document.getElementById("modeloElementosJson")?.value || "").trim();
-  let elementos = [];
-  if (rawElem) {
-    try {
-      const parsed = JSON.parse(rawElem);
-      elementos = Array.isArray(parsed) ? parsed : [];
-    } catch {
-      msg.textContent = "⚠️ JSON de elementos inválido — corrija os colchetes [ ].";
+  // ── Desenhar todo o canvas ──
+  function redraw() {
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, W, H);
+
+    // SVG de fundo
+    if (svgImg) ctx.drawImage(svgImg, 0, 0, W, H);
+
+    // Zona da logo (retângulo tracejado azul)
+    if (logoZonePos && logoZonePos.w > 0 && logoZonePos.h > 0) {
+      const { x, y, w, h } = logoZonePos;
+      ctx.save();
+      ctx.strokeStyle = MARKER_COLORS.logo;
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([5, 4]);
+      ctx.globalAlpha = 0.8;
+      ctx.strokeRect(x, y, w, h);
+      ctx.globalAlpha = 0.08;
+      ctx.fillStyle = MARKER_COLORS.logo;
+      ctx.fillRect(x, y, w, h);
+      ctx.restore();
+      // Label "LOGO"
+      ctx.save();
+      ctx.globalAlpha = 0.9;
+      ctx.fillStyle = MARKER_COLORS.logo;
+      ctx.font = "bold 9px Montserrat, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("LOGO", x + w / 2, y + h / 2);
+      ctx.restore();
+    }
+
+    // Marcadores de campo
+    Object.entries(camposPos).forEach(([key, cfg]) => {
+      const cx   = cfg.x;
+      const cy   = cfg.y;
+      const color = MARKER_COLORS[key] || "#555";
+      const mx   = cx - MARKER_W / 2;
+      const my   = cy - MARKER_H / 2;
+
+      // Sombra
+      ctx.save();
+      ctx.shadowColor = "rgba(0,0,0,0.25)";
+      ctx.shadowBlur  = 3;
+      ctx.shadowOffsetY = 1;
+
+      // Fundo do marcador
+      ctx.globalAlpha = dragging === key ? 0.95 : 0.80;
+      ctx.fillStyle   = color;
+      ctx.beginPath();
+      ctx.roundRect(mx, my, MARKER_W, MARKER_H, 3);
+      ctx.fill();
+      ctx.restore();
+
+      // Texto do marcador
+      ctx.save();
+      ctx.globalAlpha = 1;
+      ctx.fillStyle   = "#ffffff";
+      ctx.font        = `bold 7px Montserrat, sans-serif`;
+      ctx.textAlign   = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(key.toUpperCase(), cx, cy);
+      ctx.restore();
+
+      // Alça de drag (triângulo no canto)
+      ctx.save();
+      ctx.globalAlpha = 0.6;
+      ctx.fillStyle   = "#ffffff";
+      ctx.beginPath();
+      ctx.moveTo(mx + MARKER_W - 8, my + MARKER_H);
+      ctx.lineTo(mx + MARKER_W,     my + MARKER_H - 8);
+      ctx.lineTo(mx + MARKER_W,     my + MARKER_H);
+      ctx.fill();
+      ctx.restore();
+    });
+
+    // Coordenadas do marcador ativo no infobox
+    if (dragging && camposPos[dragging]) {
+      const c = camposPos[dragging];
+      if (infoBox)  infoBox.style.display  = "block";
+      if (infoNome) infoNome.textContent    = dragging;
+      if (infoX)    infoX.textContent       = Math.round(c.x);
+      if (infoY)    infoY.textContent       = Math.round(c.y);
+    } else if (dragging === "logo" && logoZonePos) {
+      if (infoBox)  infoBox.style.display  = "block";
+      if (infoNome) infoNome.textContent    = "logo";
+      if (infoX)    infoX.textContent       = Math.round(logoZonePos.x);
+      if (infoY)    infoY.textContent       = Math.round(logoZonePos.y);
+    } else {
+      if (infoBox) infoBox.style.display = "none";
+    }
+  }
+
+  // ── Qual item está sob o ponto (lx, ly)? ──
+  function hitTest(lx, ly) {
+    // Logo zone
+    if (logoZonePos) {
+      const { x, y, w, h } = logoZonePos;
+      if (lx >= x && lx <= x + w && ly >= y && ly <= y + h) return "logo";
+    }
+    // Campos (centrados no marcador)
+    for (const [key, cfg] of Object.entries(camposPos)) {
+      const mx = cfg.x - MARKER_W / 2;
+      const my = cfg.y - MARKER_H / 2;
+      if (lx >= mx && lx <= mx + MARKER_W && ly >= my && ly <= my + MARKER_H) return key;
+    }
+    return null;
+  }
+
+  // ── Eventos de mouse ──
+  canvas.addEventListener("mousedown", (e) => {
+    const { lx, ly } = displayToLogical(e.clientX, e.clientY);
+    const hit = hitTest(lx, ly);
+    if (!hit) return;
+    dragging   = hit;
+    e.preventDefault();
+    if (hit === "logo") {
+      dragOffset = { dx: lx - logoZonePos.x, dy: ly - logoZonePos.y };
+    } else {
+      dragOffset = { dx: lx - camposPos[hit].x, dy: ly - camposPos[hit].y };
+    }
+    canvas.style.cursor = "grabbing";
+    redraw();
+  });
+
+  canvas.addEventListener("mousemove", (e) => {
+    if (!dragging) {
+      const { lx, ly } = displayToLogical(e.clientX, e.clientY);
+      canvas.style.cursor = hitTest(lx, ly) ? "grab" : "crosshair";
       return;
     }
-  }
-
-  for (const el of elementos) {
-    ctx.save();
-    ctx.globalAlpha = el.opacidade ?? 1;
-    if (el.tipo === "faixa") {
-      ctx.fillStyle = el.cor || "#c8a020";
-      ctx.fillRect(el.x ?? 0, el.y ?? 0, el.largura ?? W, el.altura ?? 20);
-    } else if (el.tipo === "linha") {
-      ctx.strokeStyle = el.cor || "#c8a020";
-      ctx.lineWidth = el.espessura ?? 1;
-      ctx.beginPath();
-      if ((el.orientacao || "h") === "v") {
-        ctx.moveTo(el.x ?? 0, el.y ?? 0);
-        ctx.lineTo(el.x ?? 0, (el.y ?? 0) + (el.comprimento ?? H));
-      } else {
-        ctx.moveTo(el.x ?? 0, el.y ?? 0);
-        ctx.lineTo((el.x ?? 0) + (el.comprimento ?? W), el.y ?? 0);
-      }
-      ctx.stroke();
-    } else if (el.tipo === "circulo") {
-      ctx.fillStyle = el.cor || "#c8a020";
-      ctx.beginPath();
-      ctx.arc(el.x ?? 0, el.y ?? 0, el.raio ?? 10, 0, Math.PI * 2);
-      ctx.fill();
-    } else if (el.tipo === "icone") {
-      const def = ICONE_PATHS_ADMIN[el.icone];
-      if (def) {
-        const paths = typeof def === "string" ? [def]      : (def.paths ?? []);
-        const vw    = typeof def === "string" ? 24         : (def.vw ?? 24);
-        const vh    = typeof def === "string" ? 24         : (def.vh ?? 24);
-        const t     = el.tamanho ?? 12;
-        const s     = t / vw;
-        const drawH = t * (vh / vw);
-        ctx.save();
-        ctx.globalAlpha = 1;
-        ctx.translate((el.x ?? 0) - t / 2, (el.y ?? 0) - drawH / 2);
-        ctx.scale(s, s);
-        ctx.fillStyle = el.cor || "#333";
-        for (const d of paths) ctx.fill(new Path2D(d));
-        ctx.restore();
-      }
-    } else if (el.tipo === "imagem" && el.src) {
-      try {
-        const img = await new Promise((res, rej) => {
-          const i = new Image(); i.crossOrigin = "anonymous";
-          i.onload = () => res(i); i.onerror = rej; i.src = el.src;
-        });
-        const x = el.x ?? 0, y = el.y ?? 0;
-        const w = el.largura ?? img.naturalWidth;
-        const h = el.altura  ?? img.naturalHeight;
-        ctx.translate(x + w / 2, y + h / 2);
-        if (el.rotacao) ctx.rotate((el.rotacao * Math.PI) / 180);
-        if (el.espelhar === "h") ctx.scale(-1, 1);
-        else if (el.espelhar === "v") ctx.scale(1, -1);
-        ctx.drawImage(img, -w / 2, -h / 2, w, h);
-      } catch { /* ignora imagem que n\u00e3o carrega */ }
+    const { lx, ly } = displayToLogical(e.clientX, e.clientY);
+    if (dragging === "logo" && logoZonePos) {
+      logoZonePos.x = Math.max(0, Math.min(W - logoZonePos.w, lx - dragOffset.dx));
+      logoZonePos.y = Math.max(0, Math.min(H - logoZonePos.h, ly - dragOffset.dy));
+    } else if (camposPos[dragging]) {
+      camposPos[dragging].x = Math.max(0, Math.min(W, lx - dragOffset.dx));
+      camposPos[dragging].y = Math.max(0, Math.min(H, ly - dragOffset.dy));
     }
-    ctx.restore();
-  }
+    redraw();
+  });
 
-  // 3. Posições dos campos como texto dimmed
-  const rawCampos = String(document.getElementById("modeloCamposJson")?.value || "").trim();
-  if (rawCampos) {
-    try {
-      const campos = JSON.parse(rawCampos);
-      Object.entries(campos).forEach(([key, cfg]) => {
-        if (cfg.x == null || cfg.y == null) return;
-        ctx.save();
-        ctx.globalAlpha = 0.35;
-        ctx.font = `${cfg.fontWeight === "700" ? "bold" : "normal"} ${cfg.fontSize || 10}px ${cfg.fontFamily || "sans-serif"}`;
-        ctx.fillStyle = cfg.color || "#888";
-        ctx.textAlign = cfg.align || "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText(`[${key}]`, cfg.x, cfg.y);
-        ctx.restore();
-      });
-    } catch { /* ignora erro no preview */ }
-  }
+  const stopDrag = () => {
+    if (!dragging) return;
+    salvarCamposNoForm();
+    dragging = null;
+    canvas.style.cursor = "crosshair";
+    redraw();
+  };
+  canvas.addEventListener("mouseup",    stopDrag);
+  canvas.addEventListener("mouseleave", stopDrag);
 
-  // 4. Logo zone como retângulo tracejado azul
-  const logoX = Number(document.getElementById("logoX")?.value || 0);
-  const logoY = Number(document.getElementById("logoY")?.value || 0);
-  const logoW = Number(document.getElementById("logoW")?.value || 0);
-  const logoH = Number(document.getElementById("logoH")?.value || 0);
-  if (logoW > 0 && logoH > 0) {
-    ctx.save();
-    ctx.strokeStyle = "#2563eb";
-    ctx.lineWidth = 1.5;
-    ctx.setLineDash([5, 4]);
-    ctx.globalAlpha = 0.7;
-    ctx.strokeRect(logoX, logoY, logoW, logoH);
-    ctx.globalAlpha = 0.12;
-    ctx.fillStyle = "#2563eb";
-    ctx.fillRect(logoX, logoY, logoW, logoH);
-    ctx.restore();
-  }
+  // Touch support
+  canvas.addEventListener("touchstart", (e) => {
+    if (e.touches.length !== 1) return;
+    const t = e.touches[0];
+    const { lx, ly } = displayToLogical(t.clientX, t.clientY);
+    const hit = hitTest(lx, ly);
+    if (!hit) return;
+    e.preventDefault();
+    dragging = hit;
+    if (hit === "logo") {
+      dragOffset = { dx: lx - logoZonePos.x, dy: ly - logoZonePos.y };
+    } else {
+      dragOffset = { dx: lx - camposPos[hit].x, dy: ly - camposPos[hit].y };
+    }
+  }, { passive: false });
 
-  msg.textContent = `✅ ${elementos.length} elemento(s) — canvas 420×594 lógico`;
-});
+  canvas.addEventListener("touchmove", (e) => {
+    if (!dragging || e.touches.length !== 1) return;
+    e.preventDefault();
+    const t = e.touches[0];
+    const { lx, ly } = displayToLogical(t.clientX, t.clientY);
+    if (dragging === "logo" && logoZonePos) {
+      logoZonePos.x = Math.max(0, Math.min(W - logoZonePos.w, lx - dragOffset.dx));
+      logoZonePos.y = Math.max(0, Math.min(H - logoZonePos.h, ly - dragOffset.dy));
+    } else if (camposPos[dragging]) {
+      camposPos[dragging].x = Math.max(0, Math.min(W, lx - dragOffset.dx));
+      camposPos[dragging].y = Math.max(0, Math.min(H, ly - dragOffset.dy));
+    }
+    redraw();
+  }, { passive: false });
 
+  canvas.addEventListener("touchend", () => {
+    if (dragging) { salvarCamposNoForm(); dragging = null; redraw(); }
+  });
+
+  // ── Botão Renderizar ──
+  document.getElementById("btn-admin-preview-modelo")?.addEventListener("click", async () => {
+    canvas.style.display = "block";
+    if (msg) msg.textContent = "⏳ Renderizando...";
+
+    lerCamposDoForm();
+
+    // Obter SVG: prioridade textarea, depois URL
+    const svgTexto = String(document.getElementById("modeloSvgTexto")?.value || "").trim();
+    const svgUrl   = String(document.getElementById("modeloSvgUrl")?.value   || "").trim();
+
+    svgImg = null;
+    if (svgTexto) {
+      try {
+        const blob    = new Blob([svgTexto], { type: "image/svg+xml;charset=utf-8" });
+        const blobUrl = URL.createObjectURL(blob);
+        svgImg = await new Promise((res, rej) => {
+          const i = new Image();
+          i.onload = () => { URL.revokeObjectURL(blobUrl); res(i); };
+          i.onerror = () => { URL.revokeObjectURL(blobUrl); rej(new Error("SVG inválido")); };
+          i.src = blobUrl;
+        });
+      } catch (err) {
+        if (msg) msg.textContent = "⚠️ SVG inválido: " + err.message;
+      }
+    } else if (svgUrl) {
+      try {
+        svgImg = await new Promise((res, rej) => {
+          const i = new Image();
+          i.crossOrigin = "anonymous";
+          i.onload = () => res(i);
+          i.onerror = rej;
+          i.src = svgUrl;
+        });
+      } catch {
+        if (msg) msg.textContent = "⚠️ Não foi possível carregar o SVG da URL.";
+      }
+    }
+
+    redraw();
+    if (msg) msg.textContent = svgImg
+      ? `✅ SVG renderizado. Arraste os marcadores coloridos para posicionar os campos.`
+      : `ℹ️ Marcadores visíveis (sem SVG de fundo). Cole o SVG no textarea para ver o layout.`;
+  });
+})();
 btnLogin?.addEventListener("click", async () => {
   try {
     const email = loginEmail.value.trim();

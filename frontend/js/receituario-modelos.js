@@ -16,51 +16,42 @@
 const RECEITUARIO_MODELOS = [
   {
     id: "dourado",
-    nome: "Dourado Premium",
+    nome: "Receituário Clássico",
 
     /*
-     * Logo do cliente posicionada sobre o diâmante dourado.
-     * Diâmante ocupa canvas ~x:100-172, y:15-83.
-     * Usamos uma zona um pouco maior para que logos de qualquer proporção encaixem bem.
+     * Fundo decorativo via SVG: folhagens teal nos cantos e rodapé teal.
+     * SVG viewBox 595.5×842.25 → canvas lógico 420×594 (escala ≈0.705).
+     *
+     * Zonas a evitar (canvas coords):
+     *   Folhagem superior-direita: x > 308, y < 197
+     *   Folhagem inferior-esquerda: x < 140, y > 344
+     *   Rodapé SVG: y ≈ 551–594
+     *     Ícone localização: center x≈34, y≈565
+     *     Ícone whatsapp:    center x≈288, y≈566
      */
+    svgTemplate: "img/modelos/receituario-modelo.svg",
+
     logoZone: { x: 86, y: 14, w: 100, h: 95 },
 
     campos: {
-      /* Nome e especialidade — abaixo da zona da logo */
-      nome:          { x: 210, y: 120, fontSize: 11, color: "#c8a020", align: "center", maxWidth: 290, fontWeight: "700", fontFamily: "Playfair Display" },
-      especialidade: { x: 210, y: 135, fontSize:  9, color: "#b09020", align: "center", maxWidth: 290, fontWeight: "400", fontFamily: "Montserrat" },
+      /* Nome e especialidade — abaixo da zona da logo, área segura esquerda */
+      nome:          { x: 210, y: 120, fontSize: 11, color: "#395b64", align: "center", maxWidth: 250, fontWeight: "700", fontFamily: "Playfair Display" },
+      especialidade: { x: 210, y: 136, fontSize:  9, color: "#5e8a90", align: "center", maxWidth: 250, fontWeight: "400", fontFamily: "Montserrat" },
 
       /*
-       * Linha de contato — após os ícones WhatsApp (canvas ~x:93-113) e Instagram (canvas ~x:210-229)
-       * Centro das zonas de texto:
-       *   Telefone: canvas x:156, y:504  (centro entre fim do ícone WhatsApp e início do Instagram)
-       *   E-mail:   canvas x:280, y:504  (após ícone Instagram)
+       * Rodapé SVG (canvas y ≈ 551–594, center y ≈ 572).
+       * O SVG já desenha os ícones; o canvas posiciona apenas o texto.
+       *   Linha 1 (y=566): endereço (entre pino e whatsapp) + telefone (após whatsapp)
+       *   Linha 2 (y=580): e-mail (esquerda) + instagram (direita)
        */
-      telefone: { x: 156, y: 504, fontSize: 9, color: "#c8a020", align: "center", maxWidth: 115, fontWeight: "400", fontFamily: "Montserrat" },
-      email:    { x: 280, y: 504, fontSize: 9, color: "#c8a020", align: "center", maxWidth: 135, fontWeight: "400", fontFamily: "Montserrat" },
-
-      /*
-       * Endereço — após ícone Pin (canvas ~x:103-118)
-       * Centro da zona: canvas x:225, y:548
-       */
-      endereco:  { x: 225, y: 548, fontSize: 9, color: "#c8a020", align: "center", maxWidth: 255, fontWeight: "400", fontFamily: "Montserrat" },
-
-      /*
-       * Instagram — linha abaixo do endereço, próximo ao rodapé
-       * Centro estimado: canvas x:210, y:573
-       */
-      instagram: { x: 210, y: 573, fontSize: 9, color: "#c8a020", align: "center", maxWidth: 255, fontWeight: "400", fontFamily: "Montserrat" },
+      endereco:  { x: 159, y: 566, fontSize: 8.5, color: "#ffffff", align: "center", maxWidth: 235, fontWeight: "400", fontFamily: "Montserrat" },
+      telefone:  { x: 357, y: 566, fontSize: 8.5, color: "#ffffff", align: "center", maxWidth: 115, fontWeight: "400", fontFamily: "Montserrat" },
+      email:     { x: 159, y: 580, fontSize: 8,   color: "#ffffff", align: "center", maxWidth: 235, fontWeight: "400", fontFamily: "Montserrat" },
+      instagram: { x: 357, y: 580, fontSize: 8,   color: "#ffffff", align: "center", maxWidth: 115, fontWeight: "400", fontFamily: "Montserrat" },
     },
 
-    elementos: [
-      { tipo: "icone", icone: "folhagem-esquerda", x: 38,  y: 72,  tamanho: 78, cor: "#8b7c3c", editavelPeloCliente: true, labelCliente: "Cor da folhagem esquerda" },
-      { tipo: "icone", icone: "folhagem-direita",  x: 384, y: 521, tamanho: 78, cor: "#8b7c3c", editavelPeloCliente: true, labelCliente: "Cor da folhagem direita" },
-      { tipo: "faixa", x: 0, y: 478, largura: 420, altura: 28, cor: "#c8a020", editavelPeloCliente: true, labelCliente: "Cor do destaque" },
-      { tipo: "icone", icone: "telefone", x: 50,  y: 492, tamanho: 14, cor: "#ffffff" },
-      { tipo: "icone", icone: "email",    x: 175, y: 492, tamanho: 14, cor: "#ffffff" },
-      { tipo: "icone", icone: "localizacao", x: 300, y: 492, tamanho: 14, cor: "#ffffff" },
-      { tipo: "linha", x: 20, y: 540, comprimento: 380, espessura: 0.5, cor: "#c8a020", editavelPeloCliente: true, labelCliente: "Cor da linha" },
-    ],
+    /* O SVG já contém folhagens, rodapé e ícones decorativos */
+    elementos: [],
   },
 
   // ─────────────────────────────────────────────────────────────────────────

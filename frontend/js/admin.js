@@ -417,15 +417,31 @@ function preencherFormularioProduto(produto) {
       const elems = produto.modeloConfig.elementos;
       elementosEl.value = Array.isArray(elems) && elems.length ? JSON.stringify(elems, null, 2) : "";
     }
-    const fundoUrlEl = document.getElementById("modeloFundoUrl");
-    if (fundoUrlEl) fundoUrlEl.value = produto.modeloConfig.fundoUrl || "";
-    const prevFundo = document.getElementById("preview-fundo-modelo");
-    if (prevFundo && produto.modeloConfig.fundoUrl) {
-      prevFundo.src = produto.modeloConfig.fundoUrl;
-      prevFundo.style.display = "block";
-    }
     const svgUrlEl = document.getElementById("modeloSvgUrl");
     if (svgUrlEl) svgUrlEl.value = produto.modeloConfig.svgTemplate || "";
+
+    // Auto-carregar SVG no textarea e renderizar o canvas
+    const svgPath = produto.modeloConfig.svgTemplate || "";
+    const textoEl = document.getElementById("modeloSvgTexto");
+    const statusEl = document.getElementById("upload-svg-status");
+    if (svgPath && textoEl) {
+      fetch(svgPath)
+        .then((r) => r.ok ? r.text() : Promise.reject("SVG não encontrado: " + svgPath))
+        .then((txt) => {
+          textoEl.value = txt;
+          if (statusEl) { statusEl.textContent = "✅ SVG carregado."; statusEl.style.color = "#1f8f4f"; }
+          // Pequeno delay para garantir que o DOM da seção-modelo já está visível
+          setTimeout(() => window.adminRenderizarCanvas?.(), 100);
+        })
+        .catch((err) => {
+          if (statusEl) { statusEl.textContent = "⚠️ " + err; statusEl.style.color = "#e67e22"; }
+          // Mesmo sem SVG, mostra os marcadores
+          setTimeout(() => window.adminRenderizarCanvas?.(), 100);
+        });
+    } else {
+      // Sem SVG: mostra marcadores vazios sobre fundo branco
+      setTimeout(() => window.adminRenderizarCanvas?.(), 100);
+    }
   }
 
   selectedProductId = produto.id;
@@ -1305,8 +1321,8 @@ document.getElementById("btn-modelo-elementos-template")?.addEventListener("clic
     if (dragging) { salvarCamposNoForm(); dragging = null; redraw(); }
   });
 
-  // ── Botão Renderizar ──
-  document.getElementById("btn-admin-preview-modelo")?.addEventListener("click", async () => {
+  // ── Lógica central de renderização (usada pelo botão e pelo carregamento automático) ──
+  async function carregarEDesenhar() {
     canvas.style.display = "block";
     if (msg) msg.textContent = "⏳ Renderizando...";
 
@@ -1348,7 +1364,13 @@ document.getElementById("btn-modelo-elementos-template")?.addEventListener("clic
     if (msg) msg.textContent = svgImg
       ? `✅ SVG renderizado. Arraste os marcadores coloridos para posicionar os campos.`
       : `ℹ️ Marcadores visíveis (sem SVG de fundo). Cole o SVG no textarea para ver o layout.`;
-  });
+  }
+
+  // ── Botão Renderizar ──
+  document.getElementById("btn-admin-preview-modelo")?.addEventListener("click", carregarEDesenhar);
+
+  // ── API pública: permite acionar a renderização de fora da IIFE ──
+  window.adminRenderizarCanvas = carregarEDesenhar;
 })();
 btnLogin?.addEventListener("click", async () => {
   try {

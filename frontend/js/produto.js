@@ -1351,12 +1351,6 @@ renderVistosRecentemente();
     }
   }
 
-  function elementosPadraoModelo() {
-    // Fallback genérico para modelos sem elementos definidos.
-    // Os modelos com svgTemplate definem elementos: [] e deixam o SVG cuidar da decoração.
-    return [];
-  }
-
   // ─── Abrir / Fechar modal ───────────────────────────────────────────────
   async function abrirModal() {
     modal.hidden = false;
@@ -1433,8 +1427,8 @@ renderVistosRecentemente();
           campos:         p.modeloConfig?.campos    || {},
           elementos:      (Array.isArray(p.modeloConfig?.elementos) && p.modeloConfig.elementos.length)
             ? p.modeloConfig.elementos
-            : elementosPadraoModelo(),
-          svgTemplate:    p.modeloConfig?.svgTemplate    || null,
+            : [],
+          svgTemplate:    p.modeloConfig?.svgTemplate    || "img/modelos/receituario-modelo.svg",
           coresEditaveis: Array.isArray(p.modeloConfig?.coresEditaveis)
             ? p.modeloConfig.coresEditaveis
             : null,
@@ -1461,7 +1455,7 @@ renderVistosRecentemente();
     logoAcao = null;
     elementos = (Array.isArray(modelo.elementos) && modelo.elementos.length)
       ? modelo.elementos.map((el) => ({ ...el }))
-      : elementosPadraoModelo();
+      : [];
 
     // Converter campos — aceita tanto objeto {nome:{...}} quanto array [{label:"Nome",...}]
     const camposEntries = Array.isArray(modelo.campos)

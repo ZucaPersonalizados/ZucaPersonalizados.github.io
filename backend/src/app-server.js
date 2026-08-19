@@ -1159,6 +1159,72 @@ app.get("/api/admin/anexos/download", adminAuth, async (req, res) => {
   }
 });
 
+app.patch("/api/admin/pedidos/:id/nota-fiscal", adminAuth, requireDb, async (req, res) => {
+  try {
+    const pedidoId = String(req.params.id || "").trim();
+    if (!pedidoId) {
+      return res.status(400).json({ success: false, error: "ID do pedido invalido" });
+    }
+
+    const pedidoRef = db.collection("pedidos").doc(pedidoId);
+    const snap = await pedidoRef.get();
+    if (!snap.exists) {
+      return res.status(404).json({ success: false, error: "Pedido nao encontrado" });
+    }
+
+    const url = String(req.body.url || "").trim();
+    const nomeArquivo = String(req.body.nomeArquivo || "").trim();
+    const numero = String(req.body.numero || "").trim();
+    const serie = String(req.body.serie || "").trim();
+    const chaveAcesso = String(req.body.chaveAcesso || "").replace(/\s/g, "").trim();
+    const observacao = String(req.body.observacao || "").trim();
+
+    if (!url && !numero && !serie && !chaveAcesso && !observacao) {
+      await pedidoRef.update({
+        notaFiscal: null,
+        atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
+        atualizadoPor: req.adminSession.email,
+      });
+      return res.json({ success: true, notaFiscal: null });
+    }
+
+    if (url) {
+      let parsed;
+      try {
+        parsed = new URL(url);
+      } catch {
+        return res.status(400).json({ success: false, error: "URL da NF invalida" });
+      }
+
+      if (!["http:", "https:"].includes(parsed.protocol)) {
+        return res.status(400).json({ success: false, error: "Protocolo de URL da NF invalido" });
+      }
+    }
+
+    const notaFiscal = {
+      manual: true,
+      url: url || null,
+      nomeArquivo: nomeArquivo || null,
+      numero: numero || null,
+      serie: serie || null,
+      chaveAcesso: chaveAcesso || null,
+      observacao: observacao || null,
+      emitidaEm: admin.firestore.FieldValue.serverTimestamp(),
+      atualizadaPor: req.adminSession.email,
+    };
+
+    await pedidoRef.update({
+      notaFiscal,
+      atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
+      atualizadoPor: req.adminSession.email,
+    });
+
+    return res.json({ success: true, notaFiscal });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 app.get("/api/admin/pedidos", adminAuth, requireDb, async (req, res) => {
   try {
     const snap = await db.collection("pedidos").get();
@@ -2160,6 +2226,49 @@ app.get("/api/pedidos/:id/rastreio", requireDb, async (req, res) => {
     });
   } catch (error) {
     return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.get("/api/pedidos/:id/nota-fiscal", requireDb, async (req, res) => {
+  try {
+    const pedidoId = String(req.params.id || "").trim();
+    const authorized = await loadAuthorizedOrder(req, res, pedidoId);
+    if (!authorized) return;
+
+    const notaFiscal = authorized.data?.notaFiscal || null;
+    const rawUrl = String(notaFiscal?.url || "").trim();
+    if (!rawUrl) {
+      return res.status(404).json({ success: false, error: "Nota fiscal nao disponivel para download" });
+    }
+
+    const urlObj = new URL(rawUrl);
+    if (!["http:", "https:"].includes(urlObj.protocol)) {
+      return res.status(400).json({ success: false, error: "Protocolo de URL invalido" });
+    }
+
+    const host = String(urlObj.hostname || "").toLowerCase();
+    const hostPermitido = host === "storage.googleapis.com" || host === "firebasestorage.googleapis.com";
+    if (!hostPermitido) {
+      return res.status(400).json({ success: false, error: "Host nao permitido para download" });
+    }
+
+    const upstream = await fetch(urlObj.toString());
+    if (!upstream.ok) {
+      return res.status(upstream.status || 502).json({ success: false, error: "Falha ao obter nota fiscal" });
+    }
+
+    const buffer = Buffer.from(await upstream.arrayBuffer());
+    const fallbackNome = path.basename(urlObj.pathname || "");
+    const nomeArquivo = String(notaFiscal?.nomeArquivo || fallbackNome || "nota-fiscal.pdf")
+      .replace(/[\r\n]/g, "")
+      .replace(/[\\/:*?"<>|]+/g, "_")
+      .trim() || "nota-fiscal.pdf";
+
+    res.setHeader("Content-Type", upstream.headers.get("content-type") || "application/octet-stream");
+    res.setHeader("Content-Disposition", `attachment; filename="${nomeArquivo}"`);
+    return res.send(buffer);
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message || "Erro ao baixar nota fiscal" });
   }
 });
 

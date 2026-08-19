@@ -668,6 +668,25 @@ window.exibirDetalhes = async (pedidoId) => {
   `).join("");
 
   const anexosHtml = buildAnexosHtml(pedido);
+  const notaFiscal = pedido.notaFiscal || null;
+  const nfTemArquivo = !!String(notaFiscal?.url || "").trim();
+  const nfArquivoNome = String(notaFiscal?.nomeArquivo || "nota-fiscal.pdf");
+  const nfDownloadUrl = nfTemArquivo ? getAdminDownloadUrl(String(notaFiscal.url || ""), nfArquivoNome) : "";
+  const notaFiscalHtml = `
+    <div class="detail-item">
+      <div class="detail-label">🧾 Nota Fiscal (manual)</div>
+      <div>
+        ${nfTemArquivo
+          ? `<div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+               <span>${escapeHtml(nfArquivoNome)}</span>
+               <a href="${escapeHtml(nfDownloadUrl)}" class="btn btn-small btn-primary">⬇ Baixar NF</a>
+             </div>`
+          : `<span style="color:var(--text-secondary);">Nenhum arquivo de NF anexado.</span>`}
+        ${(notaFiscal?.numero || notaFiscal?.serie)
+          ? `<div style="margin-top:6px; font-size:13px; color:var(--text-secondary);">Número: ${escapeHtml(String(notaFiscal?.numero || "-"))} · Série: ${escapeHtml(String(notaFiscal?.serie || "-"))}</div>`
+          : ""}
+      </div>
+    </div>`;
 
   modalBody.innerHTML = `
     <div class="detail-item"><div class="detail-label">ID Pedido</div><div>#${pedido.id.slice(0, 8)}</div></div>
@@ -676,6 +695,7 @@ window.exibirDetalhes = async (pedidoId) => {
     <div class="detail-item"><div class="detail-label">Status Pag.</div><div><span class="status-pill ${pedido.status === "pagto" ? "pagto" : "pendente"}">${pedido.status === "pagto" ? "Verificado" : "Pendente"}</span></div></div>
     <div class="detail-item"><div class="detail-label">Itens</div><div><div class="items-list">${itensHtml || "<p>Sem itens</p>"}</div></div></div>
     ${anexosHtml}
+    ${notaFiscalHtml}
     <div class="detail-item"><div class="detail-label">Total</div><div style="font-size:18px; font-weight:700;">${formatarMoeda(pedido.total)}</div></div>
     <div class="detail-item"><div class="detail-label">Criado em</div><div>${formatarData(pedido.criadoEmISO)}</div></div>
   `;
@@ -765,6 +785,40 @@ window.editarStatus = async (pedidoId) => {
         </div>
       </div>
 
+      <div style="border:1px solid var(--border-color); border-radius:10px; padding:14px; background:var(--bg-primary);">
+        <p style="margin:0 0 12px; font-weight:700; font-size:14px;">🧾 Nota Fiscal (manual)</p>
+        <div style="display:grid; gap:10px;">
+          <div>
+            <label style="display:block; margin-bottom:6px; font-size:13px; font-weight:600;">Arquivo PDF da NF (opcional)</label>
+            <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+              <input id="input-nf-arquivo" type="file" accept="application/pdf" />
+              <button id="btn-upload-nf" type="button" class="btn btn-small btn-secondary">Enviar PDF</button>
+            </div>
+            <div id="nf-upload-status" style="margin-top:6px; font-size:12px; color:var(--text-secondary);"></div>
+          </div>
+          <div>
+            <label style="display:block; margin-bottom:6px; font-size:13px; font-weight:600;">URL da Nota Fiscal</label>
+            <input id="input-nf-url" type="text" value="${escapeHtml(String(pedido.notaFiscal?.url || ""))}" placeholder="https://...pdf"
+              style="padding:8px 12px; border:1px solid var(--border-color); border-radius:6px; width:100%;" />
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+            <div>
+              <label style="display:block; margin-bottom:6px; font-size:13px; font-weight:600;">Número</label>
+              <input id="input-nf-numero" type="text" value="${escapeHtml(String(pedido.notaFiscal?.numero || ""))}" style="padding:8px 12px; border:1px solid var(--border-color); border-radius:6px; width:100%;" />
+            </div>
+            <div>
+              <label style="display:block; margin-bottom:6px; font-size:13px; font-weight:600;">Série</label>
+              <input id="input-nf-serie" type="text" value="${escapeHtml(String(pedido.notaFiscal?.serie || ""))}" style="padding:8px 12px; border:1px solid var(--border-color); border-radius:6px; width:100%;" />
+            </div>
+          </div>
+          <div>
+            <label style="display:block; margin-bottom:6px; font-size:13px; font-weight:600;">Chave de Acesso (opcional)</label>
+            <input id="input-nf-chave" type="text" value="${escapeHtml(String(pedido.notaFiscal?.chaveAcesso || ""))}" placeholder="44 dígitos"
+              style="padding:8px 12px; border:1px solid var(--border-color); border-radius:6px; width:100%; font-family:monospace;" />
+          </div>
+        </div>
+      </div>
+
       <button id="btn-salvar-status" class="btn btn-primary" style="width:100%; margin-top:8px;" type="button">Salvar Mudancas</button>
     </div>
   `;
@@ -772,12 +826,42 @@ window.editarStatus = async (pedidoId) => {
   document.getElementById("modal-title").textContent = `Editar #${pedido.id.slice(0, 8)}`;
   detailsModal.classList.add("active");
 
+  document.getElementById("btn-upload-nf")?.addEventListener("click", async () => {
+    const fileInput = document.getElementById("input-nf-arquivo");
+    const statusEl = document.getElementById("nf-upload-status");
+    const urlInput = document.getElementById("input-nf-url");
+    const file = fileInput?.files?.[0];
+    if (!file) {
+      if (statusEl) statusEl.textContent = "Selecione um PDF antes de enviar.";
+      return;
+    }
+
+    if (statusEl) statusEl.textContent = "Enviando PDF...";
+    try {
+      const formData = new FormData();
+      formData.append("arquivo", file);
+      const resp = await fetch(getApiUrl("/upload"), { method: "POST", body: formData });
+      const payload = await resp.json();
+      if (!resp.ok || !payload.url) throw new Error(payload.erro || "Falha no upload da NF");
+      if (urlInput) urlInput.value = payload.url;
+      if (statusEl) statusEl.textContent = "PDF enviado. Agora clique em Salvar Mudancas.";
+    } catch (error) {
+      if (statusEl) statusEl.textContent = `Erro no upload: ${error.message}`;
+    } finally {
+      if (fileInput) fileInput.value = "";
+    }
+  });
+
   document.getElementById("btn-salvar-status")?.addEventListener("click", async () => {
     try {
       const status = document.getElementById("select-status-pagto").value;
       const statusPedido = document.getElementById("select-status-pedido").value;
       const codigoRastreio = String(document.getElementById("input-rastreio")?.value || "").trim().toUpperCase();
       const transportadora = String(document.getElementById("select-transportadora")?.value || "").trim();
+      const notaFiscalUrl = String(document.getElementById("input-nf-url")?.value || "").trim();
+      const notaFiscalNumero = String(document.getElementById("input-nf-numero")?.value || "").trim();
+      const notaFiscalSerie = String(document.getElementById("input-nf-serie")?.value || "").trim();
+      const notaFiscalChave = String(document.getElementById("input-nf-chave")?.value || "").replace(/\s/g, "").trim();
 
       const response = await fetchApi(`/api/admin/pedidos/${pedidoId}/status`, {
         method: "PATCH",
@@ -803,6 +887,30 @@ window.editarStatus = async (pedidoId) => {
         if (!rastreioResp.ok || !rastreioPayload.success) {
           throw new Error(rastreioPayload.error || "Falha ao salvar rastreio");
         }
+      }
+
+      const nomeArquivoNF = (() => {
+        if (!notaFiscalUrl) return "";
+        const semQuery = String(notaFiscalUrl).split("?")[0];
+        const partes = semQuery.split("/").filter(Boolean);
+        return partes[partes.length - 1] || "nota-fiscal.pdf";
+      })();
+
+      const nfResp = await fetchApi(`/api/admin/pedidos/${pedidoId}/nota-fiscal`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          url: notaFiscalUrl,
+          nomeArquivo: nomeArquivoNF,
+          numero: notaFiscalNumero,
+          serie: notaFiscalSerie,
+          chaveAcesso: notaFiscalChave,
+        }),
+      });
+      const nfPayload = await nfResp.json();
+      if (!nfResp.ok || !nfPayload.success) {
+        throw new Error(nfPayload.error || "Falha ao salvar nota fiscal");
       }
 
       detailsModal.classList.remove("active");

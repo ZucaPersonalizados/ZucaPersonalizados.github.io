@@ -245,6 +245,40 @@ async function cancelarPedido(idPedido, email) {
   return payload;
 }
 
+async function baixarNotaFiscalPedido(idPedido) {
+  const token = getTokenPedido(idPedido);
+  if (!token) throw new Error("Token do pedido não encontrado");
+
+  const response = await fetch(getApiUrl(`/api/pedidos/${encodeURIComponent(idPedido)}/nota-fiscal`), {
+    headers: { "x-order-token": token },
+  });
+
+  if (!response.ok) {
+    let erro = "Nota fiscal indisponível";
+    try {
+      const payload = await response.json();
+      erro = payload?.error || erro;
+    } catch {
+      // ignora parse quando resposta não for JSON
+    }
+    throw new Error(erro);
+  }
+
+  const blob = await response.blob();
+  const dispo = String(response.headers.get("content-disposition") || "");
+  const filenameMatch = dispo.match(/filename="?([^";]+)"?/i);
+  const filename = filenameMatch?.[1] || `nota-fiscal-${idPedido.slice(0, 8)}.pdf`;
+
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 async function listarPedidos(email) {
   const list = el("pedido-list");
   if (!list) return;
@@ -281,6 +315,7 @@ async function listarPedidos(email) {
       const transportadora = String(pedido.transportadora || "").trim();
       const trackingUrl = getTrackingUrl(codigoRastreio, transportadora);
       const emTransito = statusPedido === "enviado" || statusPedido === "entregue";
+      const temNotaFiscal = !!String(pedido.notaFiscal?.url || "").trim();
 
       let trackingBlock = "";
       if (emTransito && !codigoRastreio) {
@@ -333,6 +368,7 @@ async function listarPedidos(email) {
             <button type="button" class="checkout-btn secondary btn-pagar" data-id="${escapeHtml(pedido.id)}" data-pag="${escapeHtml(String(pedido.pagamento || "pix").toLowerCase())}">Pagar agora</button>`}
             ${!paid && !canceled ? `<button type="button" class="checkout-btn secondary btn-cancelar" data-id="${escapeHtml(pedido.id)}">Cancelar pedido</button>` : ""}
             ${paid ? `<button type="button" class="checkout-btn secondary btn-recomprar" data-itens='${escapeHtml(JSON.stringify(pedido.itens || []))}'>🔁 Comprar novamente</button>` : ""}
+            ${temNotaFiscal ? `<button type="button" class="checkout-btn secondary btn-baixar-nf" data-id="${escapeHtml(pedido.id)}">🧾 Baixar nota fiscal</button>` : ""}
           </div>
         </article>
       `;
@@ -434,6 +470,18 @@ async function listarPedidos(email) {
           listarPedidos(email);
         } catch (error) {
           showToast(`Erro ao cancelar: ${error.message}`, "error");
+        }
+      });
+    });
+
+    list.querySelectorAll(".btn-baixar-nf").forEach((button) => {
+      button.addEventListener("click", async () => {
+        const id = button.getAttribute("data-id") || "";
+        if (!id) return;
+        try {
+          await baixarNotaFiscalPedido(id);
+        } catch (error) {
+          showToast(`Erro ao baixar NF: ${error.message}`, "error");
         }
       });
     });

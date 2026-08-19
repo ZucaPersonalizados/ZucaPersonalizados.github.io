@@ -1,5 +1,6 @@
 import { bucket } from "../firebase.js";
 import path from "path";
+import crypto from "crypto";
 
 export const uploadArquivo = async (req, res) => {
   try {
@@ -15,24 +16,27 @@ export const uploadArquivo = async (req, res) => {
       .basename(req.file.originalname)
       .replace(/[^a-zA-Z0-9._-]/g, "_")
       .slice(0, 100) || "arquivo";
-    const nome = Date.now() + "-" + nomeOriginal;
+    const nome = `${Date.now()}-${crypto.randomBytes(16).toString("hex")}-${nomeOriginal}`;
 
     const file = bucket.file(nome);
 
     const stream = file.createWriteStream({
       metadata: {
-        contentType: req.file.mimetype
+        contentType: req.file.mimetype,
+        contentDisposition: "attachment",
       }
     });
 
     stream.on("error", (err) => {
-      res.status(500).json({ erro: err.message });
+      console.error("[UPLOAD] Falha ao salvar arquivo:", err.message);
+      if (!res.headersSent) res.status(500).json({ erro: "Falha ao salvar arquivo" });
     });
 
     stream.on("finish", async () => {
-      await file.makePublic();
-
-      const url = `https://storage.googleapis.com/${bucket.name}/${nome}`;
+      const [url] = await file.getSignedUrl({
+        action: "read",
+        expires: Date.now() + 1000 * 60 * 60,
+      });
 
       res.json({ url });
     });
@@ -48,6 +52,7 @@ export const uploadArquivo = async (req, res) => {
       return res.status(400).json({ erro: error.message || "Formato invalido. Use PDF, JPG ou PNG." });
     }
 
-    res.status(500).json({ erro: error.message });
+    console.error("[UPLOAD] Erro inesperado:", error.message);
+    res.status(500).json({ erro: "Falha ao processar upload" });
   }
 };

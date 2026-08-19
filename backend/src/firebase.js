@@ -1,4 +1,6 @@
-import admin from "firebase-admin";
+import { cert, getApps, initializeApp } from "firebase-admin/app";
+import { getFirestore } from "firebase-admin/firestore";
+import { getStorage } from "firebase-admin/storage";
 import fs from "fs";
 import path from "path";
 
@@ -96,10 +98,10 @@ const serviceAccountFromEnv =
   getServiceAccountFromBase64() ||
   getServiceAccountFromParts();
 
-if (serviceAccountFromEnv && admin.apps.length === 0) {
+if (serviceAccountFromEnv && getApps().length === 0) {
   try {
-    admin.initializeApp({
-      credential: admin.credential.cert(serviceAccountFromEnv),
+    initializeApp({
+      credential: cert(serviceAccountFromEnv),
       storageBucket: "zuca-personalizados.firebasestorage.app",
     });
     firebaseInitSource = "env";
@@ -108,7 +110,7 @@ if (serviceAccountFromEnv && admin.apps.length === 0) {
     firebaseInitError = `Falha ao inicializar Firebase por env: ${error.message}`;
     console.error("[FIREBASE]", firebaseInitError);
   }
-} else if (fs.existsSync(resolvedFirebaseKeyPath) && admin.apps.length === 0) {
+} else if (fs.existsSync(resolvedFirebaseKeyPath) && getApps().length === 0) {
   try {
     const fileContent = fs.readFileSync(resolvedFirebaseKeyPath, "utf8");
     if (fileContent.includes("BEGIN PGP PUBLIC KEY BLOCK")) {
@@ -121,8 +123,8 @@ if (serviceAccountFromEnv && admin.apps.length === 0) {
       );
 
       if (serviceAccount) {
-        admin.initializeApp({
-          credential: admin.credential.cert(serviceAccount),
+        initializeApp({
+          credential: cert(serviceAccount),
           storageBucket: "zuca-personalizados.firebasestorage.app",
         });
         firebaseInitSource = "file";
@@ -135,10 +137,10 @@ if (serviceAccountFromEnv && admin.apps.length === 0) {
   }
 }
 
-export const db = admin.apps.length > 0 ? admin.firestore() : null;
-export const bucket = admin.apps.length > 0 ? admin.storage().bucket("zuca-personalizados.firebasestorage.app") : null;
+export const db = getApps().length > 0 ? getFirestore() : null;
+export const bucket = getApps().length > 0 ? getStorage().bucket("zuca-personalizados.firebasestorage.app") : null;
 export const firebaseDebug = {
-  active: admin.apps.length > 0,
+  active: getApps().length > 0,
   source: firebaseInitSource,
   error: firebaseInitError,
   env: {

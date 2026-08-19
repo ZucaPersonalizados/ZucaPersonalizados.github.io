@@ -650,25 +650,44 @@ async function aplicarCupom() {
   }
 }
 
-async function listarPedidosPorEmail(email) {
+function salvarTokenPedido(pedidoId, accessToken) {
+  if (!pedidoId || !accessToken) return;
+  const tokens = JSON.parse(localStorage.getItem("zuca_pedido_tokens") || "{}");
+  tokens[pedidoId] = accessToken;
+  localStorage.setItem("zuca_pedido_tokens", JSON.stringify(tokens));
+}
+
+function getTokenPedido(pedidoId) {
+  const tokens = JSON.parse(localStorage.getItem("zuca_pedido_tokens") || "{}");
+  return String(tokens[pedidoId] || "");
+}
+
+async function listarPedidosPorEmail() {
   const container = el("lista-pedidos");
-  if (!container || !email) return;
+  if (!container) return;
+
+  const tokens = JSON.parse(localStorage.getItem("zuca_pedido_tokens") || "{}");
+  const pedidosIds = Object.keys(tokens);
+  if (!pedidosIds.length) {
+    container.innerHTML = "<p>Nenhum pedido ainda.</p>";
+    return;
+  }
 
   try {
-    const response = await fetch(getApiUrl(`/api/pedidos?email=${encodeURIComponent(email)}`));
-    const payload = await response.json();
-
-    if (!response.ok || !payload.success) {
-      container.innerHTML = "<p>Não foi possível carregar seus pedidos.</p>";
-      return;
-    }
-
-    if (!payload.pedidos?.length) {
+    const respostas = await Promise.all(pedidosIds.map(async (pedidoId) => {
+      const response = await fetch(getApiUrl(`/api/pedidos?pedidoId=${encodeURIComponent(pedidoId)}`), {
+        headers: { "x-order-token": tokens[pedidoId] },
+      });
+      const payload = await response.json();
+      return response.ok && payload.success ? payload.pedidos || [] : [];
+    }));
+    const pedidos = respostas.flat();
+    if (!pedidos.length) {
       container.innerHTML = "<p>Nenhum pedido ainda.</p>";
       return;
     }
 
-    container.innerHTML = payload.pedidos.map((pedido) => {
+    container.innerHTML = pedidos.map((pedido) => {
       const status = String(pedido.status || "pendente");
       const statusLabel = status === "pagto" ? "Pago" : "Pendente";
       const statusClass = status === "pagto" ? "is-paid" : "is-pending";
@@ -701,7 +720,7 @@ async function listarPedidosPorEmail(email) {
       btn.addEventListener("click", () => {
         const pedidoId = btn.getAttribute("data-pedido-id") || "";
         const pagamento = btn.getAttribute("data-pagamento") || "pix";
-        pagarPedidoPendente(pedidoId, pagamento, email, btn);
+        pagarPedidoPendente(pedidoId, pagamento, "", btn);
       });
     });
 
@@ -718,7 +737,7 @@ async function listarPedidosPorEmail(email) {
           btn
         );
         if (verificacao.aprovado) {
-          await listarPedidosPorEmail(email);
+          await listarPedidosPorEmail();
         }
       });
     });
@@ -730,7 +749,7 @@ async function listarPedidosPorEmail(email) {
 async function verificarPagamento(idPedido) {
   const response = await fetch(getApiUrl("/verificar-pagamento"), {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", "x-order-token": getTokenPedido(idPedido) },
     body: JSON.stringify({ idPedido }),
   });
   const payload = await response.json();
@@ -745,7 +764,7 @@ async function verificarPagamento(idPedido) {
 async function gerarPixDinamico(total, idPedido, cliente) {
   const response = await fetch(getApiUrl("/gerar-pix"), {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", "x-order-token": getTokenPedido(idPedido) },
     body: JSON.stringify({
       valor: total,
       descricao: `Pedido #${idPedido.slice(0, 8)} - Zuca`,
@@ -825,7 +844,7 @@ function iniciarMonitoramentoPagamento(idPedido, email = "") {
 async function iniciarCheckoutCartao(pedidoId, email) {
   const response = await fetch(getApiUrl(`/api/pedidos/${encodeURIComponent(pedidoId)}/checkout-cartao`), {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", "x-order-token": getTokenPedido(pedidoId) },
     body: JSON.stringify({ email }),
   });
   const payload = await response.json();
@@ -846,7 +865,7 @@ async function pagarPedidoPendente(idPedido, metodoOriginal, email) {
     const metodo = metodoOriginal === "cartao" ? "cartao" : "pix";
     const response = await fetch(getApiUrl(`/api/pedidos/${encodeURIComponent(idPedido)}/pagar-agora`), {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "x-order-token": getTokenPedido(idPedido) },
       body: JSON.stringify({ email, metodo }),
     });
 
@@ -1058,6 +1077,7 @@ async function finalizarPedido() {
     }
 
     const pedidoId = pedidoPayload.pedidoId;
+    salvarTokenPedido(pedidoId, pedidoPayload.accessToken);
     const total = Number(pedidoPayload.total || 0);
 
     if (metodo === "pix") {
@@ -1089,7 +1109,7 @@ async function finalizarPedido() {
       cupomAplicado = null;
       renderCarrinho();
     }
-    await listarPedidosPorEmail(cliente.email);
+    await listarPedidosPorEmail();
   } catch (error) {
     setCheckoutStatus(`Erro: ${error.message}`, "error");
     showToast(`Erro: ${error.message}`, "error", 6000);

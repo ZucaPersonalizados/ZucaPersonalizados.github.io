@@ -1,8 +1,17 @@
 import express from "express";
 import multer from "multer";
+import { rateLimit } from "express-rate-limit";
 import { uploadArquivo } from "../controllers/uploadController.js";
 
 const router = express.Router();
+
+const uploadRateLimit = rateLimit({
+	windowMs: 60 * 60 * 1000,
+	limit: 20,
+	standardHeaders: "draft-8",
+	legacyHeaders: false,
+	message: { success: false, erro: "Limite de uploads atingido. Tente novamente mais tarde." },
+});
 
 const MIME_TYPES_PERMITIDOS = new Set([
 	"application/pdf",
@@ -14,7 +23,9 @@ const MIME_TYPES_PERMITIDOS = new Set([
 const upload = multer({
 	storage: multer.memoryStorage(),
 	limits: {
-		fileSize: 8 * 1024 * 1024,
+		fileSize: 5 * 1024 * 1024,
+		fields: 10,
+		parts: 12,
 	},
 	fileFilter: (req, file, cb) => {
 		const ext = String(file?.originalname || "").toLowerCase();
@@ -31,6 +42,6 @@ const upload = multer({
 	},
 });
 
-router.post("/", upload.single("arquivo"), uploadArquivo);
+router.post("/", uploadRateLimit, upload.single("arquivo"), uploadArquivo);
 
 export default router;

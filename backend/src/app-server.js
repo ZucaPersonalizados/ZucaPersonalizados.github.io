@@ -8,8 +8,10 @@ import fs from "fs";
 import crypto from "crypto";
 import path from "path";
 import { fileURLToPath } from "url";
-import { db, firebaseDebug } from "./firebase.js";
+import { db } from "./firebase.js";
 import OpenAI from "openai";
+import helmet from "helmet";
+import { rateLimit } from "express-rate-limit";
 import produtosRoutes from "./routes/produtos.js";
 import uploadRoutes from "./routes/upload.js";
 
@@ -36,6 +38,22 @@ const cookieName = "zuca_admin_session";
 const cookieTtlMs = 1000 * 60 * 60 * 12;
 const sessions = new Map();
 
+const apiRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 300,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  message: { success: false, error: "Muitas requisicoes. Tente novamente mais tarde." },
+});
+
+const sensitiveRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 30,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  message: { success: false, error: "Muitas tentativas. Tente novamente mais tarde." },
+});
+
 const corsOrigins = String(process.env.CORS_ORIGINS || "")
   .split(",")
   .map((v) => v.trim())
@@ -52,8 +70,23 @@ app.use(
     credentials: true,
   })
 );
-app.use(express.json({ limit: "2mb" }));
-app.use(express.urlencoded({ extended: true }));
+app.disable("x-powered-by");
+app.use(helmet({ contentSecurityPolicy: false }));
+app.use(apiRateLimit);
+
+app.use((req, res, next) => {
+  const json = res.json.bind(res);
+  res.json = (body) => {
+    if (res.statusCode >= 500 && body && typeof body === "object") {
+      return json({ success: false, error: "Erro interno do servidor" });
+    }
+    return json(body);
+  };
+  return next();
+});
+
+app.use(express.json({ limit: "512kb" }));
+app.use(express.urlencoded({ extended: true, limit: "128kb", parameterLimit: 100 }));
 
 if (fs.existsSync(frontendDir)) {
   app.use(express.static(frontendDir));
@@ -93,13 +126,12 @@ function cleanupExpiredSessions() {
 
 function setSessionCookie(res, token) {
   const secure = process.env.NODE_ENV === "production";
-  const sameSite = secure ? "None" : "Lax";
   const parts = [
     `${cookieName}=${encodeURIComponent(token)}`,
     "Path=/",
     "HttpOnly",
     `Max-Age=${Math.floor(cookieTtlMs / 1000)}`,
-    `SameSite=${sameSite}`,
+    "SameSite=Lax",
   ];
   if (secure) parts.push("Secure");
   res.setHeader("Set-Cookie", parts.join("; "));
@@ -127,6 +159,55 @@ function adminAuth(req, res, next) {
 
   req.adminSession = session;
   return next();
+}
+
+function createOrderAccessToken() {
+  return crypto.randomBytes(32).toString("base64url");
+}
+
+function hashOrderAccessToken(token) {
+  return crypto.createHash("sha256").update(String(token || "")).digest("hex");
+}
+
+function getOrderAccessToken(req) {
+  const headerToken = req.headers["x-order-token"];
+  if (headerToken) return String(headerToken).trim();
+  return String(req.body?.accessToken || req.query?.accessToken || "").trim();
+}
+
+function hasOrderAccess(pedido, token) {
+  const expected = String(pedido?.accessTokenHash || "");
+  const received = hashOrderAccessToken(token);
+  if (!expected || !token || expected.length !== received.length) return false;
+  return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(received));
+}
+
+async function loadAuthorizedOrder(req, res, pedidoId) {
+  const id = String(pedidoId || "").trim();
+  if (!id) {
+    res.status(400).json({ success: false, error: "ID do pedido invalido" });
+    return null;
+  }
+
+  const token = getOrderAccessToken(req);
+  if (!token) {
+    res.status(401).json({ success: false, error: "Token do pedido obrigatorio" });
+    return null;
+  }
+
+  const pedidoSnap = await db.collection("pedidos").doc(id).get();
+  if (!pedidoSnap.exists) {
+    res.status(404).json({ success: false, error: "Pedido nao encontrado" });
+    return null;
+  }
+
+  const pedido = pedidoSnap.data() || {};
+  if (!hasOrderAccess(pedido, token)) {
+    res.status(403).json({ success: false, error: "Acesso ao pedido negado" });
+    return null;
+  }
+
+  return { ref: pedidoSnap.ref, data: pedido };
 }
 
 function parseMoney(value) {
@@ -693,9 +774,11 @@ async function createCheckoutProPreference({ pedidoId, pedidoData, appBaseUrl })
 
 function normalizePedido(docSnap) {
   const data = docSnap.data() || {};
+  const safeData = { ...data };
+  delete safeData.accessTokenHash;
 
   // Normaliza timestamps do objeto notaFiscal (Firestore Timestamp → ISO string)
-  let notaFiscal = data.notaFiscal || null;
+  let notaFiscal = safeData.notaFiscal || null;
   if (notaFiscal) {
     notaFiscal = {
       ...notaFiscal,
@@ -706,10 +789,10 @@ function normalizePedido(docSnap) {
 
   return {
     id: docSnap.id,
-    ...data,
+    ...safeData,
     notaFiscal,
-    criadoEmISO: data.criadoEm?.toDate ? data.criadoEm.toDate().toISOString() : data.criadoEm || null,
-    atualizadoEmISO: data.atualizadoEm?.toDate ? data.atualizadoEm.toDate().toISOString() : data.atualizadoEm || null,
+    criadoEmISO: safeData.criadoEm?.toDate ? safeData.criadoEm.toDate().toISOString() : safeData.criadoEm || null,
+    atualizadoEmISO: safeData.atualizadoEm?.toDate ? safeData.atualizadoEm.toDate().toISOString() : safeData.atualizadoEm || null,
   };
 }
 
@@ -718,7 +801,6 @@ app.get("/health", (req, res) => {
     status: "ok",
     service: "zuca-backend-only",
     firebase: !!db,
-    firebaseDebug,
     timestamp: new Date().toISOString(),
   });
 });
@@ -878,8 +960,8 @@ app.post("/api/pedidos", requireDb, async (req, res) => {
       return {
         id: String(item.id || ""),
         nome: String(item.nome || "Produto"),
-        preco: parseMoney(item.preco),
-        quantidade: Number(item.quantidade || 1),
+        preco: 0,
+        quantidade: Math.floor(Number(item.quantidade || 1)),
         imagem: String(item.imagem || ""),
         personalizado: !!item.personalizado,
         arquivoPersonalizacaoUrl,
@@ -896,6 +978,11 @@ app.post("/api/pedidos", requireDb, async (req, res) => {
       }
 
       const produtoData = produtoSnap.data() || {};
+      item.preco = parseMoney(produtoData.preco);
+      if (!(item.quantidade > 0) || !Number.isFinite(item.quantidade) || item.preco <= 0) {
+        invalidos.push({ id: item.id, nome: item.nome, motivo: "Preco ou quantidade invalidos" });
+        continue;
+      }
       if (isProdutoPersonalizado(produtoData) && !item.arquivoPersonalizacaoUrl) {
         invalidos.push({
           id: item.id,
@@ -933,6 +1020,7 @@ app.post("/api/pedidos", requireDb, async (req, res) => {
 
     const freteValor = Math.max(0, Number(frete?.valor || 0));
     const total = Math.max(0, subtotal - desconto + freteValor);
+    const accessToken = createOrderAccessToken();
     const pedidoRef = await db.collection("pedidos").add({
       cliente: {
         nome: String(cliente.nome || ""),
@@ -961,6 +1049,7 @@ app.post("/api/pedidos", requireDb, async (req, res) => {
       status: "pendente",
       statusPedido: "pendente",
       estoqueDebitado: false,
+      accessTokenHash: hashOrderAccessToken(accessToken),
       criadoEm: admin.firestore.FieldValue.serverTimestamp(),
       atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
     });
@@ -968,6 +1057,7 @@ app.post("/api/pedidos", requireDb, async (req, res) => {
     return res.status(201).json({
       success: true,
       pedidoId: pedidoRef.id,
+      accessToken,
       subtotal,
       desconto,
       frete: freteValor,
@@ -980,23 +1070,21 @@ app.post("/api/pedidos", requireDb, async (req, res) => {
 
 app.get("/api/pedidos", requireDb, async (req, res) => {
   try {
-    const email = String(req.query.email || "").trim().toLowerCase();
-    if (!email) {
-      return res.status(400).json({ success: false, error: "Email obrigatorio" });
+    const pedidoId = String(req.query.pedidoId || "").trim();
+    if (!pedidoId || !getOrderAccessToken(req)) {
+      return res.status(401).json({ success: false, error: "Token do pedido obrigatorio" });
     }
 
-    const snap = await db.collection("pedidos").where("cliente.email", "==", email).get();
-    const pedidos = snap.docs.map(normalizePedido).sort((a, b) => {
-      return String(b.criadoEmISO || "").localeCompare(String(a.criadoEmISO || ""));
-    });
+    const authorized = await loadAuthorizedOrder(req, res, pedidoId);
+    if (!authorized) return;
 
-    return res.json({ success: true, pedidos });
+    return res.json({ success: true, pedidos: [normalizePedido({ id: pedidoId, data: () => authorized.data })] });
   } catch (error) {
     return res.status(500).json({ success: false, error: error.message });
   }
 });
 
-app.post("/api/admin/login", (req, res) => {
+app.post("/api/admin/login", sensitiveRateLimit, (req, res) => {
   const email = String(req.body.email || "").trim().toLowerCase();
   const senha = String(req.body.senha || "").trim();
 
@@ -1299,22 +1387,24 @@ app.delete("/api/admin/cupons/:codigo", adminAuth, requireDb, async (req, res) =
   }
 });
 
-app.post("/gerar-pix", async (req, res) => {
+app.post("/gerar-pix", sensitiveRateLimit, async (req, res) => {
   try {
     const { valor, descricao, cliente, idPedido } = req.body;
-    if (!valor || Number(valor) <= 0) {
-      return res.status(400).json({ success: false, error: "Valor invalido" });
-    }
+    const authorized = await loadAuthorizedOrder(req, res, idPedido);
+    if (!authorized) return;
+    const pedido = authorized.data;
+    const valorPedido = Number(pedido.total || 0);
+    if (!(valorPedido > 0)) return res.status(400).json({ success: false, error: "Valor do pedido invalido" });
 
     const pix = await createPixCharge({
-      valor: Number(valor),
-      descricao,
-      cliente,
+      valor: valorPedido,
+      descricao: `Pedido #${String(idPedido).slice(0, 8)} - Zuca`,
+      cliente: pedido.cliente || {},
       pedidoId: idPedido,
     });
 
-    if (db && idPedido) {
-      await db.collection("pedidos").doc(idPedido).update({
+    if (db) {
+      await authorized.ref.update({
         pagamentoProvider: pix.provider,
         mercadoPagoId: pix.mercadoPagoId,
         statusMercadoPago: pix.statusMercadoPago,
@@ -1332,7 +1422,7 @@ app.post("/gerar-pix", async (req, res) => {
       transaction_id: pix.mercadoPagoId,
       status: pix.statusMercadoPago || "pending",
       expira_em: pix.expiraEm,
-      valor: Number(valor),
+      valor: valorPedido,
     });
   } catch (error) {
     const status = error?.response?.status || 500;
@@ -1354,24 +1444,10 @@ app.post("/gerar-pix", async (req, res) => {
 app.post("/api/pedidos/:id/checkout-cartao", requireDb, async (req, res) => {
   try {
     const pedidoId = String(req.params.id || "").trim();
-    const email = String(req.body.email || "").trim().toLowerCase();
-
-    if (!pedidoId) {
-      return res.status(400).json({ success: false, error: "ID do pedido invalido" });
-    }
-
-    const pedidoRef = db.collection("pedidos").doc(pedidoId);
-    const pedidoSnap = await pedidoRef.get();
-    if (!pedidoSnap.exists) {
-      return res.status(404).json({ success: false, error: "Pedido nao encontrado" });
-    }
-
-    const pedido = pedidoSnap.data() || {};
-    const pedidoEmail = String(pedido?.cliente?.email || "").trim().toLowerCase();
-
-    if (email && pedidoEmail && email !== pedidoEmail) {
-      return res.status(403).json({ success: false, error: "Pedido nao pertence ao e-mail informado" });
-    }
+    const authorized = await loadAuthorizedOrder(req, res, pedidoId);
+    if (!authorized) return;
+    const pedidoRef = authorized.ref;
+    const pedido = authorized.data;
 
     if (String(pedido.status || "").toLowerCase() === "pagto") {
       return res.status(409).json({ success: false, error: "Pedido ja esta pago" });
@@ -1408,24 +1484,11 @@ app.post("/api/pedidos/:id/checkout-cartao", requireDb, async (req, res) => {
 app.post("/api/pedidos/:id/pagar-agora", requireDb, async (req, res) => {
   try {
     const pedidoId = String(req.params.id || "").trim();
-    const email = String(req.body.email || "").trim().toLowerCase();
     const metodoSolicitado = String(req.body.metodo || "").trim().toLowerCase();
-
-    if (!pedidoId) {
-      return res.status(400).json({ success: false, error: "ID do pedido invalido" });
-    }
-
-    const pedidoRef = db.collection("pedidos").doc(pedidoId);
-    const pedidoSnap = await pedidoRef.get();
-    if (!pedidoSnap.exists) {
-      return res.status(404).json({ success: false, error: "Pedido nao encontrado" });
-    }
-
-    const pedido = pedidoSnap.data() || {};
-    const pedidoEmail = String(pedido?.cliente?.email || "").trim().toLowerCase();
-    if (email && pedidoEmail && email !== pedidoEmail) {
-      return res.status(403).json({ success: false, error: "Pedido nao pertence ao e-mail informado" });
-    }
+    const authorized = await loadAuthorizedOrder(req, res, pedidoId);
+    if (!authorized) return;
+    const pedidoRef = authorized.ref;
+    const pedido = authorized.data;
 
     if (String(pedido.status || "").toLowerCase() === "pagto") {
       return res.status(409).json({ success: false, error: "Pedido ja esta pago" });
@@ -1488,23 +1551,10 @@ app.post("/api/pedidos/:id/pagar-agora", requireDb, async (req, res) => {
 app.post("/api/pedidos/:id/cancelar", requireDb, async (req, res) => {
   try {
     const pedidoId = String(req.params.id || "").trim();
-    const email = String(req.body.email || "").trim().toLowerCase();
-
-    if (!pedidoId) {
-      return res.status(400).json({ success: false, error: "ID do pedido invalido" });
-    }
-
-    const pedidoRef = db.collection("pedidos").doc(pedidoId);
-    const pedidoSnap = await pedidoRef.get();
-    if (!pedidoSnap.exists) {
-      return res.status(404).json({ success: false, error: "Pedido nao encontrado" });
-    }
-
-    const pedido = pedidoSnap.data() || {};
-    const pedidoEmail = String(pedido?.cliente?.email || "").trim().toLowerCase();
-    if (email && pedidoEmail && email !== pedidoEmail) {
-      return res.status(403).json({ success: false, error: "Pedido nao pertence ao e-mail informado" });
-    }
+    const authorized = await loadAuthorizedOrder(req, res, pedidoId);
+    if (!authorized) return;
+    const pedidoRef = authorized.ref;
+    const pedido = authorized.data;
 
     const statusAtual = String(pedido.status || "").toLowerCase();
     if (statusAtual === "cancelado") {
@@ -1527,7 +1577,7 @@ app.post("/api/pedidos/:id/cancelar", requireDb, async (req, res) => {
   }
 });
 
-app.post("/processar-pagamento", async (req, res) => {
+app.post("/processar-pagamento", sensitiveRateLimit, async (req, res) => {
   try {
     const { valor, descricao, cliente, cartao, idPedido } = req.body;
 
@@ -1728,24 +1778,18 @@ app.post("/webhook/mercadopago", requireDb, async (req, res) => {
   }
 });
 
-app.post("/verificar-pagamento", requireDb, async (req, res) => {
+app.post("/verificar-pagamento", sensitiveRateLimit, requireDb, async (req, res) => {
   try {
     const { idPedido } = req.body;
-    if (!idPedido) {
-      return res.status(400).json({ success: false, error: "ID do pedido invalido" });
-    }
+    const authorized = await loadAuthorizedOrder(req, res, idPedido);
+    if (!authorized) return;
 
     if (!mpAccessToken) {
       return res.status(503).json({ success: false, error: "MP_ACCESS_TOKEN nao configurado" });
     }
 
-    const pedidoRef = db.collection("pedidos").doc(idPedido);
-    const pedidoSnap = await pedidoRef.get();
-    if (!pedidoSnap.exists) {
-      return res.status(404).json({ success: false, error: "Pedido nao encontrado" });
-    }
-
-    const pedidoData = pedidoSnap.data() || {};
+    const pedidoRef = authorized.ref;
+    const pedidoData = authorized.data;
     let mercadoPagoId = String(pedidoData.mercadoPagoId || "").trim();
     const pagamentoProvider = String(pedidoData.pagamentoProvider || "").toLowerCase();
 
@@ -2098,25 +2142,15 @@ app.patch("/api/admin/pedidos/:id/rastreio", adminAuth, requireDb, async (req, r
 });
 
 /**
- * GET /api/pedidos/:id/rastreio?email=X
- * Cliente consulta o código de rastreio do seu próprio pedido (autenticado por e-mail).
+ * GET /api/pedidos/:id/rastreio
+ * Cliente consulta o código de rastreio do próprio pedido com token de acesso.
  */
 app.get("/api/pedidos/:id/rastreio", requireDb, async (req, res) => {
   try {
     const pedidoId = String(req.params.id || "").trim();
-    const email = String(req.query.email || "").trim().toLowerCase();
-
-    if (!pedidoId || !email) {
-      return res.status(400).json({ success: false, error: "ID e e-mail são obrigatórios" });
-    }
-
-    const snap = await db.collection("pedidos").doc(pedidoId).get();
-    if (!snap.exists) return res.status(404).json({ success: false, error: "Pedido não encontrado" });
-
-    const pedido = snap.data();
-    if (String(pedido?.cliente?.email || "").trim().toLowerCase() !== email) {
-      return res.status(403).json({ success: false, error: "Acesso negado" });
-    }
+    const authorized = await loadAuthorizedOrder(req, res, pedidoId);
+    if (!authorized) return;
+    const pedido = authorized.data;
 
     return res.json({
       success: true,
@@ -2180,6 +2214,16 @@ app.get("/api/rastreio/consultar", async (req, res) => {
     // Não propaga erro — retorna resposta vazia para não quebrar o cliente
     return res.json({ success: true, code: String(req.query.codigo || ""), events: [], fonte: "erro" });
   }
+});
+
+app.use((error, req, res, next) => {
+  if (res.headersSent) return next(error);
+  const status = error?.type === "entity.too.large" ? 413 : Number(error?.status) || 500;
+  console.error(`[HTTP] ${req.method} ${req.originalUrl}:`, error?.message || error);
+  return res.status(status).json({
+    success: false,
+    error: status === 413 ? "Requisicao muito grande" : "Erro interno do servidor",
+  });
 });
 
 // ───────────────────────────────────────────────────────────────────────────

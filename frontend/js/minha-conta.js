@@ -197,7 +197,7 @@ function removerFotoPersonalizada() {
 async function verificarPagamento(idPedido) {
   const response = await fetch(getApiUrl("/verificar-pagamento"), {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", "x-order-token": getTokenPedido(idPedido) },
     body: JSON.stringify({ idPedido }),
   });
 
@@ -208,7 +208,7 @@ async function verificarPagamento(idPedido) {
 async function pagarAgora(idPedido, email, metodo) {
   const response = await fetch(getApiUrl(`/api/pedidos/${encodeURIComponent(idPedido)}/pagar-agora`), {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", "x-order-token": getTokenPedido(idPedido) },
     body: JSON.stringify({ email, metodo }),
   });
 
@@ -234,7 +234,7 @@ async function pagarAgora(idPedido, email, metodo) {
 async function cancelarPedido(idPedido, email) {
   const response = await fetch(getApiUrl(`/api/pedidos/${encodeURIComponent(idPedido)}/cancelar`), {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", "x-order-token": getTokenPedido(idPedido) },
     body: JSON.stringify({ email }),
   });
 
@@ -249,21 +249,22 @@ async function listarPedidos(email) {
   const list = el("pedido-list");
   if (!list) return;
 
-  if (!email) {
-    list.innerHTML = "<p>Informe seu e-mail para ver os pedidos.</p>";
+  const tokens = JSON.parse(localStorage.getItem("zuca_pedido_tokens") || "{}");
+  const pedidosIds = Object.keys(tokens);
+  if (!pedidosIds.length) {
+    list.innerHTML = "<p>Nenhum pedido encontrado nesta conta.</p>";
     return;
   }
 
   try {
-    const response = await fetch(getApiUrl(`/api/pedidos?email=${encodeURIComponent(email)}`));
-    const payload = await response.json();
-
-    if (!response.ok || !payload.success) {
-      list.innerHTML = "<p>Nao foi possivel carregar seus pedidos.</p>";
-      return;
-    }
-
-    const pedidos = Array.isArray(payload.pedidos) ? payload.pedidos : [];
+    const respostas = await Promise.all(pedidosIds.map(async (pedidoId) => {
+      const response = await fetch(getApiUrl(`/api/pedidos?pedidoId=${encodeURIComponent(pedidoId)}`), {
+        headers: { "x-order-token": tokens[pedidoId] },
+      });
+      const payload = await response.json();
+      return response.ok && payload.success ? payload.pedidos || [] : [];
+    }));
+    const pedidos = respostas.flat();
     if (!pedidos.length) {
       list.innerHTML = "<p>Nenhum pedido encontrado para este e-mail.</p>";
       return;
@@ -439,6 +440,11 @@ async function listarPedidos(email) {
   } catch {
     list.innerHTML = "<p>Nao foi possivel carregar seus pedidos.</p>";
   }
+}
+
+function getTokenPedido(pedidoId) {
+  const tokens = JSON.parse(localStorage.getItem("zuca_pedido_tokens") || "{}");
+  return String(tokens[pedidoId] || "");
 }
 
 el("btn-salvar")?.addEventListener("click", salvarPerfil);

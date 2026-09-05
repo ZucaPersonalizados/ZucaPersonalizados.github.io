@@ -2327,11 +2327,24 @@ app.get("/api/rastreio/consultar", async (req, res) => {
 
 app.use((error, req, res, next) => {
   if (res.headersSent) return next(error);
-  const status = error?.type === "entity.too.large" ? 413 : Number(error?.status) || 500;
+  const multerErrorMessages = {
+    LIMIT_FILE_SIZE: "Arquivo muito grande. Limite de 5MB.",
+    LIMIT_FILE_COUNT: "Quantidade de arquivos excede o limite.",
+    LIMIT_FIELD_COUNT: "Quantidade de campos excede o limite.",
+    LIMIT_PART_COUNT: "Quantidade de partes excede o limite.",
+    LIMIT_UNEXPECTED_FILE: "Campo de arquivo invalido.",
+    INVALID_FILE_TYPE: error?.message || "Formato de arquivo invalido.",
+  };
+  const uploadMessage = multerErrorMessages[error?.code];
+  const status = error?.type === "entity.too.large" || error?.code === "LIMIT_FILE_SIZE"
+    ? 413
+    : uploadMessage
+      ? 400
+      : Number(error?.status) || 500;
   console.error(`[HTTP] ${req.method} ${req.originalUrl}:`, error?.message || error);
   return res.status(status).json({
     success: false,
-    error: status === 413 ? "Requisicao muito grande" : "Erro interno do servidor",
+    error: status === 413 ? (uploadMessage || "Requisicao muito grande") : (uploadMessage || "Erro interno do servidor"),
   });
 });
 

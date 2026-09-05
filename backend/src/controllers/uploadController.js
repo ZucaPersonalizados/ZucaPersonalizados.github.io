@@ -33,23 +33,30 @@ export const uploadArquivo = async (req, res) => {
     });
 
     stream.on("finish", async () => {
-      const [url] = await file.getSignedUrl({
-        action: "read",
-        expires: Date.now() + 1000 * 60 * 60,
-      });
+      try {
+        const [url] = await file.getSignedUrl({
+          action: "read",
+          expires: Date.now() + 1000 * 60 * 60,
+        });
 
-      res.json({ url });
+        if (!res.headersSent) res.json({ url });
+      } catch (error) {
+        console.error("[UPLOAD] Falha ao criar URL de acesso:", error.message);
+        if (!res.headersSent) {
+          res.status(503).json({ erro: "Arquivo salvo, mas temporariamente indisponivel para acesso" });
+        }
+      }
     });
 
     stream.end(req.file.buffer);
 
   } catch (error) {
     if (error?.code === "LIMIT_FILE_SIZE") {
-      return res.status(400).json({ erro: "Arquivo muito grande. Limite de 8MB." });
+      return res.status(400).json({ erro: "Arquivo muito grande. Limite de 5MB." });
     }
 
     if (error?.code === "INVALID_FILE_TYPE") {
-      return res.status(400).json({ erro: error.message || "Formato invalido. Use PDF, JPG ou PNG." });
+      return res.status(400).json({ erro: error.message || "Formato invalido. Use PDF, JPG, PNG, WEBP ou SVG." });
     }
 
     console.error("[UPLOAD] Erro inesperado:", error.message);

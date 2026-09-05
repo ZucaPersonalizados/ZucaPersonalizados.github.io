@@ -17,6 +17,7 @@ const MIME_TYPES_PERMITIDOS = new Set([
 	"application/pdf",
 	"image/jpeg",
 	"image/png",
+	"image/webp",
 	"image/svg+xml",
 ]);
 
@@ -29,11 +30,11 @@ const upload = multer({
 	},
 	fileFilter: (req, file, cb) => {
 		const ext = String(file?.originalname || "").toLowerCase();
-		const extensaoValida = /\.(pdf|jpe?g|png|svg)$/.test(ext);
+		const extensaoValida = /\.(pdf|jpe?g|png|webp|svg)$/.test(ext);
 		const mimeValido = MIME_TYPES_PERMITIDOS.has(String(file?.mimetype || "").toLowerCase());
 
 		if (!extensaoValida || !mimeValido) {
-			const error = new Error("Formato invalido. Envie apenas PDF, JPG, JPEG, PNG ou SVG.");
+			const error = new Error("Formato invalido. Envie apenas PDF, JPG, JPEG, PNG, WEBP ou SVG.");
 			error.code = "INVALID_FILE_TYPE";
 			return cb(error);
 		}

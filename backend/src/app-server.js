@@ -1273,7 +1273,7 @@ app.get("/api/admin/produtos", adminAuth, requireDb, async (req, res) => {
   try {
     const snap = await db.collection("produtos").get();
     const produtos = snap.docs
-      .map((doc) => ({ id: doc.id, ...doc.data() }))
+      .map((doc) => normalizeProdutoAdmin(doc))
       .sort((a, b) => String(a.nome || "").localeCompare(String(b.nome || ""), "pt-BR"));
 
     return res.json({ success: true, produtos });
@@ -1281,6 +1281,26 @@ app.get("/api/admin/produtos", adminAuth, requireDb, async (req, res) => {
     return res.status(500).json({ success: false, error: error.message });
   }
 });
+
+function normalizeProdutoAdmin(docSnap) {
+  const data = docSnap.data() || {};
+  const produto = { id: docSnap.id, ...data };
+
+  for (const campo of ["atualizadoEm", "ultimaAtualizacao"]) {
+    const valor = produto[campo];
+    if (valor?.toDate) produto[campo] = valor.toDate().toISOString();
+  }
+
+  if (!Array.isArray(produto.imagens)) {
+    produto.imagens = produto.imagens ? [String(produto.imagens)] : [];
+  }
+
+  if (produto.modeloConfig && typeof produto.modeloConfig === "object") {
+    produto.modeloConfig = JSON.parse(JSON.stringify(produto.modeloConfig));
+  }
+
+  return produto;
+}
 
 app.post("/api/admin/produtos", adminAuth, requireDb, async (req, res) => {
   try {

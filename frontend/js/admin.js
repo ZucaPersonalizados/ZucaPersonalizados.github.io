@@ -37,6 +37,11 @@ async function fetchApi(path, options) {
   for (const base of API_BASES) {
     try {
       const response = await fetch(getApiUrl(path, base), options);
+      if (response.status === 401) {
+        const error = new Error("Sessao administrativa expirada. Faca login novamente.");
+        error.status = 401;
+        throw error;
+      }
       if (response.ok) {
         if (base === ORIGIN_BASE && API_BASE !== ORIGIN_BASE) {
           localStorage.removeItem("zuca_api_base_url");
@@ -50,6 +55,7 @@ async function fetchApi(path, options) {
   }
 
   if (lastResponse) return lastResponse;
+  if (lastError?.status === 401) throw lastError;
   throw lastError || new Error("Falha ao conectar com a API");
 }
 

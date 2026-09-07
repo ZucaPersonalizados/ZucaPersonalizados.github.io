@@ -1117,8 +1117,21 @@ app.post("/api/admin/logout", (req, res) => {
   return res.json({ success: true });
 });
 
-app.get("/api/admin/me", adminAuth, (req, res) => {
-  return res.json({ success: true, user: { email: req.adminSession.email } });
+app.get("/api/admin/me", (req, res) => {
+  cleanupExpiredSessions();
+  const cookies = parseCookies(req);
+  const token = cookies[cookieName];
+  const session = token ? sessions.get(token) : null;
+
+  if (!session || session.expiresAt <= Date.now()) {
+    if (token) {
+      sessions.delete(token);
+      clearSessionCookie(res);
+    }
+    return res.json({ success: false, authenticated: false });
+  }
+
+  return res.json({ success: true, authenticated: true, user: { email: session.email } });
 });
 
 app.get("/api/admin/anexos/download", adminAuth, async (req, res) => {

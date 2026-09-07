@@ -9,6 +9,7 @@ import crypto from "crypto";
 import path from "path";
 import { fileURLToPath } from "url";
 import { db } from "./firebase.js";
+import { FieldValue } from "firebase-admin/firestore";
 import OpenAI from "openai";
 import helmet from "helmet";
 import { rateLimit } from "express-rate-limit";
@@ -1050,8 +1051,8 @@ app.post("/api/pedidos", requireDb, async (req, res) => {
       statusPedido: "pendente",
       estoqueDebitado: false,
       accessTokenHash: hashOrderAccessToken(accessToken),
-      criadoEm: admin.firestore.FieldValue.serverTimestamp(),
-      atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
+      criadoEm: FieldValue.serverTimestamp(),
+      atualizadoEm: FieldValue.serverTimestamp(),
     });
 
     return res.status(201).json({
@@ -1182,7 +1183,7 @@ app.patch("/api/admin/pedidos/:id/nota-fiscal", adminAuth, requireDb, async (req
     if (!url && !numero && !serie && !chaveAcesso && !observacao) {
       await pedidoRef.update({
         notaFiscal: null,
-        atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
+        atualizadoEm: FieldValue.serverTimestamp(),
         atualizadoPor: req.adminSession.email,
       });
       return res.json({ success: true, notaFiscal: null });
@@ -1209,13 +1210,13 @@ app.patch("/api/admin/pedidos/:id/nota-fiscal", adminAuth, requireDb, async (req
       serie: serie || null,
       chaveAcesso: chaveAcesso || null,
       observacao: observacao || null,
-      emitidaEm: admin.firestore.FieldValue.serverTimestamp(),
+      emitidaEm: FieldValue.serverTimestamp(),
       atualizadaPor: req.adminSession.email,
     };
 
     await pedidoRef.update({
       notaFiscal,
-      atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
+      atualizadoEm: FieldValue.serverTimestamp(),
       atualizadoPor: req.adminSession.email,
     });
 
@@ -1255,7 +1256,7 @@ app.patch("/api/admin/pedidos/:id/status", adminAuth, requireDb, async (req, res
     const statusPedido = String(req.body.statusPedido || "");
 
     const updates = {
-      atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
+      atualizadoEm: FieldValue.serverTimestamp(),
       atualizadoPor: req.adminSession.email,
     };
 
@@ -1343,13 +1344,15 @@ app.post("/api/admin/produtos", adminAuth, requireDb, async (req, res) => {
       ehModelo: !!req.body.ehModelo,
       modeloNome: String(req.body.modeloNome || ""),
       modeloConfig: req.body.modeloConfig ?? null,
-      atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
+      atualizadoEm: FieldValue.serverTimestamp(),
       atualizadoPor: req.adminSession.email,
     };
 
     await produtoRef.set(produto);
-    return res.status(201).json({ success: true, produto: { id, ...produto } });
+    const produtoSalvo = await produtoRef.get();
+    return res.status(201).json({ success: true, produto: normalizeProdutoAdmin(produtoSalvo) });
   } catch (error) {
+    console.error("[ADMIN PRODUTOS] Falha ao criar produto:", error?.message || error);
     return res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -1393,7 +1396,7 @@ app.put("/api/admin/produtos/:id", adminAuth, requireDb, async (req, res) => {
       ehModelo: !!req.body.ehModelo,
       modeloNome: String(req.body.modeloNome || ""),
       modeloConfig: req.body.modeloConfig ?? null,
-      atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
+      atualizadoEm: FieldValue.serverTimestamp(),
       atualizadoPor: req.adminSession.email,
     };
 
@@ -1449,7 +1452,7 @@ app.post("/api/admin/cupons", adminAuth, requireDb, async (req, res) => {
       tipo,
       valor,
       ativo: req.body.ativo !== false,
-      atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
+      atualizadoEm: FieldValue.serverTimestamp(),
       atualizadoPor: req.adminSession.email,
     });
 
@@ -1496,7 +1499,7 @@ app.post("/gerar-pix", sensitiveRateLimit, async (req, res) => {
         statusMercadoPago: pix.statusMercadoPago,
         pixCopiaECola: pix.copiaECola,
         pixExpiraEm: pix.expiraEm,
-        atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
+        atualizadoEm: FieldValue.serverTimestamp(),
       });
     }
 
@@ -1553,7 +1556,7 @@ app.post("/api/pedidos/:id/checkout-cartao", requireDb, async (req, res) => {
       pagamentoProvider: "mercadopago",
       pagamento: "cartao",
       checkoutPreferenceId: preference.preferenceId,
-      atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
+      atualizadoEm: FieldValue.serverTimestamp(),
     });
 
     return res.json({
@@ -1597,7 +1600,7 @@ app.post("/api/pedidos/:id/pagar-agora", requireDb, async (req, res) => {
         statusMercadoPago: pix.statusMercadoPago,
         pixCopiaECola: pix.copiaECola,
         pixExpiraEm: pix.expiraEm,
-        atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
+        atualizadoEm: FieldValue.serverTimestamp(),
       });
 
       return res.json({
@@ -1620,7 +1623,7 @@ app.post("/api/pedidos/:id/pagar-agora", requireDb, async (req, res) => {
       pagamento: "cartao",
       pagamentoProvider: "mercadopago",
       checkoutPreferenceId: preference.preferenceId,
-      atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
+      atualizadoEm: FieldValue.serverTimestamp(),
     });
 
     return res.json({
@@ -1654,7 +1657,7 @@ app.post("/api/pedidos/:id/cancelar", requireDb, async (req, res) => {
     await pedidoRef.update({
       status: "cancelado",
       statusPedido: "cancelado",
-      atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
+      atualizadoEm: FieldValue.serverTimestamp(),
     });
 
     return res.json({ success: true, message: "Pedido cancelado com sucesso" });
@@ -1719,7 +1722,7 @@ app.post("/processar-pagamento", sensitiveRateLimit, async (req, res) => {
       await db.collection("pedidos").doc(idPedido).update({
         mercadoPagoId: payment.id,
         statusMercadoPago: payment.status,
-        atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
+        atualizadoEm: FieldValue.serverTimestamp(),
       });
     }
 
@@ -1854,8 +1857,8 @@ app.post("/webhook/mercadopago", requireDb, async (req, res) => {
       mercadoPagoId: String(pagamento.id || ""),
       statusMercadoPago,
       status: statusPedido,
-      atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
-      pagamentoVerificadoEm: admin.firestore.FieldValue.serverTimestamp(),
+      atualizadoEm: FieldValue.serverTimestamp(),
+      pagamentoVerificadoEm: FieldValue.serverTimestamp(),
     });
 
     return res.status(200).json({ received: true, updated: true });
@@ -1902,7 +1905,7 @@ app.post("/verificar-pagamento", sensitiveRateLimit, requireDb, async (req, res)
       await pedidoRef.update({
         mercadoPagoId,
         statusMercadoPago: String(pagamentoReferencia.status || "pending").toLowerCase(),
-        atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
+        atualizadoEm: FieldValue.serverTimestamp(),
       });
     }
 
@@ -1919,7 +1922,7 @@ app.post("/verificar-pagamento", sensitiveRateLimit, requireDb, async (req, res)
       await pedidoRef.update({
         status: "pendente",
         statusMercadoPago,
-        atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
+        atualizadoEm: FieldValue.serverTimestamp(),
       });
 
       return res.status(202).json({
@@ -1942,7 +1945,7 @@ app.post("/verificar-pagamento", sensitiveRateLimit, requireDb, async (req, res)
         const novoEstoque = Math.max(0, estoqueAtual - Number(item.quantidade || 0));
         await produtoRef.update({
           estoque: novoEstoque,
-          ultimaAtualizacaoEstoque: admin.firestore.FieldValue.serverTimestamp(),
+          ultimaAtualizacaoEstoque: FieldValue.serverTimestamp(),
         });
       }
     }
@@ -1951,8 +1954,8 @@ app.post("/verificar-pagamento", sensitiveRateLimit, requireDb, async (req, res)
       status: "pagto",
       statusMercadoPago,
       estoqueDebitado: true,
-      atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
-      pagamentoVerificadoEm: admin.firestore.FieldValue.serverTimestamp(),
+      atualizadoEm: FieldValue.serverTimestamp(),
+      pagamentoVerificadoEm: FieldValue.serverTimestamp(),
     });
 
     return res.json({
@@ -2206,7 +2209,7 @@ app.patch("/api/admin/pedidos/:id/rastreio", adminAuth, requireDb, async (req, r
     const updates = {
       codigoRastreio: codigoRastreio || null,
       transportadora: transportadora || null,
-      atualizadoEm: admin.firestore.FieldValue.serverTimestamp(),
+      atualizadoEm: FieldValue.serverTimestamp(),
       atualizadoPor: req.adminSession.email,
     };
 

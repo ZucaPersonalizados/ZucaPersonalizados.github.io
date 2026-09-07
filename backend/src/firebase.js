@@ -1,8 +1,12 @@
 import { cert, getApps, initializeApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
+import dotenv from "dotenv";
 import fs from "fs";
 import path from "path";
+
+// Este modulo e avaliado antes do corpo de app-server.js; carregue o .env aqui.
+dotenv.config();
 
 const firebaseKeyPath = process.env.FIREBASE_KEY_PATH || "./src/config/firebase-key.json";
 const resolvedFirebaseKeyPath = path.isAbsolute(firebaseKeyPath)

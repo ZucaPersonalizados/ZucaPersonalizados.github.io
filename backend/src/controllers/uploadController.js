@@ -2,6 +2,19 @@ import { bucket } from "../firebase.js";
 import path from "path";
 import crypto from "crypto";
 
+function mensagemErroStorage(error) {
+  const texto = JSON.stringify(error || "").toLowerCase();
+  if (texto.includes("accountdisabled") || texto.includes("billing account") || texto.includes("billingaccount")) {
+    return "O armazenamento de imagens esta bloqueado porque o faturamento do projeto Firebase esta desativado. Reative o faturamento no Google Cloud/Firebase e tente novamente.";
+  }
+
+  if (String(error?.code || "") === "403" || Number(error?.code) === 403) {
+    return "O Firebase recusou o armazenamento. Verifique as permissoes e o faturamento do projeto.";
+  }
+
+  return "Falha ao salvar arquivo no armazenamento";
+}
+
 export const uploadArquivo = async (req, res) => {
   try {
     if (!req.file) {
@@ -29,7 +42,11 @@ export const uploadArquivo = async (req, res) => {
 
     stream.on("error", (err) => {
       console.error("[UPLOAD] Falha ao salvar arquivo:", err.message);
-      if (!res.headersSent) res.status(500).json({ erro: "Falha ao salvar arquivo" });
+      if (!res.headersSent) {
+        const billingBlocked = JSON.stringify(err || "").toLowerCase().includes("billing account")
+          || JSON.stringify(err || "").toLowerCase().includes("accountdisabled");
+        res.status(billingBlocked ? 503 : 500).json({ erro: mensagemErroStorage(err) });
+      }
     });
 
     stream.on("finish", async () => {
@@ -43,7 +60,7 @@ export const uploadArquivo = async (req, res) => {
       } catch (error) {
         console.error("[UPLOAD] Falha ao criar URL de acesso:", error.message);
         if (!res.headersSent) {
-          res.status(503).json({ erro: "Arquivo salvo, mas temporariamente indisponivel para acesso" });
+          res.status(503).json({ erro: mensagemErroStorage(error) });
         }
       }
     });

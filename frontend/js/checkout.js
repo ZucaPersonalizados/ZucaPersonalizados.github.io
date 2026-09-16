@@ -403,8 +403,13 @@ function atualizarQuantidadeCarrinho(index, delta) {
   const item = itens[index];
   if (!item) return;
 
-  const quantidadeAtual = Math.max(1, Number(item.quantidade || 1));
-  const novaQuantidade = quantidadeAtual + Number(delta || 0);
+  const quantidadeAtual = Number.isFinite(Number(item.quantidade))
+    ? Math.max(1, Number(item.quantidade))
+    : 1;
+  const limiteEstoque = Number.isFinite(Number(item.estoqueMaximo)) && Number(item.estoqueMaximo) > 0
+    ? Number(item.estoqueMaximo)
+    : 99;
+  const novaQuantidade = Math.min(limiteEstoque, quantidadeAtual + Number(delta || 0));
   if (novaQuantidade <= 0) itens.splice(index, 1);
   else item.quantidade = Math.min(99, novaQuantidade);
 

@@ -531,6 +531,7 @@ function adicionarAoCarrinhoComEstoque(produto, estoqueDisponivel, quantidade = 
       personalizado: !!produto.personalizado,
       arquivoPersonalizacaoUrl: produto.arquivoPersonalizacaoUrl || "",
       arquivoPersonalizacaoNome: produto.arquivoPersonalizacaoNome || "",
+      estoqueMaximo: Math.max(0, Number(estoqueDisponivel || 0)),
       quantidade: quantidade,
     });
   }

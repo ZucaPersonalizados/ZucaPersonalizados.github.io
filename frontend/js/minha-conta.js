@@ -3,6 +3,9 @@ import {
   loginComGoogle,
   loginComApple,
   loginComMicrosoft,
+  loginComGoogleRedirect,
+  loginComAppleRedirect,
+  loginComMicrosoftRedirect,
   sairDoFirebase,
   onAuthStateChanged,
   salvarUsuarioNoStorage,
@@ -491,6 +494,11 @@ async function listarPedidos(email) {
   }
 }
 
+function listarPedidosSalvosLocalmente() {
+  const tokens = JSON.parse(localStorage.getItem("zuca_pedido_tokens") || "{}");
+  if (Object.keys(tokens).length) void listarPedidos("");
+}
+
 function getTokenPedido(pedidoId) {
   const tokens = JSON.parse(localStorage.getItem("zuca_pedido_tokens") || "{}");
   return String(tokens[pedidoId] || "");
@@ -541,6 +549,20 @@ async function executarLogin(providerFn, nomeProvedor) {
     if (btnSair) btnSair.style.display = "";
     carregarPerfil();
   } catch (err) {
+    if (["auth/popup-blocked", "auth/cancelled-popup-request"].includes(err.code)) {
+      const redirectFns = {
+        Google: loginComGoogleRedirect,
+        Apple: loginComAppleRedirect,
+        Microsoft: loginComMicrosoftRedirect,
+      };
+      try {
+        setLoginSocialStatus("Abrindo login nesta página...");
+        await redirectFns[nomeProvedor]();
+        return;
+      } catch (redirectError) {
+        err = redirectError;
+      }
+    }
     const msg = traduzirErroFirebase(err.code);
     setLoginSocialStatus(msg, false);
     showToast(msg, "error");
@@ -551,9 +573,9 @@ async function executarLogin(providerFn, nomeProvedor) {
 
 function traduzirErroFirebase(code) {
   const erros = {
-    "auth/popup-closed-by-user": "Login cancelado. Feche o popup e tente novamente.",
-    "auth/popup-blocked": "Popup bloqueado pelo navegador. Permita popups para este site.",
-    "auth/cancelled-popup-request": "Login cancelado.",
+    "auth/popup-closed-by-user": "A janela de login foi fechada. O acompanhamento do pedido continua disponível abaixo.",
+    "auth/popup-blocked": "O navegador bloqueou a janela. Permita popups ou use o acompanhamento do pedido abaixo.",
+    "auth/cancelled-popup-request": "Outra janela de login já estava aberta. Feche-a e tente novamente.",
     "auth/account-exists-with-different-credential":
       "Este e-mail já está vinculado a outro provedor. Tente outro método de login.",
     "auth/network-request-failed": "Sem conexão. Verifique sua internet e tente novamente.",
@@ -589,10 +611,12 @@ onAuthStateChanged(auth, (user) => {
     limparTodosInputs();
     if (sec) sec.style.display = "";
     if (btnSair) btnSair.style.display = "none";
+    listarPedidosSalvosLocalmente();
   }
 });
 
 renderAvatarOptions();
+listarPedidosSalvosLocalmente();
 
 /* ========== Saved Address ========== */
 function enderecoKey() {

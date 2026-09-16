@@ -447,6 +447,7 @@ async function listarPedidos(email) {
             else { carrinho.push({ ...item, quantidade: item.quantidade || 1 }); }
           }
           localStorage.setItem("zuca_carrinho", JSON.stringify(carrinho));
+          window.dispatchEvent(new CustomEvent("zuca:carrinho-atualizado"));
           showToast("Itens adicionados ao carrinho!", "success");
           setTimeout(() => { window.location.href = "/checkout"; }, 1200);
         } catch {

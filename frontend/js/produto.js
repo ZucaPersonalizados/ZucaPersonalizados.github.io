@@ -312,11 +312,40 @@ async function enviarArquivoPersonalizacao(arquivo) {
 
 function getCarrinho() {
   try {
-    return JSON.parse(localStorage.getItem("zuca_carrinho") || "[]");
+    const itens = JSON.parse(localStorage.getItem("zuca_carrinho") || "[]");
+    const consolidados = [];
+    const porChave = new Map();
+    itens.forEach((item) => {
+      const chave = `${String(item?.id || "")}::${String(item?.arquivoPersonalizacaoUrl || "")}`;
+      const existente = porChave.get(chave);
+      if (!existente) {
+        const normalizado = { ...item, quantidade: Math.max(1, Number(item?.quantidade || 1)) };
+        porChave.set(chave, normalizado);
+        consolidados.push(normalizado);
+      } else {
+        existente.quantidade += Math.max(1, Number(item?.quantidade || 1));
+        existente.estoqueMaximo = Math.max(Number(existente.estoqueMaximo || 0), Number(item?.estoqueMaximo || 0));
+      }
+    });
+    if (JSON.stringify(itens) !== JSON.stringify(consolidados)) {
+      localStorage.setItem("zuca_carrinho", JSON.stringify(consolidados));
+    }
+    return consolidados;
   } catch {
     return [];
   }
 }
+
+function notificarCarrinhoAtualizado() {
+  window.dispatchEvent(new CustomEvent("zuca:carrinho-atualizado"));
+}
+
+window.addEventListener("storage", (event) => {
+  if (event.key === "zuca_carrinho") {
+    atualizarContadorCarrinho();
+    renderizarCarrinhoSidebar();
+  }
+});
 
 function atualizarContadorCarrinho() {
   const count = getCarrinho().reduce((acc, item) => acc + Number(item.quantidade || 1), 0);
@@ -336,6 +365,7 @@ function atualizarQuantidadeCarrinhoSidebar(index, delta) {
   else item.quantidade = novaQuantidade;
 
   localStorage.setItem("zuca_carrinho", JSON.stringify(itens));
+  notificarCarrinhoAtualizado();
   atualizarContadorCarrinho();
   renderizarCarrinhoSidebar();
 }
@@ -345,6 +375,7 @@ function removerItemCarrinhoSidebar(index) {
   if (!itens[index]) return;
   itens.splice(index, 1);
   localStorage.setItem("zuca_carrinho", JSON.stringify(itens));
+  notificarCarrinhoAtualizado();
   atualizarContadorCarrinho();
   renderizarCarrinhoSidebar();
 }
@@ -577,6 +608,7 @@ function adicionarAoCarrinhoComEstoque(produto, estoqueDisponivel, quantidade = 
   }
 
   localStorage.setItem("zuca_carrinho", JSON.stringify(carrinho));
+  notificarCarrinhoAtualizado();
   atualizarContadorCarrinho();
   renderizarCarrinhoSidebar();
   showToast(`${produto.nome || "Produto"} adicionado ao carrinho!`, "success");

@@ -270,7 +270,25 @@ async function obterConfigMercadoPago(forceRefresh = false) {
 
 const getCarrinho = () => {
   try {
-    return JSON.parse(localStorage.getItem("zuca_carrinho") || "[]");
+    const itens = JSON.parse(localStorage.getItem("zuca_carrinho") || "[]");
+    const consolidados = [];
+    const porChave = new Map();
+    itens.forEach((item) => {
+      const chave = `${String(item?.id || "")}::${String(item?.arquivoPersonalizacaoUrl || "")}`;
+      const existente = porChave.get(chave);
+      if (!existente) {
+        const normalizado = { ...item, quantidade: Math.max(1, Number(item?.quantidade || 1)) };
+        porChave.set(chave, normalizado);
+        consolidados.push(normalizado);
+      } else {
+        existente.quantidade += Math.max(1, Number(item?.quantidade || 1));
+        existente.estoqueMaximo = Math.max(Number(existente.estoqueMaximo || 0), Number(item?.estoqueMaximo || 0));
+      }
+    });
+    if (JSON.stringify(itens) !== JSON.stringify(consolidados)) {
+      localStorage.setItem("zuca_carrinho", JSON.stringify(consolidados));
+    }
+    return consolidados;
   } catch {
     return [];
   }
@@ -398,6 +416,10 @@ function obterSubtotal() {
   return getCarrinho().reduce((acc, item) => acc + precoNumero(item.preco) * Number(item.quantidade || 1), 0);
 }
 
+function notificarCarrinhoAtualizado() {
+  window.dispatchEvent(new CustomEvent("zuca:carrinho-atualizado"));
+}
+
 function atualizarQuantidadeCarrinho(index, delta) {
   const itens = getCarrinho();
   const item = itens[index];
@@ -414,6 +436,7 @@ function atualizarQuantidadeCarrinho(index, delta) {
   else item.quantidade = Math.min(99, novaQuantidade);
 
   localStorage.setItem("zuca_carrinho", JSON.stringify(itens));
+  notificarCarrinhoAtualizado();
   descontoAtual = 0;
   cupomAplicado = null;
   if (el("cupom")) el("cupom").value = "";
@@ -428,6 +451,7 @@ function removerItemCarrinho(index) {
   if (!itens[index]) return;
   itens.splice(index, 1);
   localStorage.setItem("zuca_carrinho", JSON.stringify(itens));
+  notificarCarrinhoAtualizado();
   descontoAtual = 0;
   cupomAplicado = null;
   if (el("cupom")) el("cupom").value = "";
@@ -502,6 +526,14 @@ function renderCarrinho() {
   atualizarContadorCarrinho();
   renderizarCarrinhoSidebar();
 }
+
+window.addEventListener("zuca:carrinho-atualizado", () => {
+  renderCarrinho();
+});
+
+window.addEventListener("storage", (event) => {
+  if (event.key === "zuca_carrinho") renderCarrinho();
+});
 
 async function buscarViaCep(cepLimpo) {
   // Tenta backend primeiro, cai no ViaCEP direto como fallback

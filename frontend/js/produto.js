@@ -324,6 +324,31 @@ function atualizarContadorCarrinho() {
   if (cartCount) cartCount.textContent = String(count);
 }
 
+function atualizarQuantidadeCarrinhoSidebar(index, delta) {
+  const itens = getCarrinho();
+  const item = itens[index];
+  if (!item) return;
+
+  const atual = Math.max(1, Number(item.quantidade || 1));
+  const limite = Number(item.estoqueMaximo) > 0 ? Number(item.estoqueMaximo) : 99;
+  const novaQuantidade = Math.min(limite, atual + Number(delta || 0));
+  if (novaQuantidade <= 0) itens.splice(index, 1);
+  else item.quantidade = novaQuantidade;
+
+  localStorage.setItem("zuca_carrinho", JSON.stringify(itens));
+  atualizarContadorCarrinho();
+  renderizarCarrinhoSidebar();
+}
+
+function removerItemCarrinhoSidebar(index) {
+  const itens = getCarrinho();
+  if (!itens[index]) return;
+  itens.splice(index, 1);
+  localStorage.setItem("zuca_carrinho", JSON.stringify(itens));
+  atualizarContadorCarrinho();
+  renderizarCarrinhoSidebar();
+}
+
 function renderizarCarrinhoSidebar() {
   const container = document.getElementById("cart-sidebar-items");
   const totalEl = document.getElementById("cart-sidebar-total");
@@ -337,14 +362,19 @@ function renderizarCarrinhoSidebar() {
   }
 
   let total = 0;
-  container.innerHTML = itens.map((item) => {
+  container.innerHTML = itens.map((item, index) => {
     const subtotal = precoParaNumero(item.preco) * Number(item.quantidade || 1);
     total += subtotal;
     return `
       <div class="cart-item">
-        <div>
+        <div class="cart-item-info">
           <p class="cart-item-name">${escapeHtml(item.nome || "Produto")}</p>
-          <p class="cart-item-price">x${item.quantidade || 1}</p>
+          <div class="cart-item-controls">
+            <button class="cart-btn-decrease" type="button" title="Diminuir quantidade" aria-label="Diminuir quantidade" data-cart-index="${index}">−</button>
+            <span class="cart-qty">${Math.max(1, Number(item.quantidade || 1))}</span>
+            <button class="cart-btn-increase" type="button" title="Aumentar quantidade" aria-label="Aumentar quantidade" data-cart-index="${index}">+</button>
+            <button class="cart-btn-remove" type="button" title="Remover item" aria-label="Remover item" data-cart-index="${index}">Remover</button>
+          </div>
         </div>
         <strong>${formatarMoeda(subtotal)}</strong>
       </div>
@@ -352,6 +382,16 @@ function renderizarCarrinhoSidebar() {
   }).join("");
 
   totalEl.textContent = formatarMoeda(total);
+
+  container.querySelectorAll(".cart-btn-decrease").forEach((button) => {
+    button.addEventListener("click", () => atualizarQuantidadeCarrinhoSidebar(Number(button.dataset.cartIndex), -1));
+  });
+  container.querySelectorAll(".cart-btn-increase").forEach((button) => {
+    button.addEventListener("click", () => atualizarQuantidadeCarrinhoSidebar(Number(button.dataset.cartIndex), 1));
+  });
+  container.querySelectorAll(".cart-btn-remove").forEach((button) => {
+    button.addEventListener("click", () => removerItemCarrinhoSidebar(Number(button.dataset.cartIndex)));
+  });
 }
 
 function configurarHeaderProduto() {

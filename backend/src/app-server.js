@@ -8,7 +8,7 @@ import fs from "fs";
 import crypto from "crypto";
 import path from "path";
 import { fileURLToPath } from "url";
-import { db } from "./firebase.js";
+import { bucket, db } from "./firebase.js";
 import { FieldValue } from "firebase-admin/firestore";
 import OpenAI from "openai";
 import helmet from "helmet";
@@ -1007,10 +1007,44 @@ if (fs.existsSync(frontendDir)) {
   });
 }
 
+async function renovarUrlImagemStorage(url) {
+  const rawUrl = String(url || "").trim();
+  if (!bucket || !rawUrl) return rawUrl;
+
+  try {
+    const parsed = new URL(rawUrl);
+    if (parsed.hostname !== "storage.googleapis.com") return rawUrl;
+
+    const partes = parsed.pathname.split("/").filter(Boolean);
+    if (partes.length < 2 || partes[0] !== bucket.name) return rawUrl;
+
+    const objectName = decodeURIComponent(partes.slice(1).join("/"));
+    const [signedUrl] = await bucket.file(objectName).getSignedUrl({
+      action: "read",
+      expires: Date.now() + 1000 * 60 * 60 * 24 * 7,
+    });
+    return signedUrl;
+  } catch {
+    return rawUrl;
+  }
+}
+
+async function prepararProdutoComImagens(docSnap) {
+  const produto = { id: docSnap.id, ...docSnap.data() };
+  if (Array.isArray(produto.imagens)) {
+    produto.imagens = await Promise.all(produto.imagens.map(renovarUrlImagemStorage));
+  } else if (typeof produto.imagens === "string") {
+    produto.imagens = await Promise.all(
+      produto.imagens.split(",").map((imagem) => renovarUrlImagemStorage(imagem))
+    );
+  }
+  return produto;
+}
+
 app.get("/api/produtos", requireDb, async (req, res) => {
   try {
     const snapshot = await db.collection("produtos").get();
-    const produtos = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    const produtos = await Promise.all(snapshot.docs.map(prepararProdutoComImagens));
     res.json({ success: true, produtos });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -1023,7 +1057,7 @@ app.get("/api/produtos/:id", requireDb, async (req, res) => {
     if (!snap.exists) {
       return res.status(404).json({ success: false, error: "Produto nao encontrado" });
     }
-    return res.json({ success: true, produto: { id: snap.id, ...snap.data() } });
+    return res.json({ success: true, produto: await prepararProdutoComImagens(snap) });
   } catch (error) {
     return res.status(500).json({ success: false, error: error.message });
   }
@@ -1454,8 +1488,7 @@ app.patch("/api/admin/pedidos/:id/status", adminAuth, requireDb, async (req, res
 app.get("/api/admin/produtos", adminAuth, requireDb, async (req, res) => {
   try {
     const snap = await db.collection("produtos").get();
-    const produtos = snap.docs
-      .map((doc) => normalizeProdutoAdmin(doc))
+    const produtos = (await Promise.all(snap.docs.map((doc) => normalizeProdutoAdmin(doc))))
       .sort((a, b) => String(a.nome || "").localeCompare(String(b.nome || ""), "pt-BR"));
 
     return res.json({ success: true, produtos });
@@ -1464,7 +1497,7 @@ app.get("/api/admin/produtos", adminAuth, requireDb, async (req, res) => {
   }
 });
 
-function normalizeProdutoAdmin(docSnap) {
+async function normalizeProdutoAdmin(docSnap) {
   const data = docSnap.data() || {};
   const produto = { id: docSnap.id, ...data };
 
@@ -1476,6 +1509,8 @@ function normalizeProdutoAdmin(docSnap) {
   if (!Array.isArray(produto.imagens)) {
     produto.imagens = produto.imagens ? [String(produto.imagens)] : [];
   }
+
+  produto.imagens = await Promise.all(produto.imagens.map(renovarUrlImagemStorage));
 
   if (produto.modeloConfig && typeof produto.modeloConfig === "object") {
     produto.modeloConfig = JSON.parse(JSON.stringify(produto.modeloConfig));
@@ -1531,7 +1566,7 @@ app.post("/api/admin/produtos", adminAuth, requireDb, async (req, res) => {
 
     await produtoRef.set(produto);
     const produtoSalvo = await produtoRef.get();
-    return res.status(201).json({ success: true, produto: normalizeProdutoAdmin(produtoSalvo) });
+    return res.status(201).json({ success: true, produto: await normalizeProdutoAdmin(produtoSalvo) });
   } catch (error) {
     console.error("[ADMIN PRODUTOS] Falha ao criar produto:", error?.message || error);
     return res.status(500).json({ success: false, error: error.message });

@@ -448,6 +448,7 @@ async function calcularFreteMelhorEnvio({ cepDestino, itens }) {
     const validas = lista
       .filter((item) => !item.error && Number(item.price || 0) > 0)
       .map((item) => ({
+        serviceId: Number(item.id || 0) || null,
         service: String(item.name || "Entrega"),
         company: String(item.company?.name || "Melhor Envio"),
         price: Number(item.price || 0),
@@ -520,6 +521,7 @@ function selecionarOpcoesFrete(opcoes) {
     const freteGratis = o.price <= 20;
     return {
       id: o.id,
+      serviceId: o.serviceId || null,
       label: o.label,
       service: o.service,
       company: o.company,
@@ -533,6 +535,171 @@ function selecionarOpcoesFrete(opcoes) {
   });
 
   return resultado;
+}
+
+function melhorEnvioHeaders() {
+  return {
+    Authorization: `Bearer ${melhorEnvioToken}`,
+    Accept: "application/json",
+    "Content-Type": "application/json",
+    "User-Agent": "ZucaPersonalizados (contato@zuca.com)",
+  };
+}
+
+function validarEnderecoEnvio(endereco = {}, label = "endereco") {
+  const cep = digitsOnly(endereco.cep).slice(0, 8);
+  const obrigatorios = {
+    nome: String(endereco.nome || "").trim(),
+    cep,
+    endereco: String(endereco.endereco || "").trim(),
+    numero: String(endereco.numero || "").trim(),
+    bairro: String(endereco.bairro || "").trim(),
+    cidade: String(endereco.cidade || "").trim(),
+    estado: String(endereco.estado || "").trim().toUpperCase(),
+  };
+
+  const ausentes = Object.entries(obrigatorios)
+    .filter(([, value]) => !value)
+    .map(([key]) => key);
+  if (cep.length !== 8) ausentes.push("cep valido");
+  if (ausentes.length) {
+    throw new Error(`${label} incompleto: ${ausentes.join(", ")}`);
+  }
+  return obrigatorios;
+}
+
+function montarDestinatarioMelhorEnvio(cliente = {}) {
+  const endereco = validarEnderecoEnvio(cliente, "Endereco do cliente");
+  return {
+    name: endereco.nome,
+    email: String(cliente.email || "").trim().toLowerCase(),
+    phone: digitsOnly(cliente.telefone),
+    document: digitsOnly(cliente.cpfCnpj),
+    postal_code: endereco.cep,
+    address: endereco.endereco,
+    number: endereco.numero,
+    complement: String(cliente.complemento || "").trim(),
+    district: endereco.bairro,
+    city: endereco.cidade,
+    state_abbr: endereco.estado,
+  };
+}
+
+function montarRemessaMelhorEnvio(pedido, serviceId) {
+  if (!melhorEnvioToken) throw new Error("Token do Melhor Envio nao configurado");
+  const origem = validarEnderecoEnvio({
+    nome: process.env.MELHOR_ENVIO_ORIGIN_NAME || "Zuca Personalizados",
+    cep: melhorEnvioOriginCep,
+    endereco: process.env.MELHOR_ENVIO_ORIGIN_ADDRESS,
+    numero: process.env.MELHOR_ENVIO_ORIGIN_NUMBER,
+    bairro: process.env.MELHOR_ENVIO_ORIGIN_DISTRICT,
+    cidade: process.env.MELHOR_ENVIO_ORIGIN_CITY,
+    estado: process.env.MELHOR_ENVIO_ORIGIN_STATE,
+  }, "Endereco de origem");
+
+  const itens = Array.isArray(pedido.itens) && pedido.itens.length ? pedido.itens : [];
+  const produtos = itens.map((item) => ({
+    name: String(item.nome || "Produto").slice(0, 60),
+    quantity: Math.max(1, Number(item.quantidade || 1)),
+    unitary_value: Number(parseMoney(item.preco).toFixed(2)),
+  }));
+  const peso = Math.max(0.01, itens.reduce((total, item) => total + Math.max(0.01, Number(item.pesoKg || 0.3)) * Math.max(1, Number(item.quantidade || 1)), 0.3));
+  const altura = Math.max(0.1, itens.reduce((total, item) => total + Math.max(0.1, Number(item.alturaCm || 2)) * Math.max(1, Number(item.quantidade || 1)), 2));
+
+  return {
+    service: Number(serviceId),
+    agency: null,
+    from: {
+      name: origem.nome,
+      email: process.env.MELHOR_ENVIO_ORIGIN_EMAIL || "",
+      phone: digitsOnly(process.env.MELHOR_ENVIO_ORIGIN_PHONE || ""),
+      document: digitsOnly(process.env.MELHOR_ENVIO_ORIGIN_DOCUMENT || ""),
+      postal_code: origem.cep,
+      address: origem.endereco,
+      number: origem.numero,
+      district: origem.bairro,
+      city: origem.cidade,
+      state_abbr: origem.estado,
+    },
+    to: montarDestinatarioMelhorEnvio(pedido.cliente),
+    products: produtos.length ? produtos : [{ name: "Pedido", quantity: 1, unitary_value: Number(pedido.total || 0) }],
+    volumes: [{ height: Number(altura.toFixed(2)), width: 15, length: 20, weight: Number(peso.toFixed(3)) }],
+    options: {
+      insurance_value: Number(Math.max(0, Number(pedido.total || 0)).toFixed(2)),
+      receipt: false,
+      own_hand: false,
+      collect: false,
+    },
+  };
+}
+
+function extrairDadosEnvioMelhorEnvio(payload = {}) {
+  const data = payload?.data || payload;
+  const lista = Array.isArray(data) ? data : [data, ...(Array.isArray(data?.orders) ? data.orders : [])];
+  const item = lista.find((value) => value && typeof value === "object") || {};
+  return {
+    id: String(item.id || item.order_id || item.order?.id || "").trim(),
+    protocolo: String(item.protocol || item.order?.protocol || "").trim(),
+    codigoRastreio: String(item.tracking || item.tracking_code || item.order?.tracking || item.order?.tracking_code || "").trim().toUpperCase(),
+    etiquetaUrl: String(item.label || item.label_url || item.order?.label || item.order?.label_url || "").trim(),
+  };
+}
+
+async function comprarEtiquetaMelhorEnvio(pedidoId, pedidoRef, pedido) {
+  const frete = pedido.frete || {};
+  const serviceId = Number(frete.servicoId || 0);
+  if (!serviceId) {
+    throw new Error("O pedido nao possui o ID do servico de frete. Recalcule o frete antes de gerar a etiqueta.");
+  }
+
+  const itensComDimensoes = await Promise.all((Array.isArray(pedido.itens) ? pedido.itens : []).map(async (item) => {
+    const produtoSnap = item.id ? await db.collection("produtos").doc(String(item.id)).get() : null;
+    const produto = produtoSnap?.exists ? produtoSnap.data() || {} : {};
+    return {
+      ...item,
+      larguraCm: produto.larguraCm ?? produto.largura ?? 15,
+      comprimentoCm: produto.comprimentoCm ?? produto.comprimento ?? 20,
+      alturaCm: produto.alturaCm ?? produto.altura ?? 2,
+      pesoKg: produto.pesoKg ?? produto.peso ?? 0.3,
+    };
+  }));
+  const remessa = montarRemessaMelhorEnvio({ ...pedido, itens: itensComDimensoes }, serviceId);
+  const cartResponse = await axios.post("https://melhorenvio.com.br/api/v2/me/shipment/cart", remessa, {
+    headers: melhorEnvioHeaders(),
+    timeout: 30000,
+  });
+  const cart = extrairDadosEnvioMelhorEnvio(cartResponse.data);
+  if (!cart.id) throw new Error("Melhor Envio nao retornou o ID do envio");
+
+  const checkoutResponse = await axios.post("https://melhorenvio.com.br/api/v2/me/shipment/checkout", { orders: [cart.id] }, {
+    headers: melhorEnvioHeaders(),
+    timeout: 30000,
+  });
+  const checkout = extrairDadosEnvioMelhorEnvio(checkoutResponse.data);
+
+  const generateResponse = await axios.post("https://melhorenvio.com.br/api/v2/me/shipment/generate", { orders: [cart.id] }, {
+    headers: melhorEnvioHeaders(),
+    timeout: 30000,
+  });
+  const generated = extrairDadosEnvioMelhorEnvio(generateResponse.data);
+  const envio = {
+    cartId: cart.id,
+    orderId: generated.id || checkout.id || cart.id,
+    protocolo: generated.protocolo || checkout.protocolo || cart.protocolo || null,
+    codigoRastreio: generated.codigoRastreio || checkout.codigoRastreio || cart.codigoRastreio || null,
+    etiquetaUrl: generated.etiquetaUrl || checkout.etiquetaUrl || cart.etiquetaUrl || null,
+    criadoEm: new Date().toISOString(),
+  };
+
+  await pedidoRef.update({
+    melhorEnvio: envio,
+    codigoRastreio: envio.codigoRastreio,
+    transportadora: String(frete.servico || "Melhor Envio").split(" - ").pop(),
+    statusPedido: envio.codigoRastreio ? "enviado" : "em_producao",
+    atualizadoEm: FieldValue.serverTimestamp(),
+  });
+
+  return { pedidoId, ...envio };
 }
 
 function removeAccents(value = "") {
@@ -1041,6 +1208,7 @@ app.post("/api/pedidos", requireDb, async (req, res) => {
       frete: {
         valor: freteValor,
         servico: String(frete?.servico || "").trim(),
+        servicoId: Number(frete?.servicoId || 0) || null,
         prazoDias: Number(frete?.prazoDias || 0) || null,
       },
       total,
@@ -2240,6 +2408,67 @@ app.patch("/api/admin/pedidos/:id/rastreio", adminAuth, requireDb, async (req, r
     return res.json({ success: true, codigoRastreio, transportadora });
   } catch (error) {
     return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.post("/api/admin/pedidos/:id/etiqueta", adminAuth, requireDb, async (req, res) => {
+  try {
+    const pedidoId = String(req.params.id || "").trim();
+    const pedidoRef = db.collection("pedidos").doc(pedidoId);
+    const snap = await pedidoRef.get();
+    if (!snap.exists) return res.status(404).json({ success: false, error: "Pedido nao encontrado" });
+
+    const pedido = snap.data() || {};
+    if (pedido.melhorEnvio?.orderId || pedido.melhorEnvio?.cartId) {
+      return res.json({ success: true, jaExistia: true, ...pedido.melhorEnvio });
+    }
+    if (String(pedido.status || "") !== "pagto") {
+      return res.status(409).json({ success: false, error: "A etiqueta so pode ser gerada para pedidos com pagamento confirmado" });
+    }
+
+    const etiqueta = await comprarEtiquetaMelhorEnvio(pedidoId, pedidoRef, pedido);
+    return res.status(201).json({ success: true, ...etiqueta });
+  } catch (error) {
+    console.error("[MELHOR ENVIO] Falha ao gerar etiqueta:", error?.response?.data || error?.message || error);
+    const apiError = error?.response?.data?.message || error?.response?.data?.error;
+    return res.status(502).json({ success: false, error: String(apiError || error.message || "Falha ao gerar etiqueta no Melhor Envio") });
+  }
+});
+
+app.get("/api/admin/pedidos/:id/etiqueta/imprimir", adminAuth, requireDb, async (req, res) => {
+  try {
+    const pedidoId = String(req.params.id || "").trim();
+    const snap = await db.collection("pedidos").doc(pedidoId).get();
+    if (!snap.exists) return res.status(404).json({ success: false, error: "Pedido nao encontrado" });
+
+    const envio = snap.data()?.melhorEnvio || {};
+    const orderId = String(envio.orderId || envio.cartId || "").trim();
+    if (!orderId) return res.status(404).json({ success: false, error: "Etiqueta ainda nao foi gerada" });
+
+    const response = await axios.get("https://melhorenvio.com.br/api/v2/me/shipment/print", {
+      params: { "orders[]": orderId },
+      headers: melhorEnvioHeaders(),
+      responseType: "arraybuffer",
+      timeout: 30000,
+    });
+    const contentType = String(response.headers["content-type"] || "application/pdf");
+    const payloadText = Buffer.from(response.data).toString("utf8");
+    if (!contentType.includes("pdf") && payloadText.trim().startsWith("{")) {
+      const payload = JSON.parse(payloadText);
+      const url = String(payload.url || payload.label || payload.link || "").trim();
+      if (!url) throw new Error("Melhor Envio nao retornou o arquivo da etiqueta");
+      const pdf = await axios.get(url, { responseType: "arraybuffer", timeout: 30000 });
+      res.setHeader("Content-Type", pdf.headers["content-type"] || "application/pdf");
+      res.setHeader("Content-Disposition", `inline; filename="etiqueta-${pedidoId.slice(0, 8)}.pdf"`);
+      return res.send(Buffer.from(pdf.data));
+    }
+
+    res.setHeader("Content-Type", contentType);
+    res.setHeader("Content-Disposition", `inline; filename="etiqueta-${pedidoId.slice(0, 8)}.pdf"`);
+    return res.send(Buffer.from(response.data));
+  } catch (error) {
+    console.error("[MELHOR ENVIO] Falha ao imprimir etiqueta:", error?.response?.data || error?.message || error);
+    return res.status(502).json({ success: false, error: "Falha ao obter a etiqueta no Melhor Envio" });
   }
 });
 

@@ -556,6 +556,9 @@ function exibirPedidos() {
           <button class="btn btn-small btn-secondary" type="button" onclick="editarStatus('${pedido.id}')">Editar</button>
           <button class="btn btn-small btn-secondary" type="button" onclick="editarRastreio('${pedido.id}')" title="Código de rastreio">🚚 Rastreio</button>
           <button class="btn btn-small btn-primary" type="button" onclick="baixarAnexosPedido('${pedido.id}')" title="Abrir anexos do pedido">📎 Anexos</button>
+          ${pedido.melhorEnvio?.orderId || pedido.melhorEnvio?.cartId
+            ? `<button class="btn btn-small btn-primary" type="button" onclick="imprimirEtiqueta('${pedido.id}')" title="Imprimir etiqueta">🏷️ Imprimir etiqueta</button>`
+            : `<button class="btn btn-small btn-secondary" type="button" onclick="gerarEtiqueta('${pedido.id}')" title="Comprar e gerar etiqueta no Melhor Envio">🏷️ Gerar etiqueta</button>`}
         </div>
       </td>
     </tr>
@@ -732,6 +735,57 @@ window.baixarAnexosPedido = (pedidoId) => {
     a.click();
     a.remove();
   });
+};
+
+window.gerarEtiqueta = async (pedidoId) => {
+  const pedido = allOrders.find((item) => item.id === pedidoId);
+  if (!pedido) return;
+  const confirmou = window.confirm("Gerar e comprar esta etiqueta no Melhor Envio? Essa ação pode consumir o saldo da conta.");
+  if (!confirmou) return;
+
+  try {
+    const response = await fetchApi(`/api/admin/pedidos/${encodeURIComponent(pedidoId)}/etiqueta`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+    });
+    const payload = await response.json();
+    if (!response.ok || !payload.success) {
+      throw new Error(payload.error || "Falha ao gerar etiqueta");
+    }
+
+    await carregarPedidos();
+    alert(`Etiqueta gerada${payload.codigoRastreio ? `! Código: ${payload.codigoRastreio}` : "."}`);
+    await imprimirEtiqueta(pedidoId);
+  } catch (error) {
+    alert(`Erro ao gerar etiqueta: ${error.message}`);
+  }
+};
+
+window.imprimirEtiqueta = async (pedidoId) => {
+  try {
+    const response = await fetchApi(`/api/admin/pedidos/${encodeURIComponent(pedidoId)}/etiqueta/imprimir`, {
+      credentials: "include",
+    });
+    if (!response.ok) {
+      let message = "Falha ao obter etiqueta";
+      try { message = (await response.json()).error || message; } catch { /* resposta pode não ser JSON */ }
+      throw new Error(message);
+    }
+
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.target = "_blank";
+    link.rel = "noopener";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  } catch (error) {
+    alert(`Erro ao imprimir etiqueta: ${error.message}`);
+  }
 };
 
 window.editarStatus = async (pedidoId) => {

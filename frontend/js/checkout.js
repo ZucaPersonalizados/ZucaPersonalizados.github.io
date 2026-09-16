@@ -177,6 +177,7 @@ let monitorPagamentoTimer = null;
 let freteAtual = {
   valor: 0,
   servico: "",
+  servicoId: null,
   prazoDias: null,
 };
 let freteOpcoes = [];
@@ -406,7 +407,7 @@ function renderCarrinho() {
 
   if (itens.length === 0) {
     container.innerHTML = "<p style='color:#999;font-size:14px;'>Seu carrinho está vazio.</p>";
-    freteAtual = { valor: 0, servico: "", prazoDias: null };
+    freteAtual = { valor: 0, servico: "", servicoId: null, prazoDias: null };
     atualizarResumo(0);
     return;
   }
@@ -477,7 +478,7 @@ async function recalcularFrete() {
   const freteContainer = el("frete-options");
 
   if (!isCepValido(cep)) {
-    freteAtual = { valor: 0, servico: "", prazoDias: null };
+    freteAtual = { valor: 0, servico: "", servicoId: null, prazoDias: null };
     if (freteContainer) freteContainer.innerHTML = "";
     atualizarResumo(obterSubtotal());
     return;
@@ -512,6 +513,7 @@ async function recalcularFrete() {
     freteAtual = {
       valor: Number(maisBarata.price || 0),
       servico: String(`${maisBarata.service || "Entrega"} - ${maisBarata.company || "Transportadora"}`),
+      servicoId: Number(maisBarata.serviceId || 0) || null,
       prazoDias: Number(maisBarata.delivery_time || 0) || null,
     };
 
@@ -561,6 +563,7 @@ function renderFreteOptions(opcoes, selectedId) {
       freteAtual = {
         valor: Number(opcao.price || 0),
         servico: String(`${opcao.service || "Entrega"} - ${opcao.company || "Transportadora"}`),
+        servicoId: Number(opcao.serviceId || 0) || null,
         prazoDias: Number(opcao.delivery_time || 0) || null,
       };
 
@@ -1064,6 +1067,7 @@ async function finalizarPedido() {
         frete: {
           valor: Number(freteAtual.valor || 0),
           servico: freteAtual.servico,
+          servicoId: freteAtual.servicoId || null,
           prazoDias: freteAtual.prazoDias,
         },
         cupom: cupomAplicado,

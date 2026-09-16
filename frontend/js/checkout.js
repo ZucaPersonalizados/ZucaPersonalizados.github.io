@@ -398,6 +398,60 @@ function obterSubtotal() {
   return getCarrinho().reduce((acc, item) => acc + precoNumero(item.preco) * Number(item.quantidade || 1), 0);
 }
 
+function atualizarQuantidadeCarrinho(index, delta) {
+  const itens = getCarrinho();
+  const item = itens[index];
+  if (!item) return;
+
+  const quantidadeAtual = Math.max(1, Number(item.quantidade || 1));
+  const novaQuantidade = quantidadeAtual + Number(delta || 0);
+  if (novaQuantidade <= 0) itens.splice(index, 1);
+  else item.quantidade = Math.min(99, novaQuantidade);
+
+  localStorage.setItem("zuca_carrinho", JSON.stringify(itens));
+  descontoAtual = 0;
+  cupomAplicado = null;
+  if (el("cupom")) el("cupom").value = "";
+  freteAtual = { valor: 0, servico: "", servicoId: null, prazoDias: null };
+  freteOpcoes = [];
+  renderCarrinho();
+  if (isCepValido(el("cep")?.value || "")) void recalcularFrete();
+}
+
+function removerItemCarrinho(index) {
+  const itens = getCarrinho();
+  if (!itens[index]) return;
+  itens.splice(index, 1);
+  localStorage.setItem("zuca_carrinho", JSON.stringify(itens));
+  descontoAtual = 0;
+  cupomAplicado = null;
+  if (el("cupom")) el("cupom").value = "";
+  freteAtual = { valor: 0, servico: "", servicoId: null, prazoDias: null };
+  freteOpcoes = [];
+  renderCarrinho();
+  if (isCepValido(el("cep")?.value || "")) void recalcularFrete();
+}
+
+function controlesQuantidadeHtml(index, quantidade) {
+  return `
+    <div class="cart-quantity-control" aria-label="Quantidade">
+      <button type="button" class="cart-quantity-btn" data-cart-action="decrease" data-cart-index="${index}" aria-label="Diminuir quantidade">−</button>
+      <span class="cart-quantity-value">${quantidade}</span>
+      <button type="button" class="cart-quantity-btn" data-cart-action="increase" data-cart-index="${index}" aria-label="Aumentar quantidade">+</button>
+    </div>`;
+}
+
+function ligarControlesCarrinho(container) {
+  container?.querySelectorAll("[data-cart-action]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const index = Number(button.getAttribute("data-cart-index"));
+      const action = button.getAttribute("data-cart-action");
+      if (action === "remove") removerItemCarrinho(index);
+      else atualizarQuantidadeCarrinho(index, action === "increase" ? 1 : -1);
+    });
+  });
+}
+
 function renderCarrinho() {
   const itens = getCarrinho();
   const container = el("lista-carrinho");
@@ -415,21 +469,28 @@ function renderCarrinho() {
   let subtotal = 0;
   container.innerHTML = "";
 
-  itens.forEach((item) => {
+  itens.forEach((item, index) => {
     const subtotalItem = precoNumero(item.preco) * Number(item.quantidade || 1);
     subtotal += subtotalItem;
 
     const div = document.createElement("div");
     div.className = "cart-item";
+    const quantidade = Math.max(1, Number(item.quantidade || 1));
     div.innerHTML = `
-      <span>
-        <strong>${escapeHtml(item.nome)}</strong><br/>
-        <small>x${item.quantidade || 1}</small>
-      </span>
-      <strong>${formatarMoeda(subtotalItem)}</strong>
+      <div class="cart-item-info">
+        <strong>${escapeHtml(item.nome)}</strong>
+        <small>${formatarMoeda(precoNumero(item.preco))} por unidade</small>
+      </div>
+      <div class="cart-item-actions">
+        ${controlesQuantidadeHtml(index, quantidade)}
+        <strong>${formatarMoeda(subtotalItem)}</strong>
+        <button type="button" class="cart-remove-btn" data-cart-action="remove" data-cart-index="${index}">Remover</button>
+      </div>
     `;
     container.appendChild(div);
   });
+
+  ligarControlesCarrinho(container);
 
   atualizarResumo(subtotal);
 
@@ -593,14 +654,17 @@ function renderizarCarrinhoSidebar() {
   }
 
   let total = 0;
-  container.innerHTML = itens.map((item) => {
+  container.innerHTML = itens.map((item, index) => {
     const subtotal = precoNumero(item.preco) * Number(item.quantidade || 1);
     total += subtotal;
     return `
       <div class="cart-item">
         <div>
           <p class="cart-item-name">${escapeHtml(item.nome || "Produto")}</p>
-          <p class="cart-item-price">x${item.quantidade || 1}</p>
+          <div class="cart-sidebar-controls">
+            ${controlesQuantidadeHtml(index, Math.max(1, Number(item.quantidade || 1)))}
+            <button type="button" class="cart-remove-btn" data-cart-action="remove" data-cart-index="${index}">Remover</button>
+          </div>
         </div>
         <strong>${formatarMoeda(subtotal)}</strong>
       </div>
@@ -608,6 +672,7 @@ function renderizarCarrinhoSidebar() {
   }).join("");
 
   totalEl.textContent = formatarMoeda(total);
+  ligarControlesCarrinho(container);
 }
 
 function abrirCarrinhoSidebar() {

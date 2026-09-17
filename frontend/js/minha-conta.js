@@ -6,6 +6,7 @@ import {
   loginComGoogleRedirect,
   loginComAppleRedirect,
   loginComMicrosoftRedirect,
+  obterResultadoLoginRedirect,
   sairDoFirebase,
   onAuthStateChanged,
   salvarUsuarioNoStorage,
@@ -537,6 +538,10 @@ async function executarLogin(providerFn, nomeProvedor) {
   setLoginSocialStatus(`Abrindo login com ${nomeProvedor}...`);
   try {
     const result = await providerFn();
+    if (!result?.user) {
+      setLoginSocialStatus("Redirecionando para concluir o login...");
+      return;
+    }
     const user = result.user;
     currentUid = user.uid;
     salvarUsuarioNoStorage(user);
@@ -571,6 +576,25 @@ async function executarLogin(providerFn, nomeProvedor) {
   }
 }
 
+async function processarRetornoLogin() {
+  try {
+    const result = await obterResultadoLoginRedirect();
+    if (!result?.user) return;
+    currentUid = result.user.uid;
+    salvarUsuarioNoStorage(result.user);
+    setLoginSocialStatus(`Bem-vindo, ${result.user.displayName || result.user.email}!`);
+    const sec = el("login-social-section");
+    if (sec) sec.style.display = "none";
+    const btnSair = el("btn-sair-conta");
+    if (btnSair) btnSair.style.display = "";
+    carregarPerfil();
+  } catch (err) {
+    const msg = traduzirErroFirebase(err.code);
+    setLoginSocialStatus(msg, false);
+    showToast(msg, "error");
+  }
+}
+
 function traduzirErroFirebase(code) {
   const erros = {
     "auth/popup-closed-by-user": "A janela de login foi fechada. O acompanhamento do pedido continua disponível abaixo.",
@@ -581,6 +605,9 @@ function traduzirErroFirebase(code) {
     "auth/network-request-failed": "Sem conexão. Verifique sua internet e tente novamente.",
     "auth/unauthorized-domain":
       "Domínio não autorizado no Firebase. Contate o suporte.",
+    "auth/operation-not-supported-in-this-environment":
+      "Este navegador não permite login por redirecionamento. Tente outro navegador.",
+    "auth/invalid-credential": "A credencial retornada pelo provedor expirou. Tente novamente.",
   };
   return erros[code] || `Erro ao fazer login (${code || "desconhecido"}).`;
 }
@@ -617,6 +644,7 @@ onAuthStateChanged(auth, (user) => {
 
 renderAvatarOptions();
 listarPedidosSalvosLocalmente();
+void processarRetornoLogin();
 
 /* ========== Saved Address ========== */
 function enderecoKey() {

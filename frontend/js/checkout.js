@@ -1388,6 +1388,10 @@ function configurarHeaderCheckout() {
       const { loginComGoogle, loginComApple, loginComMicrosoft, salvarUsuarioNoStorage } = await import("./firebase-auth.js");
       const fn = provider === "google" ? loginComGoogle : provider === "apple" ? loginComApple : loginComMicrosoft;
       const result = await fn();
+      if (!result?.user) {
+        if (status) status.textContent = "Redirecionando para concluir o login...";
+        return;
+      }
       salvarUsuarioNoStorage(result.user);
       dropdown.classList.remove("ativo");
       btnAvatar.setAttribute("aria-expanded", "false");

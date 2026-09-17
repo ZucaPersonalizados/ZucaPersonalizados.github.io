@@ -7,8 +7,8 @@
 import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import {
   getAuth,
-  signInWithPopup,
   signInWithRedirect,
+  getRedirectResult,
   signOut,
   onAuthStateChanged,
   GoogleAuthProvider,
@@ -63,6 +63,10 @@ export async function loginComAppleRedirect() {
 
 export async function loginComMicrosoftRedirect() {
   return signInWithRedirect(auth, microsoftProvider);
+}
+
+export async function obterResultadoLoginRedirect() {
+  return getRedirectResult(auth);
 }
 
 // ── Logout ──

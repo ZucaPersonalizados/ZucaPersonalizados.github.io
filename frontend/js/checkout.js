@@ -3,9 +3,14 @@ import {
   sairDoFirebase,
   onAuthStateChanged,
   salvarUsuarioNoStorage,
+  obterResultadoLoginRedirect,
 } from "./firebase-auth.js";
 
 const el = (id) => document.getElementById(id);
+
+void obterResultadoLoginRedirect().catch((error) => {
+  console.error("[AUTH] Falha ao concluir login por redirecionamento:", error.code || error.message);
+});
 
 const API_BASE = (() => {
   const custom = localStorage.getItem("zuca_api_base_url");
@@ -1400,8 +1405,8 @@ function configurarHeaderCheckout() {
       showToast(`Bem-vindo, ${result.user.displayName || result.user.email}!`, "success");
     } catch (err) {
       const msgs = {
-        "auth/popup-closed-by-user": "Login cancelado.",
-        "auth/popup-blocked": "Popup bloqueado. Permita popups para este site.",
+        "auth/popup-closed-by-user": "O login foi interrompido. Tente novamente.",
+        "auth/popup-blocked": "O login foi interrompido pelo navegador. Tente novamente.",
         "auth/network-request-failed": "Sem conexão. Verifique sua internet.",
       };
       const msg = msgs[err.code] || "Erro ao entrar. Tente novamente.";

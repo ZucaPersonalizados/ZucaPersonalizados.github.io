@@ -3,6 +3,7 @@ import {
   sairDoFirebase,
   onAuthStateChanged,
   salvarUsuarioNoStorage,
+  obterResultadoLoginRedirect,
 } from "./firebase-auth.js";
 
 const API_BASE = (() => {
@@ -13,6 +14,10 @@ const API_BASE = (() => {
 
 const ORIGIN_BASE = window.location.origin.replace(/\/$/, "");
 const API_BASES = [...new Set([API_BASE, ORIGIN_BASE].filter(Boolean))];
+
+void obterResultadoLoginRedirect().catch((error) => {
+  console.error("[AUTH] Falha ao concluir login por redirecionamento:", error.code || error.message);
+});
 
 function getApiUrl(path, base = API_BASE) {
   return `${base}${path}`;
@@ -869,8 +874,8 @@ function configurarHeaderUX() {
       showToast(`Bem-vindo, ${result.user.displayName || result.user.email}!`, "success");
     } catch (err) {
       const msgs = {
-        "auth/popup-closed-by-user": "Login cancelado.",
-        "auth/popup-blocked": "Popup bloqueado. Permita popups para este site.",
+        "auth/popup-closed-by-user": "O login foi interrompido. Tente novamente.",
+        "auth/popup-blocked": "O login foi interrompido pelo navegador. Tente novamente.",
         "auth/account-exists-with-different-credential": "E-mail já vinculado a outro provedor.",
         "auth/network-request-failed": "Sem conexão. Verifique sua internet.",
         "auth/unauthorized-domain": "Domínio não autorizado. Contate o suporte.",

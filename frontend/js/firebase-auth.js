@@ -53,18 +53,6 @@ export async function loginComMicrosoft() {
   return signInWithRedirect(auth, microsoftProvider);
 }
 
-export async function loginComGoogleRedirect() {
-  return signInWithRedirect(auth, googleProvider);
-}
-
-export async function loginComAppleRedirect() {
-  return signInWithRedirect(auth, appleProvider);
-}
-
-export async function loginComMicrosoftRedirect() {
-  return signInWithRedirect(auth, microsoftProvider);
-}
-
 export async function obterResultadoLoginRedirect() {
   return getRedirectResult(auth);
 }

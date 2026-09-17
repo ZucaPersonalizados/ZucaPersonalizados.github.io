@@ -3,9 +3,6 @@ import {
   loginComGoogle,
   loginComApple,
   loginComMicrosoft,
-  loginComGoogleRedirect,
-  loginComAppleRedirect,
-  loginComMicrosoftRedirect,
   obterResultadoLoginRedirect,
   sairDoFirebase,
   onAuthStateChanged,
@@ -554,20 +551,6 @@ async function executarLogin(providerFn, nomeProvedor) {
     if (btnSair) btnSair.style.display = "";
     carregarPerfil();
   } catch (err) {
-    if (["auth/popup-blocked", "auth/cancelled-popup-request"].includes(err.code)) {
-      const redirectFns = {
-        Google: loginComGoogleRedirect,
-        Apple: loginComAppleRedirect,
-        Microsoft: loginComMicrosoftRedirect,
-      };
-      try {
-        setLoginSocialStatus("Abrindo login nesta página...");
-        await redirectFns[nomeProvedor]();
-        return;
-      } catch (redirectError) {
-        err = redirectError;
-      }
-    }
     const msg = traduzirErroFirebase(err.code);
     setLoginSocialStatus(msg, false);
     showToast(msg, "error");
@@ -597,9 +580,9 @@ async function processarRetornoLogin() {
 
 function traduzirErroFirebase(code) {
   const erros = {
-    "auth/popup-closed-by-user": "A janela de login foi fechada. O acompanhamento do pedido continua disponível abaixo.",
-    "auth/popup-blocked": "O navegador bloqueou a janela. Permita popups ou use o acompanhamento do pedido abaixo.",
-    "auth/cancelled-popup-request": "Outra janela de login já estava aberta. Feche-a e tente novamente.",
+    "auth/popup-closed-by-user": "O login foi interrompido pelo provedor. Tente novamente.",
+    "auth/popup-blocked": "O login foi interrompido pelo navegador. Tente novamente.",
+    "auth/cancelled-popup-request": "O login foi interrompido. Tente novamente.",
     "auth/account-exists-with-different-credential":
       "Este e-mail já está vinculado a outro provedor. Tente outro método de login.",
     "auth/network-request-failed": "Sem conexão. Verifique sua internet e tente novamente.",

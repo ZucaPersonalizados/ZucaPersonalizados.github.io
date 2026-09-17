@@ -1,6 +1,6 @@
 /**
  * firebase-auth.js — Firebase Authentication
- * Google, Apple (iCloud) e Microsoft (Outlook) via popup OAuth.
+ * Google, Apple (iCloud) e Microsoft (Outlook) via redirect OAuth.
  * Exporta helpers usados em todas as páginas.
  */
 
@@ -42,15 +42,15 @@ microsoftProvider.setCustomParameters({ prompt: "select_account" });
 
 // ── Login ──
 export async function loginComGoogle() {
-  return signInWithPopup(auth, googleProvider);
+  return signInWithRedirect(auth, googleProvider);
 }
 
 export async function loginComApple() {
-  return signInWithPopup(auth, appleProvider);
+  return signInWithRedirect(auth, appleProvider);
 }
 
 export async function loginComMicrosoft() {
-  return signInWithPopup(auth, microsoftProvider);
+  return signInWithRedirect(auth, microsoftProvider);
 }
 
 export async function loginComGoogleRedirect() {

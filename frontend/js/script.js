@@ -15,8 +15,15 @@ const API_BASE = (() => {
 const ORIGIN_BASE = window.location.origin.replace(/\/$/, "");
 const API_BASES = [...new Set([API_BASE, ORIGIN_BASE].filter(Boolean))];
 
-void obterResultadoLoginRedirect().catch((error) => {
+void obterResultadoLoginRedirect().then((result) => {
+  if (!result?.user) return;
+  salvarUsuarioNoStorage(result.user);
+  atualizarMenuUsuario();
+  showToast(`Bem-vindo, ${result.user.displayName || result.user.email}!`, "success");
+}).catch((error) => {
   console.error("[AUTH] Falha ao concluir login por redirecionamento:", error.code || error.message);
+  const status = document.querySelector(".add-login-status");
+  if (status) status.textContent = `Não foi possível concluir o login (${error.code || "erro"}).`;
 });
 
 function getApiUrl(path, base = API_BASE) {
